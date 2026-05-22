@@ -1,3 +1,29 @@
+# --- AI-Optimized-Resume-V2（PRD §6.1、附录 C）---
+# 用户职业档案与任务状态（样例见 data/profile.example.json）
+data/profile.json
+data/tasks/
+
+# 简历 HTML 产出；保留脱敏样例目录 output/example/
+output/**
+!output/example/
+!output/example/**
+
+# --- IDE / 编辑器 ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# --- 操作系统 ---
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# --- Python（Harness / 后端实现）---
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -181,25 +207,12 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-# PyCharm
-#   JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#   be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#   and can be added to the global gitignore or merged into this file.  For a more nuclear
-#   option (not recommended) you can uncomment the following to ignore the entire idea folder.
-# .idea/
-
 # Abstra
 #   Abstra is an AI-powered process automation framework.
 #   Ignore directories containing user credentials, local state, and settings.
 #   Learn more at https://abstra.io/docs
 .abstra/
 
-# Visual Studio Code
-#   Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore 
-#   that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
-#   and can be added to the global gitignore or merged into this file. However, if you prefer, 
-#   you could uncomment the following to ignore the entire vscode folder
-# .vscode/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
