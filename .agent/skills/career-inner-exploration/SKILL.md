@@ -12,29 +12,29 @@ description: >-
   and resume.experience_bank.
 ---
 
-# 职业内核探索（Career Inner Exploration）
+# 职业内核探索
 
 将 Superpowers [brainstorming](https://github.com/shareAI-lab/learn-claude-code/tree/main/skills/brainstorming) 的 **「先澄清、逐步深入、分段确认、再落档」** 范式，用于用户的 **职业初探** 阶段——陪用户触及 **内心五主题**，并通过对基线简历的 **深度追问** 扩充可落档的经历素材（`resume.experience_bank`），供后续 JD 匹配与简历优化使用。
 
 ## 与 brainstorming 的差异
 
-| brainstorming（Superpowers） | 本 Skill |
+| 头脑风暴（Superpowers） | 本技能包 |
 |------------------------------|----------|
 | 产出技术/产品设计 spec | 产出 `profile.json` → `exploration.*` + `resume.experience_bank` |
-| 下一步 `writing-plans` | 下一步：用户确认初探 → `complete_task` milestone → 解锁 JD 流程 |
+| 下一步 `writing-plans` | 下一步：用户确认初探 → `complete_task` 里程碑 → 解锁岗位描述流程 |
 | 禁止写代码 | 禁止 JD 评估、简历 HTML、建 `jd_*` 任务 list；**禁止** 在本阶段改写 `resume.source_text` 正文 |
 
 ## HARD-GATE
 
-**不得** 在用户未确认「进入深度探讨」或未提交表单前调用本 skill（该阶段由主 Agent 普通对话 + §5.1.0 邀请完成）。
+**不得** 在用户未确认「进入深度探讨」或未提交表单前调用本技能包（该阶段由入口编排智能体普通对话 + §5.1.0 邀请完成）。
 
 在以下条件 **全部满足前**，不得：
 
-- 粘贴/分析 JD、调用 JD 专家
-- 优化简历、生成简历 HTML、建 `jd_*` task list
+- 粘贴/分析岗位描述、调用市场/岗位智能体
+- 优化简历、生成简历网页、建 `jd_*` 任务列表
 - 用泛泛的职场鸡汤替代 **逐字段** 探索
 
-允许：在用户已提交表单后阅读 `profile.json`、更新 `preference_tags.custom[]`（须用户确认）、创建/推进 `explore_*` 下的 milestone 与对话。
+允许：在用户已提交表单后阅读 `profile.json`、更新 `preference_tags.custom[]`（须用户确认）、创建/推进 `explore_*` 下的里程碑与对话。
 
 初探 **落档完成** 的唯一出口：用户发送附录 B 话术（如 `确认完成初探`）且各探索字段已写入后，调用 `complete_task` 并设置 `exploration.completed_at`。
 
@@ -42,7 +42,7 @@ description: >-
 
 ## 模式选择：首次初探 vs 初探复盘
 
-主 Agent（Harness）须在加载本 skill 时标明模式（或根据 `profile.json` 自行判断）：
+入口编排智能体（运行框架）须在加载本技能包时标明模式（或根据 `profile.json` 自行判断）：
 
 | 模式 | 条件 | 走哪条清单 |
 |------|------|------------|
@@ -159,4 +159,4 @@ flowchart TD
 ## 延伸阅读
 
 - 各主题与简历问题库：[phases.md](phases.md)
-- 产品规格：项目 `docs/prd/career-planning-agent-prd.md` §5.2（初探）、§5.8（Task）、§4.1（Agent）
+- 产品规格：项目 `docs/prd/career-planning-agent-prd.md` §5.2（初探）、§5.8（任务系统）、§4.1（智能体架构）
