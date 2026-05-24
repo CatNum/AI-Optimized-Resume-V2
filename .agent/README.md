@@ -11,7 +11,7 @@ load_skill(name)
   → 注入身份/能力/策略/简历等子智能体系统提示
 ```
 
-入口编排智能体根据阶段 **显式** 调用，参见 PRD §5.2.5。
+入口编排智能体根据阶段 **显式** 调用，参见 [A03 机制 · 技能包 PRD](../docs/prd/A03.%20机制-技能包%20PRD.md)。
 
 ## 技能包一览
 
@@ -38,4 +38,4 @@ load_skill(name)
 - `jd_*` 里程碑「岗位对齐」⇄ `career-jd-alignment`
 - `jd_*` 的 `work` 工作子任务 ⇄ `resume-module-optimize`
 
-产品规格：[docs/prd/career-planning-agent-prd.md](../docs/prd/career-planning-agent-prd.md)（智能体架构见 §4.1；功能规格见第 5 章）
+产品规格：[docs/prd/00. 职业规划 Agent PRD.md](../docs/prd/00.%20职业规划%20Agent%20PRD.md)（总领 §4.1 智能体架构）；[§5 功能规格索引](../docs/prd/00.%20职业规划%20Agent%20PRD.md#5-功能规格索引) 链至 A/B 子 PRD

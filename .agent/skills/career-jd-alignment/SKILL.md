@@ -79,5 +79,5 @@ flowchart TD
 
 ## 延伸阅读
 
-- 产品规格：`docs/prd/career-planning-agent-prd.md` §5.4（JD 对齐）、§5.3（JD 分析）
+- 产品规格：`docs/prd/B04. 流程-职业战略与投递策略 PRD.md`（JD 对齐）、`docs/prd/B03. 流程-市场岗位分析 PRD.md`（JD 分析）
 - 初探结论来源：`career-inner-exploration` skill
