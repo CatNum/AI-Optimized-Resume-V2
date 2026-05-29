@@ -2,11 +2,11 @@
 name: career-jd-alignment
 description: >-
   Facilitates JD-specific career alignment dialogue after JD paste and match
-  assessment. Use when jd_* task list is active, JD expert has reported
+  assessment. Use when list_type=jd task list is active, JD expert has reported
   recommendation (or user confirmed continue despite not recommended), and before
   user confirms resume optimization. Loads exploration.* from profile.json.
   One question per turn; updates career.* fields. MUST NOT optimize resume or
-  generate HTML. Invoked by planner sub-agent via Harness load_skill, not IDE.
+  generate HTML. Invoked by planner sub-agent via Harness load_skill.
 ---
 
 # 岗位对齐探讨

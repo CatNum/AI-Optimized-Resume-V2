@@ -1,6 +1,8 @@
 # 智能体技能包（本项目）
 
-本目录存放 **职业规划智能体** 专用技能包。由 **自建运行框架** 通过 `load_skill(name)` 读取并注入子智能体上下文，**不** 依赖 Cursor IDE 的技能发现。
+本目录存放 **职业规划智能体** 专用技能包。由 **自建运行框架** 通过 `load_skill(name)` 读取并注入子智能体上下文。
+
+**方法论参考**：[Superpowers](https://github.com/obra/superpowers)（初探技能包范式取自 [brainstorming](https://github.com/obra/superpowers/tree/main/skills/brainstorming)）。
 
 ## 加载方式（运行框架）
 
@@ -18,8 +20,8 @@ load_skill(name)
 | 标识名 | 路径 | 执行者 | 阶段 |
 |------|------|--------|------|
 | `career-inner-exploration` | [skills/career-inner-exploration/](skills/career-inner-exploration/) | 身份智能体 + 能力智能体 | 用户确认进入并提交表单后初探 / **初探复盘** |
-| `career-jd-alignment` | [skills/career-jd-alignment/](skills/career-jd-alignment/) | 策略智能体 | 岗位评估后、确认优化简历前（`jd_*`） |
-| `resume-module-optimize` | [skills/resume-module-optimize/](skills/resume-module-optimize/) | 简历智能体 | 用户确认按岗位描述优化后（`jd_*` 的 `work`） |
+| `career-jd-alignment` | [skills/career-jd-alignment/](skills/career-jd-alignment/) | 策略智能体 | 岗位评估后、确认优化简历前（`list_type=jd`） |
+| `resume-module-optimize` | [skills/resume-module-optimize/](skills/resume-module-optimize/) | 简历智能体 | 用户确认按岗位描述优化后（`list_type=jd` 的 `work`） |
 
 ## 触发矩阵
 
@@ -34,8 +36,8 @@ load_skill(name)
 
 ## 与任务系统
 
-- `explore_*` 里程碑「职业初探」⇄ `career-inner-exploration`
-- `jd_*` 里程碑「岗位对齐」⇄ `career-jd-alignment`
-- `jd_*` 的 `work` 工作子任务 ⇄ `resume-module-optimize`
+- `list_type=explore` 里程碑「职业初探」⇄ `career-inner-exploration`
+- `list_type=jd` 里程碑「岗位对齐」⇄ `career-jd-alignment`
+- `list_type=jd` 的 `work` 工作子任务 ⇄ `resume-module-optimize`
 
 产品规格：[docs/prd/00. 职业规划 Agent PRD.md](../docs/prd/00.%20职业规划%20Agent%20PRD.md)（总领 §4.1 智能体架构）；[§5 功能规格索引](../docs/prd/00.%20职业规划%20Agent%20PRD.md#5-功能规格索引) 链至 A/B 子 PRD

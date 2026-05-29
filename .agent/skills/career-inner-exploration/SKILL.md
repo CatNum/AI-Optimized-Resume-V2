@@ -3,10 +3,10 @@ name: career-inner-exploration
 description: >-
   Facilitates deep, step-by-step career inner exploration after the user has
   confirmed entering deep exploration (PRD 5.1.0) and submitted the structured
-  profile form. Use when the explore_* task list is active, the
+  profile form. Use when a task list with list_type explore or plan is active, the
   milestone is career initial exploration (职业初探), the user asks for planning or
   self-discovery before JD/resume work, exploration review (初探复盘), or the
-  planner sub-agent is invoked for explore_* / plan_* lists. MUST NOT use during
+  planner sub-agent is invoked for list_type explore or plan. MUST NOT use during
   JD matching, resume optimization, or simple factual Q&A.
   One question per turn; writes conclusions to profile.json exploration fields
   and resume.experience_bank.
@@ -14,7 +14,7 @@ description: >-
 
 # 职业内核探索
 
-将 Superpowers [brainstorming](https://github.com/shareAI-lab/learn-claude-code/tree/main/skills/brainstorming) 的 **「先澄清、逐步深入、分段确认、再落档」** 范式，用于用户的 **职业初探** 阶段——陪用户触及 **内心五主题**，并通过对基线简历的 **深度追问** 扩充可落档的经历素材（`resume.experience_bank`），供后续 JD 匹配与简历优化使用。
+将 [Superpowers](https://github.com/obra/superpowers) 技能库中的 [brainstorming](https://github.com/obra/superpowers/tree/main/skills/brainstorming) **「先澄清、逐步深入、分段确认、再落档」** 范式，用于用户的 **职业初探** 阶段——陪用户触及 **内心五主题**，并通过对基线简历的 **深度追问** 扩充可落档的经历素材（`resume.experience_bank`），供后续 JD 匹配与简历优化使用。
 
 ## 与 brainstorming 的差异
 
@@ -22,7 +22,7 @@ description: >-
 |------------------------------|----------|
 | 产出技术/产品设计 spec | 产出 `profile.json` → `exploration.*` + `resume.experience_bank` |
 | 下一步 `writing-plans` | 下一步：用户确认初探 → `complete_task` 里程碑 → 解锁岗位描述流程 |
-| 禁止写代码 | 禁止 JD 评估、简历 HTML、建 `jd_*` 任务 list；**禁止** 在本阶段改写 `resume.source_text` 正文 |
+| 禁止写代码 | 禁止 JD 评估、简历 HTML、建 `list_type=jd` 的任务 list；**禁止** 在本阶段改写 `resume.source_path` 指向的基线 Markdown |
 
 ## HARD-GATE
 
@@ -31,10 +31,10 @@ description: >-
 在以下条件 **全部满足前**，不得：
 
 - 粘贴/分析岗位描述、调用市场/岗位智能体
-- 优化简历、生成简历网页、建 `jd_*` 任务列表
+- 优化简历、生成简历网页、建 `list_type=jd` 的任务 list
 - 用泛泛的职场鸡汤替代 **逐字段** 探索
 
-允许：在用户已提交表单后阅读 `profile.json`、更新 `preference_tags.custom[]`（须用户确认）、创建/推进 `explore_*` 下的里程碑与对话。
+允许：在用户已提交表单后阅读 `profile.json`、在当前 `list_type=explore`（或 `plan`）的 list 下创建/推进里程碑与对话。`preference_tags.custom[]` 由 HTML 交付命名后系统沉淀，初探阶段不维护（见 [A01 §5.1.5](../../docs/prd/A01.%20机制-职业档案%20PRD.md)）。
 
 初探 **落档完成** 的唯一出口：用户发送附录 B 话术（如 `确认完成初探`）且各探索字段已写入后，调用 `complete_task` 并设置 `exploration.completed_at`。
 
@@ -55,22 +55,22 @@ description: >-
 
 ## 执行清单 A：首次初探（完整清单）
 
-为当前 `explore_*` list 创建或勾选对应 **work** 子任务（若 Task 系统已启用）；对话本身仍遵循下列顺序：
+为当前 `list_type=explore`（或 `plan`）的 list 创建或勾选对应 **work** 子任务（若 Task 系统已启用）；对话本身仍遵循下列顺序：
 
-1. **读取上下文** — 读取 `data/profile.json`（表单字段、`resume.source_text`、`resume.experience_bank`（若有）、`preference_tags`）；若有简历，用 2–3 句指出「简历写了什么 / 可能还缺什么素材」；**不要** 连珠炮提问。
+1. **读取上下文** — 读取 `data/profile.json`（表单字段、`resume.source_path` → 基线 Markdown、`resume.experience_bank`（若有）、`preference_tags`）；若有简历，用 2–3 句指出「简历写了什么 / 可能还缺什么素材」；**不要** 连珠炮提问。
 2. **建立探索框架** — 说明本轮 **两条线**：内心五主题（慢聊）+ 对照简历把 **没写全的经历** 挖出来；本轮 **不写投递简历、不对 JD**。
 3. **主题 1：内心真实需求**（`exploration.inner_needs`）— 见 [phases.md](phases.md)；**每次只问一个问题**。
 4. **主题 2：渴望**（`exploration.desires`）— 主题 1 结束后 **穿插 1 轮** 简历对照问（见 phases「交织对照」）。
 5. **主题 3：职业需要**（`exploration.career_needs`）
 6. **主题 4：当下最重要**（`exploration.priorities_now`）— 主题 3 结束后 **穿插 1 轮** 简历对照问。
 7. **主题 5：当前问题**（`exploration.current_problems`）
-8. **简历深度追问（集中段）** — 对照 `source_text`，至少 **3–5 轮**（一次一问）；发掘未写项目、个人贡献、量化、隐性能力；逐条确认后写入 `experience_bank.items[]`；见 phases「简历深度追问」。
+8. **简历深度追问（集中段）** — 对照基线 Markdown，至少 **3–5 轮**（一次一问）；发掘未写项目、个人贡献、量化、隐性能力；逐条确认后写入 `experience_bank.items[]`；见 phases「简历深度追问」。
 9. **交叉与深挖** — 内心五主题与简历素材是否矛盾；**一个** 追问澄清；镜像倾听。
 10. **路径草案（可选）** — 2–3 种职业方向/节奏 trade-off；写入 `career.next_hop` / `career.horizon_3_5y` **草案** 前须分段确认。
 11. **初探摘要 + 经历素材摘要** — `exploration.summary`（200–400 字）与 `resume.experience_bank.narrative_summary`（200–500 字）**分段呈现**，分别确认。
 12. **落档** — 写入 `exploration.*`、`resume.experience_bank`、更新 `career.*` 草案；`exploration.completed_at`；`complete_task` 初探 milestone；提示可粘贴 JD。
 
-**交织原则**：步骤 4、6 的简历对照问用于 **轻触达**；步骤 8 为 **集中深挖**，不可省略（有 `source_text` 时）。
+**交织原则**：步骤 4、6 的简历对照问用于 **轻触达**；步骤 8 为 **集中深挖**，不可省略（有 `resume.source_path` 时）。
 
 ---
 
