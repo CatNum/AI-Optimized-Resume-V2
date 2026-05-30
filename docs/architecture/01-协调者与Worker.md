@@ -4,7 +4,7 @@
 |------|------|
 | 文档版本 | v0.3 |
 | 父文档 | [00-架构总览.md](./00-架构总览.md) |
-| 最后更新 | 2026-05-29 |
+| 最后更新 | 2026-05-30 |
 
 ## 1. 架构原则
 
@@ -45,7 +45,7 @@ flowchart TB
 | `opportunity` | 岗位/机会智能体 | `opportunity_snapshots`、推荐/不推荐 |
 | `strategy` | 策略智能体 | `strategy.*`、`career.*`、三时间维度 |
 | `resume` | 简历智能体 | 简历正文表达、`resume-module-optimize` |
-| `asset` | 资产智能体 | 复用建议、命名、HTML、`outputs_index` |
+| `asset` | 资产智能体 | 复用建议、`outputs_index` / `index` 登记、文件管理 |
 
 > PRD 中的「策略读取岗位在途结论」：由 **协调者** 在派 `strategy` 时，将 `opportunity` Worker 返回的 `structured_output` 放入 `DelegateRequest.context`，而非 `opportunity` 直连 `strategy`。
 
@@ -80,7 +80,15 @@ stateDiagram-v2
 
 协调者 **没有** `load_skill`；该能力仅在 Worker 的 `worker_meta_tools` 中（见 [02-平台服务 §2](./02-平台服务.md#2-skill-管理注册表--worker-自选)）。
 
-协调者 **不应** 拥有 `write_resume_html`；该工具仅开放给 `resume` / `asset` Worker（且受闸门约束）。
+协调者 **不应** 拥有 `write_resume_html` / `register_outputs_index`。`write_resume_html` **仅** `resume`；`register_outputs_index` **仅** `asset`（消费 resume 的 `html_deliveries`，见 [§4.3](#43-html-交付协作resume-写盘--asset-登记)）。
+
+### 3.2 Worker 侧能力工具（经 Harness）
+
+| 工具 | 用途 |
+|------|------|
+| `load_skill(name, mode?)` | Worker 选中后加载正文并注入 **本 Run** 上下文；可重复调用 |
+| `list_skills()` | 可选；索引已在 `capability_bundle` 时可不调 |
+| 各业务 tool | 见 [02-平台服务 §3](./02-平台服务.md#3-tool-管理) |
 
 ## 4. 派工协议 `DelegateRequest` / `WorkerResult`
 
@@ -92,9 +100,7 @@ stateDiagram-v2
   "worker_id": "opportunity",
   "goal": "解析用户粘贴的 JD，输出推荐结论与结构化匹配要点",
   "capability_bundle": {
-    "skill_index": [
-      { "name": "career-jd-alignment", "description": "...", "when_to_use": "..." }
-    ],
+    "skill_index": [],
     "tool_index": [
       { "name": "profile_patch", "description": "..." },
       { "name": "browser_fetch", "description": "..." }
@@ -146,6 +152,31 @@ stateDiagram-v2
 - 落档：Harness 校验 `proposed_profile_patches` 白名单后写入；或由 Worker 通过 `profile_patch` 工具提交。
 - **对用户可见文案**：**仅** 协调者 `synthesize` 流式输出；Worker **不** 向 SSE 推送 `token`。协调者根据 `structured_output` / `internal_notes` 汇总后回复用户。
 
+### 4.3 HTML 交付协作（resume 写盘 → asset 登记）
+
+| 步骤 | 角色 | 动作 |
+|------|------|------|
+| 1 | `resume` | `write_resume_html` 写 `output/`（每档一份；schema 见 [05 §8](./05-API与流式协议.md#8-harness-toolwrite_resume_htmlresume)） |
+| 2 | `resume` | `structured_output.html_deliveries[]` 回传协调者 |
+| 3 | 协调者 | 写入 `session_state.prior_results.resume`，并 `delegate_worker(asset, …)` 注入 `context` |
+| 4 | `asset` | `register_outputs_index`：校验路径只读存在 → 更新 `outputs_index` / `index.html`（参数 schema 见 [05 §7](./05-API与流式协议.md#7-harness-toolregister_outputs_indexasset)） |
+
+**`html_deliveries[]` 单条示例**（resume `structured_output`）：
+
+```json
+{
+  "path": "output/2026-05-30/2026-05-30-后端-云原生-标准.html",
+  "filename": "2026-05-30-后端-云原生-标准.html",
+  "optimization_level": "标准",
+  "filename_tags": ["后端", "云原生"],
+  "session_date": "2026-05-30"
+}
+```
+
+- **禁止**：`asset` 调用 `write_resume_html` 或改写已落盘 HTML 正文。
+- **禁止**：`asset` 在未收到 `html_deliveries`（或等价 `context`）时凭空编造 `outputs_index` 路径。
+- 协调者可在同轮用户消息内先 `delegate(resume)` 再 `delegate(asset)`；多档时 `html_deliveries` 为数组，asset **一次** 登记即可。
+
 ## 5. 典型派工链（JD 主路径）
 
 PRD 阶段顺序不变；**调用拓扑**为星型：
@@ -169,23 +200,47 @@ sequenceDiagram
   A-->>C: 复用方案
   C->>Cap: delegate(可选深挖)
   Cap-->>C: bank 更新提议
-  C->>R: delegate(按档优化)
-  R-->>C: 简历 Markdown/HTML 片段
-  C->>A: delegate(落盘命名索引)
-  A-->>C: paths + outputs_index
+  C->>R: delegate(按档优化 + write_resume_html)
+  R-->>C: html_deliveries[] + 正文摘要
+  C->>A: delegate(context 含 html_deliveries)
+  A->>A: register_outputs_index（只读校验 + 写索引）
+  A-->>C: outputs_index 更新结果
   C->>C: 合成面向用户的总结
 ```
 
+## 5.1 典型派工链（`list_type=plan` 纯规划）
+
+无具体 JD、**不生成 HTML**；协调者星型派工，Preset 见 [02 §4.4 Preset `plan`](./02-平台服务.md#44-典型任务流程预设preset)。
+
+```mermaid
+sequenceDiagram
+  participant C as 协调者
+  participant I as identity
+  participant Cap as capability
+  participant S as strategy
+
+  C->>I: delegate(可选：身份/偏好片段)
+  I-->>C: structured_output
+  C->>Cap: delegate(可选：能力资产片段)
+  Cap-->>C: structured_output
+  C->>S: delegate(多路径推演, 无 opportunity 注入)
+  S-->>C: path_options + gate_prompt(若需)
+  C->>C: synthesize → 用户（仅 JSON 落档，无 resume/asset HTML）
+```
+
+- `strategy` 可读 `profile.json` 全档；**不要求** `opportunity_snapshots`。
+- 用户确认的路径写入 `strategy.*`、`career.*` 后，可 `complete_task` 结束 `plan` list。
+
 ## 6. 闸门与对话确认
 
-所有 [PRD 附录 B](../prd/00.%20职业规划%20Agent%20PRD.md#附录-b确认话术建议) 闸门由 **协调者** 在合成回复中询问；Harness 提供 `match_gate_intent(user_text)` 辅助判定，**不**提供独立确认 API。
+[PRD 附录 B](../prd/00.%20职业规划%20Agent%20PRD.md#附录-b确认话术建议) 闸门：**领域 Worker** 在 `structured_output` 中产出确认问句（如 `gate_prompt`）；**协调者** `synthesize` 转述后经 SSE 对用户呈现。Harness 提供 `match_gate_intent(user_text)` 辅助判定，**不**提供独立确认 API。
 
-| 闸门 | 协调者行为 | Harness |
-|------|------------|---------|
-| 进入深度探讨 | 邀请 → 用户确认 → 通知前端弹表单 | 可选 `gate_deep_explore` 状态位 |
-| 初探完成 | 派 `identity`/`capability` 完成后询问 | `exploration.completed_at` 校验 |
-| 不推荐仍继续 | 展示 O 的结论后询问 | 写 `career.jd_override` |
-| 优化确认 | 派 `resume` 前必须 true | 拒绝未确认时 `delegate_worker(resume)` |
+| 闸门 | Worker 产出 | 协调者 / Harness |
+|------|-------------|------------------|
+| 进入深度探讨 | 协调者自拟邀请 | 可选 `gate_deep_explore` 状态位 |
+| 初探完成 | identity/capability 可选 `gate_prompt` | `exploration.completed_at` 校验 |
+| 不推荐仍继续 | opportunity 结论 + 问句 | 写 `career.jd_override` |
+| 优化确认 | strategy 的 `gate_prompt` | 派 `resume` 前须确认；拒绝未确认时 `delegate_worker(resume)` |
 
 ## 7. 与「错误模型」的对比
 
@@ -195,16 +250,6 @@ sequenceDiagram
 | 策略 Agent 直接读 opportunity 内存 | 协调者 delegate 时注入 `context` |
 | 子 Agent 互相 `invoke` | 禁止；仅 `delegate_worker` |
 | 协调者预指定 `skill_name` | 禁止；Worker Run 内自选 + `load_skill` |
-
-### 3.2 Worker 侧能力工具（经 Harness）
-
-| 工具 | 用途 |
-|------|------|
-| `load_skill(name, mode?)` | Worker 选中后加载正文并注入 **本 Run** 上下文；可重复调用 |
-| `list_skills()` | 可选；索引已在 `capability_bundle` 时可不调 |
-| 各业务 tool | 见 [02-平台服务 §3](./02-平台服务.md#3-tool-管理) |
-
----
 
 ## 8. 单轮用户消息内的协作（总览）
 

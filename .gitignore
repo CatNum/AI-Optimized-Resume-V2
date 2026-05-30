@@ -2,6 +2,9 @@
 # 用户职业档案与任务状态（样例见 data/profile.example.json）
 data/profile.json
 data/tasks/
+data/sessions/
+data/logs/
+data/resume/
 
 # 简历 HTML 产出；保留脱敏样例目录 output/example/
 output/**

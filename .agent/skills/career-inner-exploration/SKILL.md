@@ -6,7 +6,7 @@ description: >-
   profile form. Use when a task list with list_type explore or plan is active, the
   milestone is career initial exploration (职业初探), the user asks for planning or
   self-discovery before JD/resume work, exploration review (初探复盘), or the
-  planner sub-agent is invoked for list_type explore or plan. MUST NOT use during
+  identity or capability Worker is invoked for list_type explore or plan. MUST NOT use during
   JD matching, resume optimization, or simple factual Q&A.
   One question per turn; writes conclusions to profile.json exploration fields
   and resume.experience_bank.

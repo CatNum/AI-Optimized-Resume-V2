@@ -6,7 +6,7 @@ description: >-
   recommendation (or user confirmed continue despite not recommended), and before
   user confirms resume optimization. Loads exploration.* from profile.json.
   One question per turn; updates career.* fields. MUST NOT optimize resume or
-  generate HTML. Invoked by planner sub-agent via Harness load_skill.
+  generate HTML. Invoked by strategy Worker via Harness load_skill in Run.
 ---
 
 # 岗位对齐探讨

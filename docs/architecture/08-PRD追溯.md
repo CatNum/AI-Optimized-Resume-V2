@@ -3,7 +3,7 @@
 | 属性 | 内容 |
 |------|------|
 | 文档版本 | v0.2 |
-| 最后更新 | 2026-05-29 |
+| 最后更新 | 2026-05-30 |
 
 ## 机制类
 
@@ -53,6 +53,14 @@
 | 8 | 2026-05-29 | 前端 React + Vite → [06-前端架构.md](./06-前端架构.md) |
 | 9 | 2026-05-29 | 多篇 `docs/architecture/` |
 | 10 | — | 实施顺序后续讨论 |
+| 13 | 2026-05-30 | 任务启停：**纯对话**，无「开始执行」按钮 → A02/06 已同步 |
+| 14 | 2026-05-30 | 用户可见流式：**仅协调者 SSE** |
+| 15 | 2026-05-30 | 闸门：Worker `gate_prompt` + 协调者转述 |
+| 16 | 2026-05-30 | Session：仅 `state.json` 派工态，不存 messages |
+| 17 | 2026-05-30 | 废弃任务 `metadata.skill_name` |
+| 18 | 2026-05-30 | `write_resume_html` **仅 resume**；asset `register_outputs_index`（resume → `html_deliveries` → asset 登记，见 [01 §4.3](./01-协调者与Worker.md#43-html-交付协作resume-写盘--asset-登记)） |
+| 19 | 2026-05-30 | `list_type=plan` 派工链 → [01 §5.1](./01-协调者与Worker.md#51-典型派工链list_typeplan-纯规划) |
+| 20 | 2026-05-30 | 命名统一 **`career_os`**；Prompt → `platform/prompt/` |
 
 ---
 
