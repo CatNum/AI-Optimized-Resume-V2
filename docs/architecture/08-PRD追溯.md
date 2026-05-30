@@ -2,7 +2,7 @@
 
 | 属性 | 内容 |
 |------|------|
-| 文档版本 | v0.2 |
+| 文档版本 | v0.3 |
 | 最后更新 | 2026-05-30 |
 
 ## 机制类
@@ -52,15 +52,80 @@
 | 12 | 2026-05-29 | **仅协调者 SSE 流式对用户**；Worker 结果汇总后 synthesize → [07 §6](./07-Agent运行时.md#6-流式--sse仅协调者对用户输出) |
 | 8 | 2026-05-29 | 前端 React + Vite → [06-前端架构.md](./06-前端架构.md) |
 | 9 | 2026-05-29 | 多篇 `docs/architecture/` |
-| 10 | — | 实施顺序后续讨论 |
+| 10 | 2026-05-30 | **实施顺序** P0→P2 → 本文「实施顺序」节 |
 | 13 | 2026-05-30 | 任务启停：**纯对话**，无「开始执行」按钮 → A02/06 已同步 |
 | 14 | 2026-05-30 | 用户可见流式：**仅协调者 SSE** |
 | 15 | 2026-05-30 | 闸门：Worker `gate_prompt` + 协调者转述 |
-| 16 | 2026-05-30 | Session：仅 `state.json` 派工态，不存 messages |
+| 16 | 2026-05-30 | ~~Session 仅 state.json~~ → **#21/#28**：`messages.json` 会话级落盘，换会话清空 |
 | 17 | 2026-05-30 | 废弃任务 `metadata.skill_name` |
 | 18 | 2026-05-30 | `write_resume_html` **仅 resume**；asset `register_outputs_index`（resume → `html_deliveries` → asset 登记，见 [01 §4.3](./01-协调者与Worker.md#43-html-交付协作resume-写盘--asset-登记)） |
 | 19 | 2026-05-30 | `list_type=plan` 派工链 → [01 §5.1](./01-协调者与Worker.md#51-典型派工链list_typeplan-纯规划) |
 | 20 | 2026-05-30 | 命名统一 **`career_os`**；Prompt → `platform/prompt/` |
+| 21 | 2026-05-30 | **Session 工作区**：`messages.json` + 换会话清空 tasks（含 ready）→ [10 §1](./10-会话闸门与state.md#1-会话工作区生命周期) |
+| 22 | 2026-05-30 | **闸门 G1 + B1**：`state.json` 临时位；未初探 JD 软引导、无 HTTP 403 → [10 §2](./10-会话闸门与state.md#2-gates-闸门) |
+| 23 | 2026-05-30 | **structured_output S2** + 各 Worker 契约 → [09](./09-Worker结构化输出.md) |
+| 24 | 2026-05-30 | **Profile 落档 P3 + O-P1**：proposed vs patch；snapshot 即时 patch |
+| 25 | 2026-05-30 | **L7-C + T1**：搜索 API + httpx 抓页；Worker 自选 `browser_fetch` → [11](./11-L7-浏览器Tool.md) |
+| 26 | 2026-05-30 | **协调者 C3 + T6-1** → [01 §9](./01-协调者与Worker.md#9-协调者路由策略) |
+| 27 | 2026-05-30 | **初探 gate E1**：`context.gate_owner` 指定唯一 `gate_prompt` 产出者 |
+| 28 | 2026-05-30 | 修订 #16：Session **含** `messages.json`（会话级，不跨会话） |
+| 29 | 2026-05-30 | **Eval E-LLM**：L2/L3 真 LLM 优先；mock 仅无 Key 降级 → [12 §3.0](./12-评测与可观测.md#30-真-llm-优先e-llm) |
+
+> 原 #16「不存 messages」已由 #21/#28 替代：不 **长期/跨会话** 存对话，当前 session 可落盘 `messages.json`。
+
+## 实施顺序（v0.1）
+
+总原则：**先 Harness 确定性层 → 再 2 个 Worker 打通 delegate → 再 Skills/E2E → 最后 L7 与 Eval 满配**。详述与 trace/eval 见 [12-评测与可观测.md](./12-评测与可观测.md)。
+
+### P0 — 可 Demo 最小编排（无真实 LLM 亦可测）
+
+| 步骤 | 交付 | 验收 |
+|:----:|------|------|
+| P0-1 | `backend/` 骨架、`pyproject.toml`、FastAPI `/healthz` | `uv run uvicorn` 启动 |
+| P0-2 | `ProfileStore` / `SessionStore` / `TaskStore` | 读写 `profile.example.json`；`messages.json` + `state.json` |
+| P0-3 | `POST /v1/sessions/new` + session 换会话 **清 tasks** | [10 §1](./10-会话闸门与state.md#1-会话工作区生命周期) |
+| P0-4 | Tool 注册表 + `profile_get/patch`、`apply_proposed_patches` | L1 pytest ≥5（无 LLM） |
+| P0-5 | `delegate_worker` + **真 LLM** Worker（先 `opportunity`、`strategy`） | 返 S2 schema；无 SSE Worker token；**无 Key 时** 暂用 stub 仅测 Harness |
+| P0-6 | 协调者 LangGraph + **C3**（真 LLM 验证 gate 停链） | trajectory case ≥3（`-m llm`） |
+| P0-7 | `POST /v1/chat` SSE（仅协调者 token）+ `match_gate_intent` | 闸门 3 个：深度探讨、不推荐继续、优化确认 |
+| P0-8 | `TraceWriter` → `data/logs/traces/*.jsonl` | delegate / tool / gate 可 grep |
+
+### P1 — 产品主路径
+
+| 步骤 | 交付 | 验收 |
+|:----:|------|------|
+| P1-1 | Skill 扫描 + `load_skill` + `allowed_workers` | [07 §8 SPIKE](./07-Agent运行时.md#8-spike-验收) |
+| P1-2 | 7 Worker 图（可先 4 个：identity、capability、opportunity、strategy） | [09](./09-Worker结构化输出.md) 校验 |
+| P1-3 | Task `explore` / `jd` + `meta.session_id` + 对话 start/abandon | T6-1 |
+| P1-4 | `write_resume_html` + `register_outputs_index` + 三档 | HTML + index 可打开 |
+| P1-5 | E2E **真 LLM**：初探 → JD → 策略 → 三档 HTML | 1 条 golden path `-m llm` 全绿 |
+| P1-6 | `web/` Chat + SSE + R2 刷新 + 只读 TaskProgress | [06](./06-前端架构.md) |
+
+### P2 — 作品完整度
+
+| 步骤 | 交付 | 验收 |
+|:----:|------|------|
+| P2-1 | `browser_fetch`（L7-C） | 降级 case ≥3 |
+| P2-2 | Eval **≥20**（真 LLM 为主；`-m not llm` 仅降级） | [12 §3.2](./12-评测与可观测.md#32-20-条-case-分布简历对齐) |
+| P2-3 | 记录 LLM eval 通过率 + token 成本摘要 | 简历可引用实测数据 |
+| P2-4 | `python -m career_os.trace replay`（可选） | 单 run_id 时序摘要 |
+
+### 依赖关系（示意）
+
+```mermaid
+flowchart TB
+  P01[P0-1 骨架] --> P02[P0-2 Store]
+  P02 --> P03[P0-3 Session]
+  P02 --> P04[P0-4 Tools]
+  P04 --> P05[P0-5 delegate]
+  P05 --> P06[P0-6 协调者+C3]
+  P06 --> P07[P0-7 SSE+闸门]
+  P07 --> P08[P0-8 Trace]
+  P08 --> P11[P1 Skills+Workers]
+  P11 --> P14[P1 E2E]
+  P14 --> P22[P2 Eval 满配]
+  P11 --> P21[P2 Browser]
+```
 
 ---
 

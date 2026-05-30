@@ -1,0 +1,70 @@
+{
+  "meta": {
+    "version": 1,
+    "updated_at": "2026-05-30T00:00:00Z"
+  },
+  "basic": {
+    "name": "示例用户",
+    "years_of_experience": 5,
+    "contact_email": "demo@example.com"
+  },
+  "skills": {
+    "primary": ["Go", "Python", "Kubernetes"],
+    "proficiency_notes": "示例：表单与对话增量维护"
+  },
+  "intent": {
+    "role_families": ["后端", "云原生"],
+    "target_city": "上海",
+    "availability": "1个月内"
+  },
+  "constraints": {
+    "remote_preference": "混合",
+    "overtime_tolerance": "低"
+  },
+  "exploration": {
+    "completed_at": null,
+    "inner_needs": "",
+    "desires": "",
+    "career_needs": "",
+    "priorities_now": "",
+    "current_problems": "",
+    "summary": ""
+  },
+  "career": {
+    "current_assessment": {},
+    "next_hop": {},
+    "horizon_3_5y": {},
+    "selected_path_id": "",
+    "jd_override": []
+  },
+  "capability": {
+    "skill_graph": {},
+    "transfer_paths": [],
+    "evidence_gaps": [],
+    "portfolio_summary": ""
+  },
+  "market": {
+    "role_families": [],
+    "trend_notes": [],
+    "opportunity_snapshots": []
+  },
+  "strategy": {
+    "path_options": [],
+    "selected_strategy": {},
+    "risk_notes": [],
+    "last_reviewed_at": null
+  },
+  "resume": {
+    "source_path": "resume/source.md",
+    "last_optimization_levels": [],
+    "experience_bank": {
+      "items": [],
+      "narrative_summary": ""
+    }
+  },
+  "preference_tags": {
+    "selected": ["后端", "云原生"],
+    "custom": []
+  },
+  "outputs_index": []
+}

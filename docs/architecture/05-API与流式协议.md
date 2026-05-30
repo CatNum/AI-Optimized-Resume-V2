@@ -4,7 +4,7 @@
 |------|------|
 | 文档版本 | v0.3 |
 | 父文档 | [00-架构总览.md](./00-架构总览.md) |
-| 最后更新 | 2026-05-30 |
+| 最后更新 | 2026-05-30（Session 生命周期、gate 说明） |
 
 ## 1. 设计原则
 
@@ -17,6 +17,7 @@
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | `POST` | `/v1/chat` | 用户消息；响应 `text/event-stream` |
+| `POST` | `/v1/sessions/new` | 新建会话（清空旧 session 工作区与绑定任务）；返回 `{ "session_id" }` |
 | `POST` | `/v1/profile/onboarding` | B01 表单提交（确认进入深度探讨后） |
 | `GET` | `/v1/profile` | 读档案摘要（前端表单回显、简历预览） |
 | `GET` | `/v1/resume/markdown` | 读 `source.md` 渲染用 |
@@ -46,8 +47,9 @@
 }
 ```
 
-- `session_id`：首次可省略，响应 `done` 事件带回新 ID。
+- `session_id`：首次可省略，响应 `session` 事件带回新 ID。**浏览器刷新（R2）** 视为新会话：前端调用 `POST /v1/sessions/new` 或不带 `session_id`，服务端清空旧工作区（见 [10 §1](./10-会话闸门与state.md#1-会话工作区生命周期)）。
 - `attachments`：拖入历史 HTML 等（B05）。
+- 请求 **仅** 单条 `message`；历史由服务端 `messages.json` 维护（`begin_chat` 读写）。
 
 ### 3.2 SSE 事件
 
@@ -76,7 +78,7 @@ data: {"finish_reason":"stop"}
 | `token` | `{"delta":"你"}` | 面向用户的 **模型增量**（一字或子词） | 追加到当前 assistant 气泡，实现 **逐字输出** |
 | `task_snapshot` | `{"list_id":"...","tasks":[...]}` | **任务列表快照**变更（建 list、claim/complete 等） | 刷新只读进度条；**不**提供「开始/放弃」按钮 |
 | `form_request` | `{"type":"onboarding"}` | 协调者判定应 **弹出建档表单** | 打开 onboarding UI；提交走 `POST /v1/profile/onboarding` |
-| `gate` | `{"name":"optimize_confirm","prompt":"..."}` | 可选：当前处于某 **对话闸门** | 可高亮提示；用户仍通过 **输入框** 确认（PRD 无专用按钮） |
+| `gate` | `{"name":"optimize_confirm","prompt":"..."}` | 可选 **UI 提示**：当前处于某对话闸门 | **仅**高亮/提示；用户 **必须**在输入框确认；语义以 `match_gate_intent` + [10 §2](./10-会话闸门与state.md#2-gates-闸门) 为准 |
 | `error` | `{"code":"...","message":"..."}` | 本轮出错（模型不可用、超时等） | 展示错误；保留已收到的 `token`  partial 文本 |
 | `done` | `{"finish_reason":"stop"}` | 对 **本条用户消息** 的处理结束 | 结束 loading；允许发送下一条消息 |
 
@@ -128,13 +130,24 @@ event: task_snapshot →  {"list_id":"list_7f3a…","tasks":[…]}
 ### 3.3 流式路径
 
 ```text
-LLM token → coordinator/worker async generator → FastAPI StreamingResponse → browser fetch reader
+协调者 synthesize: LLM token → async generator → FastAPI StreamingResponse → browser fetch reader
+Worker 内部 LLM: 仅 Run 内 messages，不接入 SSE 管道
 ```
 
 服务端需：
 
 - SSE 每个 `token` 事件及时 `yield`（避免整段缓冲）。
 - 客户端断开时取消当前 `asyncio` Run 任务。
+
+### 3.4 Session 生命周期（R2：刷新清空）
+
+| 事件 | 行为 |
+|------|------|
+| `POST /v1/sessions/new` 或首次 chat 无 `session_id` | 生成 `session_id`；若存在旧 session 则清空其 `messages.json`、`state.json` 及绑定 **全部** tasks |
+| 每条 chat 结束 | append user/assistant 至 `data/sessions/{id}/messages.json` |
+| 浏览器刷新 | 前端 **不**复用旧 `session_id`；UI 聊天气泡为空；**profile / output 保留** |
+
+详见 [10-会话闸门与state.md](./10-会话闸门与state.md)。
 
 ## 4. `POST /v1/profile/onboarding`
 
@@ -153,9 +166,10 @@ LLM token → coordinator/worker async generator → FastAPI StreamingResponse �
 | HTTP | code | 场景 |
 |------|------|------|
 | 400 | `invalid_request` | 缺字段 |
-| 403 | `gate_blocked` | 未确认初探却请求 JD 流程（可选硬拦） |
 | 503 | `agent_unavailable` | Python 未启动 |
 | 504 | `run_timeout` | Run 超时 |
+
+> v0.1 **不使用** HTTP `403 gate_blocked`：未初探完成走 JD 时由协调者 **软引导**（B1），不硬拦 API。
 
 ## 7. Harness Tool：`register_outputs_index`（asset）
 

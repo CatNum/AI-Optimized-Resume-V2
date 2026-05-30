@@ -4,6 +4,7 @@
 
 - 产品需求：[docs/prd/00. 职业规划 Agent PRD.md](docs/prd/00.%20职业规划%20Agent%20PRD.md)（总领）；功能规格见同目录 A/B 系列子 PRD
 - 架构设计：[docs/architecture/00-架构总览.md](docs/architecture/00-架构总览.md)（一主多从协调者 + **Python 单体** + SSE）
+- 简历项目描述：[docs/简历项目描述.md](docs/简历项目描述.md)（直贴简历用）
 - 智能体技能包（`load_skill`）：[.agent/README.md](.agent/README.md)
 - 边界参考：[docs/参考文档.md](docs/参考文档.md)
 

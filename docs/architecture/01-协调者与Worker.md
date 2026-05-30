@@ -94,34 +94,39 @@ stateDiagram-v2
 
 ### 4.1 请求（协调者 → Harness → Python Worker）
 
+> 下列 JSON 中 `//` 为 **中文含义备注**（文档说明用）；实现侧传输对象须为合法 JSON，**不得** 含 `//` 注释。
+
 ```json
 {
-  "run_id": "run_8f2c...",
-  "worker_id": "opportunity",
-  "goal": "解析用户粘贴的 JD，输出推荐结论与结构化匹配要点",
-  "capability_bundle": {
-    "skill_index": [],
-    "tool_index": [
+  "run_id": "run_8f2c...",              // 本次 Worker Run 唯一 ID（Agent 运行时，见 02 §4.1）
+  "worker_id": "opportunity",           // 派工目标 Worker：岗位/机会智能体
+  "goal": "解析用户粘贴的 JD，输出推荐结论与结构化匹配要点",  // 协调者下发的任务目标（自然语言指令）
+  "capability_bundle": {                // 能力索引包：仅元数据，不含 skill 正文
+    "skill_index": [],                  // 该 Worker 可用的 skill 目录（name/description/when_to_use）；opportunity 示例为空
+    "tool_index": [                     // 该 Worker 可调用的 tool 目录（名称 + 描述）
       { "name": "profile_patch", "description": "..." },
       { "name": "browser_fetch", "description": "..." }
     ]
   },
-  "context": {
-    "user_message": "...(本轮用户原文)...",
-    "session_state": {
-      "list_id": "list_7f3a9c2e",
-      "list_type": "jd",
-      "prior_results": {
+  "context": {                          // 派工上下文（协调者组装，非 Worker 互传）
+    "user_message": "...(本轮用户原文)...",  // 触发本次派工的用户消息原文
+    "session_state": {                  // 会话级工作状态（协调者维护）
+      "list_id": "list_7f3a9c2e",       // 当前任务列表 ID（A02）
+      "list_type": "jd",                // 业务流类型：explore | jd | plan
+      "prior_results": {                // 已完成 Worker 的结构化结论摘要（按 worker_id 键）
         "market": { "summary": "..." }
       }
     },
-    "profile_slices": ["exploration.summary", "capability.portfolio_summary"],
-    "constraints": {
-      "one_question_at_a_time": true,
-      "no_fabrication": true
+    "profile_slices": [                 // 从 profile.json 截取的路径列表，Harness 注入片段
+      "exploration.summary",
+      "capability.portfolio_summary"
+    ],
+    "constraints": {                    // 执行约束（Harness / Prompt 共同 enforce）
+      "one_question_at_a_time": true,   // 一次只向用户提一个问题（初探等场景）
+      "no_fabrication": true            // 禁止虚构未确认经历/事实
     }
   },
-  "stream": true
+  "stream": true                        // Worker 内部 LLM 是否流式；不映射 SSE token（见 07 §6）
 }
 ```
 
@@ -130,22 +135,24 @@ stateDiagram-v2
 
 ### 4.2 响应（Worker → Harness → 协调者）
 
+> 下列 JSON 中 `//` 为 **中文含义备注**（文档说明用）；落盘与 gRPC/内存传输须为合法 JSON，**不得** 含 `//` 注释。
+
 ```json
 {
-  "run_id": "run_8f2c...",
-  "worker_id": "opportunity",
-  "status": "completed",
-  "structured_output": {
-    "recommendation": "not_recommended",
-    "jd_fingerprint": "sha256:...",
-    "match_highlights": [],
-    "blockers": [],
-    "risks": [],
-    "user_visible_summary": "供协调者合成对话的摘要"
+  "run_id": "run_8f2c...",              // 与 DelegateRequest 一致
+  "worker_id": "opportunity",           // 执行本 Run 的 Worker ID
+  "status": "completed",                // completed | failed | cancelled
+  "structured_output": {                // 领域结构化结果（Pydantic 校验；schema 按 worker_id 注册）
+    "recommendation": "not_recommended", // recommended | not_recommended
+    "jd_fingerprint": "sha256:...",     // JD 内容指纹，用于去重与 outputs 关联
+    "match_highlights": [],             // 匹配要点
+    "blockers": [],                     // 硬伤 / 不匹配项
+    "risks": [],                        // 投递或职业风险
+    "user_visible_summary": "供协调者合成对话的摘要"  // 供协调者 synthesize 转述的摘要（非直出 SSE）
   },
-  "proposed_profile_patches": [],
-  "proposed_task_completions": [],
-  "internal_notes": "可选：供协调者 synthesize 参考的内部要点，不对用户展示"
+  "proposed_profile_patches": [],       // 建议写入 profile 的 patch 列表（Harness 白名单校验后落档）
+  "proposed_task_completions": [],      // 建议完成的 task_id 列表（milestone/work）
+  "internal_notes": "可选：供协调者 synthesize 参考的内部要点，不对用户展示"  // 协调者汇总用；不映射 SSE
 }
 ```
 
@@ -262,7 +269,18 @@ flowchart LR
   C --> U[合成回复]
 ```
 
-同一 **用户消息触发的协调者循环** 内，可连续 `delegate` 多个 Worker；每个 Worker 在 **自己的 Run** 里独立完成 skill/tool 选型，协调者不传 skill 正文。
+同一 **用户消息触发的协调者循环** 内，**无 `gate_prompt` 时可连续** `delegate` 多个 Worker；**一旦出现 `gate_prompt` 必须 synthesize 并等待用户下一条消息**（C3，见 [§9](#9-协调者路由策略)）。
+
+## 9. 协调者路由策略
+
+| 决策 | 规则 |
+|------|------|
+| **C3** | 无 `gate_prompt` → 可同轮连派；有 `gate_prompt` → synthesize 后 **结束本轮**，等下一条用户消息 |
+| **T6-1** | `explore` / `jd` / `plan` 主路径 **必须** `create_task_list`；闲聊/单次 FAQ **不建** list |
+| **Harness** | 硬约束（`optimize_confirmed`、tool 权限、task 状态机） |
+| **协调者 LLM** | 意图识别、Worker 选择、`goal` / `context`（含 `gate_owner`、`requires_optimize_gate` 等） |
+
+`structured_output` 字段契约见 [09-Worker结构化输出.md](./09-Worker结构化输出.md)。
 
 ---
 
