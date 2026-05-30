@@ -2,7 +2,7 @@
 
 | 属性 | 内容 |
 |------|------|
-| 文档版本 | v0.1 |
+| 文档版本 | v0.3 |
 | 父文档 | [00-架构总览.md](./00-架构总览.md) |
 | 最后更新 | 2026-05-29 |
 
@@ -51,19 +51,79 @@
 
 ### 3.2 SSE 事件
 
-`Content-Type: text/event-stream`
+`POST /v1/chat` 的响应为 **SSE（Server-Sent Events）**：HTTP 连接保持打开，服务端 **边处理边推送** 多条事件；前端按 `event` 字段分流处理，而非等待整段 JSON 一次返回。
 
-| event | data 示例 | 说明 |
-|-------|-----------|------|
-| `session` | `{"session_id":"sess_..."}` | 首包或新建会话 |
-| `token` | `{"delta":"你"}` | 模型增量字符/子词 |
-| `task_snapshot` | `{"list_id":"...","tasks":[...]}` | 任务变更后推送（进度条刷新） |
-| `form_request` | `{"type":"onboarding"}` | 协调者判定可弹建档表单 |
-| `gate` | `{"name":"optimize_confirm","prompt":"..."}` | 闸门提示（可选，辅助 UI 高亮） |
-| `error` | `{"code":"...","message":"..."}` | 可恢复/不可恢复错误 |
-| `done` | `{"finish_reason":"stop"}` | 本轮结束 |
+**响应头**：`Content-Type: text/event-stream`
 
-前端对 `token` 事件做字符串拼接；`done` 后允许下一条用户消息。
+**单条推送格式（概念）**：
+
+```text
+event: token
+data: {"delta":"你"}
+
+event: done
+data: {"finish_reason":"stop"}
+
+```
+
+每条事件由 `event:`（类型）与 `data:`（JSON 字符串）组成，以空行分隔。
+
+#### 3.2.1 事件类型说明
+
+| event | data 示例 | 含义 | 前端典型处理 |
+|-------|-----------|------|--------------|
+| `session` | `{"session_id":"sess_..."}` | 当前 **会话 ID**（新建或续接） | 写入 state；后续 `POST /v1/chat` 携带 `session_id` |
+| `token` | `{"delta":"你"}` | 面向用户的 **模型增量**（一字或子词） | 追加到当前 assistant 气泡，实现 **逐字输出** |
+| `task_snapshot` | `{"list_id":"...","tasks":[...]}` | **任务列表快照**变更（建 list、claim/complete 等） | 刷新只读进度条；**不**提供「开始/放弃」按钮 |
+| `form_request` | `{"type":"onboarding"}` | 协调者判定应 **弹出建档表单** | 打开 onboarding UI；提交走 `POST /v1/profile/onboarding` |
+| `gate` | `{"name":"optimize_confirm","prompt":"..."}` | 可选：当前处于某 **对话闸门** | 可高亮提示；用户仍通过 **输入框** 确认（PRD 无专用按钮） |
+| `error` | `{"code":"...","message":"..."}` | 本轮出错（模型不可用、超时等） | 展示错误；保留已收到的 `token`  partial 文本 |
+| `done` | `{"finish_reason":"stop"}` | 对 **本条用户消息** 的处理结束 | 结束 loading；允许发送下一条消息 |
+
+**前端约定**：
+
+- 将所有 `token.data.delta` **字符串拼接** 为完整 assistant 回复。
+- 收到 `done` 之前，通常 **禁用** 再次发送，避免并发两条 chat。
+- `session_id` 以首条 `session` 或响应上下文为准（若请求未带则必须保存）。
+
+#### 3.2.2 一轮对话中的事件顺序（示例）
+
+用户发送：「我想理清职业方向」
+
+```text
+event: session       →  {"session_id":"sess_abc"}
+event: token         →  {"delta":"我"}
+event: token         →  {"delta":"理解你的诉求…"}
+event: token         →  {"delta":"是否进入深度探讨与规划？"}
+event: done          →  {"finish_reason":"stop"}
+```
+
+用户回复「确认进入深度探讨」后，下一轮可能包含：
+
+```text
+event: form_request  →  {"type":"onboarding"}
+event: done          →  …
+```
+
+协调者派工并更新 `data/tasks` 时，可能在 `token` 流中间插入：
+
+```text
+event: task_snapshot →  {"list_id":"list_7f3a…","tasks":[…]}
+```
+
+#### 3.2.3 与 Agent 内部的关系
+
+**流式出口唯一**：SSE 的 `token` **仅** 来自协调者 `synthesize`；Worker 在后台 Run，结果由协调者汇总后再以 `token` 输出。Worker **不得** 流式直出到前端。
+
+| 内部行为 | 对用户可见的 SSE |
+|----------|------------------|
+| 协调者 `synthesize` 流式生成 | `token`（**唯一**用户可见正文来源） |
+| `create_task_list` / `complete_task` 等改任务文件 | `task_snapshot` |
+| 协调者判定弹表单 | `form_request` |
+| Worker Run（含 `load_skill`、业务 tool、内部 LLM 流） | **无** `token`；结论回协调者后再 synthesize |
+| 协调者本轮循环结束 | `done` |
+
+任务与表单类 side-effect 通过 `task_snapshot` / `form_request` 驱动 UI；聊天正文 **始终** 经协调者汇总后的 `token` 呈现。
 
 ### 3.3 流式路径
 

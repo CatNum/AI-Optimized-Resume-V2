@@ -2,188 +2,117 @@
 
 | 属性 | 内容 |
 |------|------|
-| 文档版本 | v0.3 |
+| 文档版本 | v0.5 |
 | 父文档 | [00-架构总览.md](./00-架构总览.md) |
 | 最后更新 | 2026-05-29 |
 
 ## 1. 选型结论：二者结合
 
-v0.1 采用生产常见做法：**底层统一 LangChain 生态，上层用 LangGraph 做图编排**。
+v0.1 采用：**LangChain** 提供 Prompts / Models / Tools；**LangGraph** 编排协调者主图与各 Worker 子图。
 
-| 层级 | 技术 | 在本项目中的职责 |
-|------|------|------------------|
-| **LangChain** | `Prompts`、`Models`、`Tools`、（节点内）`Runnable` / LCEL | 提示词模板、LLM 封装、Harness 工具包装为 `@tool`；节点内可拼短链 |
-| **LangGraph** | `StateGraph`、节点、边、条件路由、`checkpointer` | 协调者主图；每个 Worker 一张**子图**；循环/派工/闸门路由 |
+**能力选型原则**：协调者只 **派工 + 附索引**；Worker 在子图 **ReAct 循环** 内自行 `load_skill` 与调用业务 tool（见 [02-平台服务 §2–3](./02-平台服务.md)）。
 
-```mermaid
-flowchart TB
-  subgraph LG["LangGraph · 编排"]
-    CG[协调者 StateGraph]
-    WG1[Worker 子图 identity]
-    WG2[Worker 子图 opportunity]
-    CG -->|delegate 节点调用| WG1
-    CG -->|delegate 节点调用| WG2
-  end
-
-  subgraph LC["LangChain · 节点内组件"]
-    P[ChatPromptTemplate]
-    M[ChatModel]
-    T[Tools → Harness]
-  end
-
-  CG --> P
-  WG1 --> P
-  P --> M
-  M --> T
-  T --> H[Harness.execute_tool]
-```
-
-**与「一主多从」对齐**：
-
-- **仅协调者主图**负责路由（是否派工、派哪个 Worker、是否继续追问用户）。
-- **Worker 子图之间无边**；子图只被协调者图中的 `delegate_worker` 类节点 **invoke**，不得互相 `invoke`。
-- 业务副作用仍全部落在 Harness Tool，LangChain Tool 仅是薄封装。
-
-## 2. 固定约束（框架之上）
+## 2. 固定约束
 
 | 约束 | 说明 |
 |------|------|
-| 单进程 | API、Harness、图编译产物均在 `career_os` 内 |
-| Tool 同源 | LangChain `@tool` → `Harness.execute_tool(actor=...)` |
-| 流式一等 | 对外 `graph.astream_events` / `astream` → 映射为 SSE `token` |
-| 结构化输出 | Worker 子图结束写入 state；Pydantic 校验 `structured_output` |
-| Skill 注入 | `platform.skill` 正文填入 `ChatPromptTemplate` 的 system 段 |
+| 单进程 | API、Harness、图均在 `career_os` 内 |
+| 协调者不 `load_skill` | Skill 正文仅通过 Worker 的 tool 进入上下文 |
+| Worker 子图内可多轮 | `load_skill` → 推理 → `tool` → 再 `load_skill` … 直至 `structured_output` |
+| Tool 同源 | `@tool` → `Harness.execute_tool(actor=worker_id)` |
+| 无 Worker↔Worker 边 | 仅协调者 `delegate` 触发子图 |
+| **唯一用户出口** | 仅协调者 `synthesize` 的文本经 SSE `token` 面向用户；Worker **不** 流式直出 |
 
 ## 3. 协调者主图（LangGraph）
 
-**状态（`CoordinatorState`）建议字段**：
+**状态字段**：`messages`、`session_id`、`session_state`（含 `prior_results`）、`last_worker_result` 等。
 
-| 字段 | 用途 |
-|------|------|
-| `messages` | `Annotated[list, add_messages]` 对话历史 |
-| `session_id` | 会话 ID |
-| `session_state` | `prior_results`、闸门标记、当前 `list_id` |
-| `pending_worker` | 待派工 Worker ID（可选） |
-| `last_worker_result` | 最近一次 Worker 结构化结果 |
+**节点**：`analyze` →（`gate_check`）→ `delegate` → `synthesize`。
 
-**典型节点**：
+`delegate` 调用 Harness `delegate_worker`：**不传 `skill_name`**，由 Harness 写入 `capability_bundle`（skill/tool 索引）。
 
-| 节点 | 类型 | 行为 |
-|------|------|------|
-| `analyze` | LC model + tools | 判断简单问答 / 需派工 / 需闸门话术 |
-| `delegate` | 逻辑节点 | `invoke(worker_subgraph, input=...)`，合并结果到 state |
-| `synthesize` | LC model | 面向用户流式回复 |
-| `gate_check` | 逻辑节点 | 读 Harness `gate` 服务或规则，决定下一跳 |
-
-**典型边**：
+## 4. Worker 子图（自选 Skill + Tool）
 
 ```mermaid
 stateDiagram-v2
-  [*] --> analyze
-  analyze --> synthesize: 简单问答
-  analyze --> delegate: 需派工
-  analyze --> gate_check: 需确认闸门
-  gate_check --> delegate: 已通过
-  gate_check --> synthesize: 向用户提问
-  delegate --> synthesize: Worker 完成
-  synthesize --> [*]
+  [*] --> boot: DelegateRequest
+  boot --> react: 注入 prompt + skill_index + tool_index
+  react --> react: load_skill / 业务 tool
+  react --> emit: 任务完成
+  emit --> [*]: structured_output
 ```
 
-- **循环**：`analyze` ↔ `delegate` 可在用户多轮补充信息时重复，由条件边控制，避免无上限循环（`recursion_limit` / 自定义步数上限）。
-- **检查点**：v0.1 可用 `MemorySaver` 或文件型 checkpointer 绑定 `session_id`，用于同会话内刷新恢复；**不**替代 `profile.json` 长期记忆。
+| 阶段 | 行为 |
+|------|------|
+| **boot** | `platform.prompt(worker_id)` + `goal` + `context` + **索引**（无 skill 正文） |
+| **react** | LangChain `bind_tools`：`load_skill`、`list_skills`（可选）、业务 tools；LLM 或规则决定下一步 |
+| **load_skill 之后** | 将 `SkillBundle.body` 追加到 `messages`（或 state.skill_context），**后续 token 可见** |
+| **emit** | Pydantic 校验 `structured_output` 返回协调者 |
 
-## 4. Worker 子图（LangGraph + LangChain）
-
-每个 `worker_id` 对应 **独立编译的子图**（如 `graphs/workers/opportunity.py`）。
-
-| 节点 | LangChain 组件 |
-|------|----------------|
-| `prepare_context` | 读 Harness 预组装的 `profile_slices` + `DelegateRequest.context` |
-| `run_skill_phase` | `ChatPromptTemplate` + `skill_body` + `ChatModel`（一次一问时循环） |
-| `tool_loop` | `create_react_agent` 或 model.bind_tools + 条件边，工具走 Harness |
-| `emit_structured` | 解析为 Pydantic `WorkerResult` / `structured_output` |
-
-子图 **入口**：协调者 `delegate` 节点传入的 `DelegateRequest`。  
-子图 **出口**：`structured_output` + 可选 `proposed_profile_patches`（经 Tool 落档）。
-
-**禁止**：在子图内添加指向其他 Worker 子图的边。
-
-## 5. LangChain 在项目中的落点
-
-| 能力 | 实现建议 |
-|------|----------|
-| **Models** | `langchain_openai.ChatOpenAI`（或兼容网关）；统一 `base_url` / `api_key` 配置 |
-| **Prompts** | `ChatPromptTemplate`；`platform.prompt` 渲染为 template 变量；Skill 进 `system` |
-| **Tools** | `@tool` 装饰器，内部 `await harness.execute_tool(...)`；按角色注册不同 `ToolNode` |
-| **结构化输出** | `with_structured_output` 或 Pydantic parser 作为子图最后一跳 |
-| **流式** | 节点内 `model.astream`；图级 `graph.astream_events(version="v2")` 过滤 `on_chat_model_stream` |
-
-### 5.1 与平台服务分工
-
-| 平台服务 | LangChain 关系 |
-|----------|----------------|
-| `platform.prompt` | 产出 template 字符串 / YAML → `ChatPromptTemplate.from_messages` |
-| `platform.skill` | 注入 system，**不**单独跑图 |
-| `platform.tool` | 注册表 → 转为 `langchain_core.tools.StructuredTool` |
-| Harness | Tool 的执行真相源；图不直接写文件 |
-
-## 6. 流式 → SSE 映射
+**典型 LC 拼装**：
 
 ```text
-LangGraph astream_events
-  → 过滤 event: on_chat_model_stream / on_chain_stream
-  → career_os StreamEvent.token(delta)
-  → FastAPI SSE event: token
+system = worker_base_prompt + "可用技能见 skill_index；需要步骤时调用 load_skill"
+tools  = [load_skill, list_skills?, ...business_tools]
+# 模型调用 load_skill("career-inner-exploration") → tool 返回正文 → 继续 react
 ```
 
-协调者 `synthesize` 节点与用户可见 Worker 追问共用同一套映射；`task_snapshot` / `form_request` 由 Harness 在 Tool 成功后注入 SSE（非 LangChain 事件）。
+**禁止**：子图启动时默认注入全部 skill 正文；禁止协调者在 `DelegateRequest` 里带 `skill_name` 绕过 Worker 选型。
 
-## 7. 依赖（backend）
+## 5. LangChain 落点
 
-```toml
-# pyproject.toml 片段（版本以实施时锁定为准）
-langchain-core = ">=0.3"
-langchain-openai = ">=0.2"   # 或所用厂商包
-langgraph = ">=0.2"
-langgraph-checkpoint = ">=2.0"  # MemorySaver / SqliteSaver
+| 能力 | 用法 |
+|------|------|
+| **Models** | 协调者与各 Worker 可共用或分模型配置 |
+| **Prompts** | 协调者 / Worker 分场景 template；skill 正文 **不**写进静态 template |
+| **Tools** | `load_skill` / 业务 tool 均注册为 LC Tool，执行走 Harness |
+| **流式** | **仅**协调者 `synthesize` → SSE `token`（见 §6） |
+
+## 6. 流式 → SSE（仅协调者对用户输出）
+
+**产品约定**：用户 **只** 与协调者对话；页面上逐字出现的 `token` **全部** 来自协调者 `synthesize` 节点。Worker Run 在后台完成，其结论以 **结构化结果**（及可选内部摘要）交还协调者，由协调者 **汇总、改写、统一口吻** 后再流式输出。
+
+| 组件 | 是否推送 SSE `token` | 说明 |
+|------|----------------------|------|
+| **协调者 `synthesize`** | **是** | 唯一面向用户的流式文本来源 |
+| **Worker 子图** | **否** | 内部可 `astream` 调试；**禁止** 映射到前端 `token` |
+| **`load_skill`** | **否** | 返回 skill 正文块，注入 Worker 上下文，非用户可见 |
+| **业务 tool 结果** | **否** | 作为 tool message 留在 Worker Run 内 |
+
+```mermaid
+sequenceDiagram
+  participant U as 用户
+  participant SSE as SSE token
+  participant C as 协调者
+  participant W as Worker
+
+  U->>C: 用户消息
+  C->>W: delegate（无用户可见输出）
+  W-->>C: structured_output + 可选 internal_notes
+  C->>SSE: synthesize 流式 token
+  SSE->>U: 逐字显示（协调者汇总后的回复）
 ```
 
-## 8. 目录建议
+- Worker 若需「一次一问」，由协调者在 `synthesize` 中 **转述** Worker 的 `structured_output` / 追问要点，而非 Worker 原文直出。
+- 实现：`astream_events` 过滤时 **仅** 订阅协调者 `synthesize` 节点的 `on_chat_model_stream`；Worker 子图 run 不在 SSE 管道上挂 `token` handler。
+
+## 7. 目录建议
 
 ```text
 backend/career_os/agents/
-  graphs/
-    coordinator.py      # 主图 compile
-    workers/
-      identity.py
-      opportunity.py
-      ...
-  lc/                     # 可复用 LangChain 构件
-    models.py               # get_chat_model()
-    tools.py                # harness_tools_for(actor)
-    prompts.py              # build_prompt_template(worker_id)
-  state/
-    coordinator.py          # TypedDict / Pydantic state
-    worker.py
+  graphs/coordinator.py
+  graphs/workers/*.py      # 每 Worker 一个 react 子图
+  lc/models.py
+  lc/tools.py              # load_skill, harness_tools_for(worker_id)
+  state/coordinator.py
+  state/worker.py            # 含 loaded_skills[], skill_index
 ```
 
-## 9. Worker `structured_output` Schema
+## 8. SPIKE 验收
 
-| worker_id | Pydantic 模型（示意） |
-|-----------|----------------------|
-| `opportunity` | `recommendation`, `jd_fingerprint`, `match_highlights`, ... |
-| `strategy` | `three_horizons`, `selected_path_id`, `narrative_summary` |
-| `resume` | `markdown_by_level: dict[Literal[保守,标准,进取], str]` |
-| `asset` | `files`, `outputs_index_entries` |
-| `identity` / `capability` | `exploration_patch`, `capability_patch` |
-
-子图最后一节点 `emit_structured` 必须经校验失败则 Run `failed`，协调者在 `synthesize` 中向用户说明。
-
-## 10. SPIKE 验收（实施前）
-
-1. 协调者主图：`analyze` → `delegate`(mock 子图) → `synthesize`，SSE 流式通。
-2. 真实子图 `opportunity`：`bind_tools` + `profile_get`，一次 Tool 往返 &lt; 50ms（本地）。
-3. `MemorySaver` + `session_id`：刷新后会话可续（可选 v0.1）。
+1. 协调者 `delegate` 不带 `skill_name`，Worker 收到索引。
+2. Worker 子图：先 `load_skill(A)` 执行几步，再 `load_skill(B)`，审计日志有两条 `skill.load`。
+3. Harness 拒绝 Worker 加载 `allowed_workers` 不包含自己的 skill。
 
 ---
 

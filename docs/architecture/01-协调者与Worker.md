@@ -2,7 +2,7 @@
 
 | 属性 | 内容 |
 |------|------|
-| 文档版本 | v0.1 |
+| 文档版本 | v0.3 |
 | 父文档 | [00-架构总览.md](./00-架构总览.md) |
 | 最后更新 | 2026-05-29 |
 
@@ -26,9 +26,12 @@ flowchart TB
 
 | 规则 | 说明 |
 |------|------|
-| **协调者不干活** | 不做 JD 打分、不改写简历正文、不写 `profile` 字段；只做意图识别、派工计划、结果合成、闸门话术确认引导 |
+| **协调者不干活** | 不做 JD 打分、不改写简历正文、不写 `profile` 字段；只做意图识别、**任务拆分与派工**、结果合成、闸门话术确认引导 |
+| **协调者不选 Skill/Tool** | 派工时只给 Worker **`goal` + `context` + 能力索引**（`skill_index`、`tool_index`）；**不** 预指定 `skill_name`，**不** 预加载 skill 正文 |
+| **Worker 自选能力** | 在同一 Worker Run 内，由 Worker **自行** 决定调用哪些 skill/tool（规则或 LLM）；可多次 `load_skill` |
 | **Worker 不互通信** | 无 Worker→Worker 调用；上游结论由协调者写入 `session_state` 或经 Harness 落档后再派下一 Worker |
 | **单一对话入口** | 用户只与「产品对话面」交互；背后始终是协调者 Run（PRD「入口编排」职责） |
+| **Worker 不直出用户** | Worker 产出 `structured_output`（及可选 `internal_notes`）交协调者；**禁止** Worker 文本映射为 SSE `token` |
 | **存储经 Harness** | Worker 不直接 `os.Write`；通过 Tool 访问 Profile / Task / Output |
 
 ## 2. 角色与 PRD 智能体映射
@@ -53,7 +56,7 @@ stateDiagram-v2
   [*] --> Analyze: 用户消息
   Analyze --> Plan: 需多步/派工
   Analyze --> Reply: 简单问答
-  Plan --> Delegate: 选择 Worker + 输入
+  Plan --> Delegate: 选择 Worker + goal（附 skill/tool 索引）
   Delegate --> Wait: Harness 执行 WorkerRun
   Wait --> Merge: 收到 WorkerResult
   Merge --> Plan: 还需下一步 Worker
@@ -67,14 +70,15 @@ stateDiagram-v2
 
 | 工具 | 用途 |
 |------|------|
-| `delegate_worker` | 发起一次 Worker Run（指定 worker_id、goal、context、skill_name?） |
+| `delegate_worker` | 发起 Worker Run：`worker_id`、`goal`、`context`；Harness 自动附加该 Worker 的 **skill_index / tool_index** |
 | `list_tasks` / `get_task` | 查看计划（只读或推进前检查） |
 | `create_task_list` / `create_task` | 多步流程时建图（通常协调者决策后调用） |
 | `start_task_list` | 用户对话表达「开始执行」后调用 |
 | `abandon_task_list` | 用户对话表达放弃后调用 |
 | `complete_task` | milestone 在用户确认话术后 |
-| `load_skill` | 为 Worker 准备 skill 正文（或由 Harness 在 delegate 时自动附加） |
 | `profile_get` / `profile_patch` | 协调者提议更新时（须用户确认后 patch） |
+
+协调者 **没有** `load_skill`；该能力仅在 Worker 的 `worker_meta_tools` 中（见 [02-平台服务 §2](./02-平台服务.md#2-skill-管理注册表--worker-自选)）。
 
 协调者 **不应** 拥有 `write_resume_html`；该工具仅开放给 `resume` / `asset` Worker（且受闸门约束）。
 
@@ -87,7 +91,15 @@ stateDiagram-v2
   "run_id": "run_8f2c...",
   "worker_id": "opportunity",
   "goal": "解析用户粘贴的 JD，输出推荐结论与结构化匹配要点",
-  "skill_name": null,
+  "capability_bundle": {
+    "skill_index": [
+      { "name": "career-jd-alignment", "description": "...", "when_to_use": "..." }
+    ],
+    "tool_index": [
+      { "name": "profile_patch", "description": "..." },
+      { "name": "browser_fetch", "description": "..." }
+    ]
+  },
   "context": {
     "user_message": "...(本轮用户原文)...",
     "session_state": {
@@ -127,12 +139,12 @@ stateDiagram-v2
   },
   "proposed_profile_patches": [],
   "proposed_task_completions": [],
-  "assistant_message": "可选：Worker 侧直接生成的单轮追问（仍经协调者转发）"
+  "internal_notes": "可选：供协调者 synthesize 参考的内部要点，不对用户展示"
 }
 ```
 
 - 落档：Harness 校验 `proposed_profile_patches` 白名单后写入；或由 Worker 通过 `profile_patch` 工具提交。
-- **流式**：`assistant_message` 可在 Worker Run 中逐 token 流式返回；最终 `structured_output` 在 Run 结束时一次性交给协调者。
+- **对用户可见文案**：**仅** 协调者 `synthesize` 流式输出；Worker **不** 向 SSE 推送 `token`。协调者根据 `structured_output` / `internal_notes` 汇总后回复用户。
 
 ## 5. 典型派工链（JD 主路径）
 
@@ -182,6 +194,30 @@ sequenceDiagram
 | Workflow 内 Agent 互传 `handoff` | 协调者 `session_state.prior_results` |
 | 策略 Agent 直接读 opportunity 内存 | 协调者 delegate 时注入 `context` |
 | 子 Agent 互相 `invoke` | 禁止；仅 `delegate_worker` |
+| 协调者预指定 `skill_name` | 禁止；Worker Run 内自选 + `load_skill` |
+
+### 3.2 Worker 侧能力工具（经 Harness）
+
+| 工具 | 用途 |
+|------|------|
+| `load_skill(name, mode?)` | Worker 选中后加载正文并注入 **本 Run** 上下文；可重复调用 |
+| `list_skills()` | 可选；索引已在 `capability_bundle` 时可不调 |
+| 各业务 tool | 见 [02-平台服务 §3](./02-平台服务.md#3-tool-管理) |
+
+---
+
+## 8. 单轮用户消息内的协作（总览）
+
+```mermaid
+flowchart LR
+  U[用户消息] --> C[协调者：分析 + 拆任务]
+  C --> D[delegate_worker × N]
+  D --> W[Worker：读索引 → 选 skill/tool → load_skill → 执行]
+  W --> C
+  C --> U[合成回复]
+```
+
+同一 **用户消息触发的协调者循环** 内，可连续 `delegate` 多个 Worker；每个 Worker 在 **自己的 Run** 里独立完成 skill/tool 选型，协调者不传 skill 正文。
 
 ---
 

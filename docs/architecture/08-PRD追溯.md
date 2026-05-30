@@ -29,7 +29,7 @@
 
 | PRD 条目 | 架构决策 |
 |----------|----------|
-| §4.1 Multi-Agent 互调 | **废弃** → 一主多从 [01-协调者与Worker.md](./01-协调者与Worker.md) |
+| §4.1 Multi-Agent 互调 | **废弃** → 一主多从；**PRD 00 §4.1 / B04 §5.4.1 已同步（2026-05-29）** |
 | §4.1 L2 Workflow | 协调者循环 + `delegate_worker` |
 | 附录 B 闸门 | 对话-only；`gate` SSE 可选 |
 | 附录 C 目录 | `store` 路径一致 |
@@ -47,7 +47,9 @@
 | 4 | 2026-05-29 | REST + SSE 逐字流式 |
 | 5 | 2026-05-29 | 任务开始/放弃仅对话，无专用 API/按钮 |
 | 6 | 2026-05-29 | **Python + Web**（FastAPI + React） |
-| 7 | 2026-05-29 | **LangChain + LangGraph 结合**：LC 提供 Prompt/Model/Tool，LG 编排协调者与 Worker 子图 → [07-Agent运行时.md](./07-Agent运行时.md) |
+| 7 | 2026-05-29 | **LangChain + LangGraph 结合** → [07-Agent运行时.md](./07-Agent运行时.md) |
+| 11 | 2026-05-29 | **Skill/Tool 由 Worker 自选** → [02-平台服务 §2](./02-平台服务.md#2-skill-管理注册表--worker-自选) |
+| 12 | 2026-05-29 | **仅协调者 SSE 流式对用户**；Worker 结果汇总后 synthesize → [07 §6](./07-Agent运行时.md#6-流式--sse仅协调者对用户输出) |
 | 8 | 2026-05-29 | 前端 React + Vite → [06-前端架构.md](./06-前端架构.md) |
 | 9 | 2026-05-29 | 多篇 `docs/architecture/` |
 | 10 | — | 实施顺序后续讨论 |

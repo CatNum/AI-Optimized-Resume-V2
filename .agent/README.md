@@ -10,10 +10,10 @@
 load_skill(name)
   → 读取 .agent/skills/{name}/SKILL.md
   → 可选附加 .agent/skills/{name}/phases.md 等
-  → 注入身份/能力/策略/简历等子智能体系统提示
+  → Worker Run 内按需注入上下文（非协调者预加载）
 ```
 
-入口编排智能体根据阶段 **显式** 调用，参见 [A03 机制 · 技能包 PRD](../docs/prd/A03.%20机制-技能包%20PRD.md)。
+协调者派工附 **skill 索引**；Worker 在 Run 内 **自行** `load_skill`，参见 [A03](../docs/prd/A03.%20机制-技能包%20PRD.md) 与 [架构 02-平台服务](../docs/architecture/02-平台服务.md)。
 
 ## 技能包一览
 
