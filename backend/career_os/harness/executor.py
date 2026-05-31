@@ -1,10 +1,19 @@
-from dataclasses import dataclass
 from typing import Any
 
+from career_os.harness.delegate import check_delegate_rules, delegate_worker as run_delegate_worker
+from career_os.harness.errors import HarnessError
 from career_os.platform.tool.handlers.profile import (
     apply_proposed_patches,
     profile_get,
     profile_patch,
+)
+from career_os.platform.tool.handlers.task import (
+    apply_proposed_task_completions,
+    claim_task,
+    complete_task,
+    create_task,
+    create_task_list,
+    list_tasks,
 )
 from career_os.platform.tool.registry import (
     COORDINATOR_TOOLS,
@@ -12,12 +21,6 @@ from career_os.platform.tool.registry import (
     WORKER_META_TOOLS,
     ToolRegistry,
 )
-
-
-@dataclass
-class HarnessError:
-    code: str
-    message: str
 
 
 class Harness:
@@ -36,6 +39,16 @@ class Harness:
         self.tools.register(
             "profile_get",
             profile_get,
+            actors={"coordinator"},
+        )
+        self.tools.register("create_task_list", create_task_list, actors={"coordinator"})
+        self.tools.register("create_task", create_task, actors={"coordinator"})
+        self.tools.register("list_tasks", list_tasks, actors={"coordinator"})
+        self.tools.register("claim_task", claim_task, actors={"coordinator"})
+        self.tools.register("complete_task", complete_task, actors={"coordinator"})
+        self.tools.register(
+            "apply_proposed_task_completions",
+            apply_proposed_task_completions,
             actors={"coordinator"},
         )
 
@@ -61,3 +74,25 @@ class Harness:
             return actor in WORKER_BUSINESS_TOOLS
         business = WORKER_BUSINESS_TOOLS.get(actor, set())
         return tool_name in business
+
+    def delegate_worker(
+        self,
+        actor: str,
+        worker_id: str,
+        goal: str,
+        session_state: dict[str, Any],
+        *,
+        context: dict[str, Any] | None = None,
+    ) -> Any | HarnessError:
+        return run_delegate_worker(
+            actor,
+            worker_id,
+            goal,
+            session_state,
+            context=context,
+        )
+
+    def check_delegate_rules(
+        self, worker_id: str, session_state: dict[str, Any]
+    ) -> HarnessError | None:
+        return check_delegate_rules(worker_id, session_state)

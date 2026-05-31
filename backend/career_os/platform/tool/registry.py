@@ -21,6 +21,7 @@ COORDINATOR_TOOLS = {
     "get_task",
     "claim_task",
     "complete_task",
+    "apply_proposed_task_completions",
     "profile_get",
     "apply_proposed_patches",
     "match_gate_intent",
