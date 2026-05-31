@@ -5,6 +5,7 @@ import { useChatSSE } from "../hooks/useChatSSE";
 import { OnboardingForm } from "./OnboardingForm";
 
 type Message = { role: "user" | "assistant"; content: string };
+type PendingGate = { name: string; prompt: string };
 
 export function ChatPage() {
   const [sessionId, setSessionId] = useState<string | null>(
@@ -13,6 +14,7 @@ export function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  const [pendingGate, setPendingGate] = useState<PendingGate | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [tasks, setTasks] = useState<{ id: string; title: string; status: string }[]>([]);
   const { sendMessage, loading } = useChatSSE();
@@ -31,6 +33,7 @@ export function ChatPage() {
     if (!input.trim() || loading) return;
     const userText = input.trim();
     setInput("");
+    setPendingGate(null);
     setMessages((prev) => [...prev, { role: "user", content: userText }]);
     let assistant = "";
 
@@ -50,6 +53,14 @@ export function ChatPage() {
           }
           return [...next, { role: "assistant", content: assistant }];
         });
+      },
+      onGate: (payload) => {
+        if (payload.prompt) {
+          setPendingGate({
+            name: payload.name ?? "confirm",
+            prompt: payload.prompt,
+          });
+        }
       },
       onHistoryNotice: () => {
         setNotice("对话较长，建议新开对话；档案与 HTML 仍保留。");
@@ -87,6 +98,28 @@ export function ChatPage() {
       {notice && (
         <div className="mb-3 rounded border border-amber-700/50 bg-amber-950/40 px-3 py-2 text-sm text-amber-200">
           {notice}
+        </div>
+      )}
+
+      {pendingGate && (
+        <div className="mb-3 rounded border border-sky-700/50 bg-sky-950/40 px-4 py-3 text-sm">
+          <p className="mb-2 text-sky-100">{pendingGate.prompt}</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="rounded bg-emerald-700 px-3 py-1 text-white hover:bg-emerald-600"
+              onClick={() => setInput("确认")}
+            >
+              确认
+            </button>
+            <button
+              type="button"
+              className="rounded border border-slate-600 px-3 py-1 text-slate-300 hover:bg-slate-800"
+              onClick={() => setInput("取消")}
+            >
+              取消
+            </button>
+          </div>
         </div>
       )}
 

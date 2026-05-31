@@ -1,8 +1,14 @@
 import { useCallback, useState } from "react";
 
+type GatePayload = {
+  name?: string;
+  prompt?: string;
+};
+
 type ChatHandlers = {
   onSession: (sessionId: string) => void;
   onToken: (delta: string) => void;
+  onGate: (payload: GatePayload) => void;
   onHistoryNotice: (payload: Record<string, unknown>) => void;
   onDone: () => void;
   onError: (message: string) => void;
@@ -59,6 +65,7 @@ export function useChatSSE() {
             const data = JSON.parse(dataLine.replace("data:", "").trim());
             if (event === "session") handlers.onSession(data.session_id);
             if (event === "token") handlers.onToken(data.delta);
+            if (event === "gate") handlers.onGate(data);
             if (event === "history_notice") handlers.onHistoryNotice(data);
             if (event === "done") handlers.onDone();
             if (event === "error") handlers.onError(data.message);
