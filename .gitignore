@@ -11,6 +11,9 @@ output/**
 !output/example/
 !output/example/**
 
+# --- Git worktrees (superpowers isolated development) ---
+.worktrees/
+
 # --- IDE / 编辑器 ---
 .idea/
 .vscode/

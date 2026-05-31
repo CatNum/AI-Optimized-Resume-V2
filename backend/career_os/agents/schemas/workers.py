@@ -108,12 +108,46 @@ WORKER_SCHEMAS: dict[str, type[BaseModel]] = {
 }
 
 
+def normalize_gate_prompt(raw: Any) -> dict[str, Any] | None:
+    """Flatten common LLM variants into GatePrompt shape: name + prompt."""
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        return None
+
+    prompt = raw.get("prompt")
+    name = raw.get("name") or raw.get("gate_name")
+    if isinstance(prompt, str) and isinstance(name, str):
+        return {"name": name, "prompt": prompt, **raw}
+
+    for key, value in raw.items():
+        if key in {"name", "gate_name", "type"}:
+            continue
+        if isinstance(value, str):
+            return {"name": key, "prompt": value}
+        if isinstance(value, dict):
+            nested_prompt = value.get("prompt")
+            if isinstance(nested_prompt, str):
+                return {"name": key, "prompt": nested_prompt, **value}
+    return raw if isinstance(raw.get("prompt"), str) else None
+
+
+def normalize_worker_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(payload)
+    if "gate_prompt" in normalized:
+        gate = normalize_gate_prompt(normalized["gate_prompt"])
+        if gate is not None:
+            normalized["gate_prompt"] = gate
+    return normalized
+
+
 def validate_structured_output(
     worker_id: str, payload: dict[str, Any]
 ) -> tuple[dict[str, Any] | None, str | None]:
     schema = WORKER_SCHEMAS.get(worker_id)
     if schema is None:
         return payload, None
+    payload = normalize_worker_payload(payload)
     try:
         validated = schema.model_validate(payload)
     except ValidationError as exc:

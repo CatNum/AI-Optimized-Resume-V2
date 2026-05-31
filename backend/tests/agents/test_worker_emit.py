@@ -24,6 +24,41 @@ def test_identity_explore_gate_prompt_fails():
     assert error is not None
 
 
+def test_strategy_nested_gate_prompt_normalizes():
+    validated, error = validate_structured_output(
+        "strategy",
+        {
+            "user_visible_summary": "策略完成",
+            "path_options": [{"id": "a", "label": "稳健"}],
+            "three_horizons": {"apply_narrative": "先投递"},
+            "gate_prompt": {
+                "optimize_confirm": {
+                    "type": "confirm",
+                    "prompt": "是否确认按该 JD 优化简历？",
+                }
+            },
+        },
+    )
+    assert error is None
+    assert validated["gate_prompt"]["name"] == "optimize_confirm"
+    assert "优化简历" in validated["gate_prompt"]["prompt"]
+
+
+def test_opportunity_gate_prompt_string_value_normalizes():
+    validated, error = validate_structured_output(
+        "opportunity",
+        {
+            "recommendation": "not_recommended",
+            "user_visible_summary": "不匹配",
+            "gate_prompt": {
+                "jd_continue_despite_not_recommended": "是否仍要继续？",
+            },
+        },
+    )
+    assert error is None
+    assert validated["gate_prompt"]["name"] == "jd_continue_despite_not_recommended"
+
+
 def test_opportunity_valid_output_passes():
     validated, error = validate_structured_output(
         "opportunity",

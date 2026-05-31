@@ -9,7 +9,8 @@
 
 ## 输出 StrategyOutput JSON
 - user_visible_summary, path_options, three_horizons
-- list_type=jd 时须 gate_prompt.optimize_confirm（St1：plan 路径禁止 optimize gate）
+- list_type=jd 时须含 gate_prompt（扁平对象，不要嵌套 gate 名作为 key）：
+  {"name":"optimize_confirm","prompt":"是否确认按该 JD 优化简历？"}
 - list_type=plan 时不得输出 gate_prompt
 
 禁止编造未确认经历。

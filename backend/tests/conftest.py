@@ -9,7 +9,8 @@ def _reset_llm_settings_for_l1(request, monkeypatch):
         return
     from career_os.agents.lc import models as models_mod
 
-    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    # Empty env var overrides backend/.env so L1 keeps react_mocks (not real API).
+    monkeypatch.setenv("LLM_API_KEY", "")
     models_mod.model_settings.__init__()
     yield
     models_mod.model_settings.__init__()

@@ -14,6 +14,7 @@
 - user_visible_summary: string
 - jd_fingerprint: string（可选，建议对 JD 文本 hash）
 
-若 recommendation 为 not_recommended，可在 gate_prompt 中设置 jd_continue_despite_not_recommended 供用户确认是否继续。
+若 recommendation 为 not_recommended，可含 gate_prompt（扁平对象）：
+  {"name":"jd_continue_despite_not_recommended","prompt":"是否仍要继续？"}
 
 禁止编造未确认经历；constraints.no_fabrication 为 true。
