@@ -3,6 +3,7 @@ from datetime import date
 from typing import Any
 
 from career_os.platform.store.output import OutputStore
+from career_os.platform.tool.handlers.outputs import normalize_output_path
 
 LEVEL_ORDER = ["保守", "标准", "进取"]
 
@@ -22,7 +23,7 @@ def write_resume_html(actor: str, args: dict[str, Any]) -> ResumeHtmlError | dic
     store = OutputStore()
     path = store.write(filename, content, day=date.today())
     return {
-        "path": str(path),
+        "path": normalize_output_path(path),
         "optimization_level": level,
         "filename_tags": args.get("filename_tags") or [],
     }

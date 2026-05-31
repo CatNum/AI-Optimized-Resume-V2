@@ -1,0 +1,63 @@
+import importlib
+
+import pytest
+
+from career_os.harness.executor import Harness
+from career_os.platform.store.output import OutputStore
+from career_os.platform.store.profile import ProfileStore
+from career_os.platform.tool.handlers.outputs import dedupe_outputs_index
+
+
+@pytest.fixture
+def harness(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("OUTPUT_DIR", str(tmp_path / "output"))
+    import career_os.config as config_mod
+    import career_os.platform.store.output as output_mod
+    import career_os.platform.store.profile as profile_mod
+
+    importlib.reload(config_mod)
+    importlib.reload(output_mod)
+    importlib.reload(profile_mod)
+    return Harness()
+
+
+def test_dedupe_outputs_index_keeps_first_entry():
+    entries = [
+        {"path": "output/2026-05-31/resume_标准.html", "optimization_level": "标准"},
+        {"path": "output/2026-05-31/resume_标准.html", "optimization_level": "标准"},
+    ]
+    assert len(dedupe_outputs_index(entries)) == 1
+
+
+def test_register_outputs_index_skips_duplicate_path(harness, tmp_path):
+    from datetime import date
+
+    day = date(2026, 5, 31)
+    html_path = OutputStore().write("resume_标准.html", "<html></html>", day=day)
+    delivery = {
+        "path": "output/2026-05-31/resume_标准.html",
+        "optimization_level": "标准",
+        "created_at": "2026-05-31T00:00:00+00:00",
+    }
+
+    first = harness.execute_tool(
+        "asset",
+        "register_outputs_index",
+        {"deliveries": [delivery]},
+    )
+    second = harness.execute_tool(
+        "asset",
+        "register_outputs_index",
+        {"deliveries": [delivery]},
+    )
+
+    assert first["registered"]
+    assert not first["skipped"]
+    assert not second["registered"]
+    assert second["skipped"] == [
+        {"path": "output/2026-05-31/resume_标准.html", "reason": "already_registered"}
+    ]
+
+    index = ProfileStore().get(["outputs_index"])["outputs_index"]
+    assert len(index) == 1

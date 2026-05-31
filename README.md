@@ -4,6 +4,19 @@
 
 **分支策略**：仅维护 `main`（本地与远端一致）。
 
+```bash
+# 首次（项目根）
+make install
+# 编辑 backend/.env：LLM_PROVIDER / LLM_API_KEY
+
+# 演示（data/demo）· 默认
+make dev
+# 手测 / 联调（data/test，会话持久保存）
+make dev-test
+```
+
+访问：**http://localhost:15173**
+
 ## 文档索引
 
 | 类型 | 链接 |
@@ -25,13 +38,32 @@
 | 7 类 Worker | 全部 **ReAct**（`run_worker_react`）；无 `LLM_API_KEY` 时 L1 走 `react_mocks` |
 | LLM | [LiteLLM](backend/career_os/agents/lc/providers.py) 统一路由；配置见 `backend/.env.example` |
 | 前端 | React + Vite；Chat SSE（含 `gate` 事件展示） |
-| 评测 | **96** pytest（L1 **90** + LLM **6**）；trace 写入 `backend/data/logs/traces/` |
+| 评测 | **96** pytest（L1 **90** + LLM **6**）；trace 写入各环境 `data/{demo|test}/logs/traces/` |
 
 尚未落地或待深化：记忆索引 side-query、三档 HTML 生成顺序复用、Browser Tool 生产级降级、部分 PRD 业务流程细节（见下方「优化点」）。
 
 ## 快速开始
 
 **环境**：Python ≥ 3.11、[uv](https://docs.astral.sh/uv/)、Node.js（前端）。
+
+**一键启动**（项目根目录，后端 `:18080` + 前端 `:15173`）：
+
+| 命令 | 数据目录 | 用途 |
+|------|----------|------|
+| `make dev` / `make dev-demo` | `backend/data/demo`、`backend/output/demo` | 演示、对外展示 |
+| `make dev-test` | `backend/data/test`、`backend/output/test` | 手测、联调（会话长期保留） |
+
+```bash
+make dev-demo   # 演示
+make dev-test   # 手测
+# 或
+./scripts/dev.sh .env.demo
+./scripts/dev.sh .env.test
+```
+
+LLM Key 等共用配置写在 **`backend/.env`**；`backend/.env.demo` / `.env.test` 只覆盖 `DATA_DIR` / `OUTPUT_DIR`。pytest 仍用临时目录，不会写入上述路径。
+
+**分步启动**（需两个终端）：
 
 ```bash
 # 1. 后端依赖
@@ -41,15 +73,22 @@ cd backend && uv sync
 cp .env.example .env
 # 编辑 .env：LLM_PROVIDER / LLM_API_KEY
 
-# 3. 启动后端（默认 8080，与前端 proxy 一致）
-uv run uvicorn career_os.main:app --reload --port 8080
+# 3. 启动后端（默认 18080，与前端 proxy 一致）
+uv run uvicorn career_os.main:app --reload --port 18080
 
 # 4. 另开终端：前端
 cd web && npm install && npm run dev
-# → http://localhost:5173
+# → http://localhost:15173
 ```
 
-本地数据与产出：`backend/data/`（会话、档案）、`backend/output/`（HTML 简历）；均不入 Git。
+本地数据与产出（按环境隔离，均不入 Git）：
+
+| 环境 | 档案 / 会话 | HTML 产出 |
+|------|-------------|-----------|
+| 演示 | `backend/data/demo/` | `backend/output/demo/` |
+| 手测 | `backend/data/test/` | `backend/output/test/` |
+
+端口冲突时可覆盖：`BACKEND_PORT=19080 FRONTEND_PORT=16173 make dev-test`（需同步改 `web/vite.config.ts` 中 proxy 与 `backend/career_os/config.py` 的 CORS）。
 
 ## 仓库结构
 
@@ -61,7 +100,9 @@ cd web && npm install && npm run dev
 ├── .agent/skills/         # 三阶段 Skill 包（Worker Run 内 load_skill）
 ├── docs/prd/              # 产品规格
 ├── docs/architecture/     # 架构与协议
-└── docs/superpowers/plans/ # 迭代实施计划
+├── docs/superpowers/plans/ # 迭代实施计划
+├── scripts/dev.sh         # 本地一键启动（make dev）
+└── Makefile               # make dev / make install
 ```
 
 ## 测试

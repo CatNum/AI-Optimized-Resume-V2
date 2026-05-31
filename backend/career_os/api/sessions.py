@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from career_os.harness.executor import Harness
+from career_os.platform.tool.handlers.outputs import dedupe_outputs_index
 from career_os.platform.store.profile import ProfileStore
 from career_os.platform.store.session import SessionStore
 from career_os.platform.store.task import TaskStore
@@ -91,10 +92,12 @@ def get_tasks():
 
 @router.get("/outputs")
 def list_outputs():
-    from career_os.platform.store.profile import ProfileStore
-
     profile = ProfileStore()
-    return {"outputs_index": profile.get(["outputs_index"]).get("outputs_index", [])}
+    raw = profile.get(["outputs_index"]).get("outputs_index", [])
+    deduped = dedupe_outputs_index(raw)
+    if len(deduped) != len(raw):
+        profile.patch([{"path": "outputs_index", "value": deduped, "op": "set"}])
+    return {"outputs_index": deduped}
 
 
 @router.delete("/outputs/{encoded_path:path}")
