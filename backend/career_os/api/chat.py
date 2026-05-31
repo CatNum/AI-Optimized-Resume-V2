@@ -6,7 +6,6 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from career_os.agents.graphs.coordinator import run_coordinator_turn
-from career_os.agents.lc.worker_llm import plan_workers_with_llm
 from career_os.agents.graphs.workers.registry import build_harness_worker_runner
 from career_os.harness.executor import Harness
 from career_os.harness.gate import match_gate_intent
@@ -62,37 +61,6 @@ def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str
     return []
 
 
-def _determine_workers(message: str, session_state: dict[str, Any]) -> list[str]:
-    gate_workers = _apply_pending_gate(message, session_state)
-    if gate_workers is not None:
-        return gate_workers
-
-    text = message.lower()
-    prior = session_state.get("prior_results") or {}
-    flags = (session_state.get("gates") or {}).get("flags") or {}
-
-    if "jd" in text or "岗位" in message or "job" in text:
-        session_state["list_type"] = "jd"
-        return ["market", "opportunity"]
-    if "初探" in message or "explore" in text:
-        session_state["list_type"] = "explore"
-        return ["identity", "capability"]
-
-    if session_state.get("list_type") == "jd":
-        if (
-            "market" in prior
-            and "opportunity" in prior
-            and "strategy" not in prior
-            and any(k in message for k in ("策略", "继续", "下一步", "制定"))
-        ):
-            return ["strategy"]
-
-    if flags.get("optimize_confirmed"):
-        if ("优化" in message or "resume" in text) and "resume" not in prior:
-            return ["resume", "asset"]
-    return []
-
-
 async def _chat_stream(
     body: ChatRequest,
     session_id: str,
@@ -116,9 +84,9 @@ async def _chat_stream(
         )
 
     session_store.append_message(session_id, "user", body.message)
-    pending = plan_workers_with_llm(body.message, state) or _determine_workers(
-        body.message, state
-    )
+    pending = _apply_pending_gate(body.message, state)
+    if pending is None:
+        pending = []
     context: dict[str, Any] = {}
     if "resume" in pending:
         context["selected_optimization_levels"] = ["标准", "进取"]

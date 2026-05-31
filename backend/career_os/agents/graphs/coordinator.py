@@ -2,6 +2,7 @@ from typing import Any, Callable
 
 from langgraph.graph import END, StateGraph
 
+from career_os.agents.lc.coordinator_llm import analyze_workers, fallback_analyze_workers
 from career_os.agents.lc.worker_llm import synthesize_with_llm
 from career_os.agents.state.coordinator import CoordinatorState
 from career_os.harness.explore_closure import (
@@ -39,8 +40,25 @@ def build_coordinator_graph(
             return state
         pending = list(state.get("pending_workers") or [])
         if not pending:
-            return {**state, "current_worker_id": None}
-        return {**state, "current_worker_id": pending[0]}
+            analysis = analyze_workers(
+                state.get("user_message", ""),
+                state.get("session_state") or {},
+                state.get("worker_index") or [],
+            )
+            if not analysis:
+                analysis = fallback_analyze_workers(
+                    state.get("user_message", ""),
+                    state.get("session_state") or {},
+                )
+            if analysis:
+                pending = analysis.get("workers") or []
+                if analysis.get("list_type"):
+                    session_state = dict(state.get("session_state") or {})
+                    session_state["list_type"] = analysis["list_type"]
+                    state = {**state, "session_state": session_state}
+        if not pending:
+            return {**state, "current_worker_id": None, "pending_workers": []}
+        return {**state, "pending_workers": pending, "current_worker_id": pending[0]}
 
     def delegate(state: CoordinatorState) -> CoordinatorState:
         worker_id = state.get("current_worker_id")
