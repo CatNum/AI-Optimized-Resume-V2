@@ -9,6 +9,8 @@ from career_os.agents.graphs.workers import (
     resume,
     strategy,
 )
+from career_os.agents.graphs.workers.react_runner import run_worker_react
+from career_os.agents.lc.client import llm_enabled
 from career_os.agents.lc.worker_llm import enhance_worker_summary_with_llm
 
 WorkerFn = Callable[[Any, str, dict[str, Any], dict[str, Any]], dict[str, Any]]
@@ -24,13 +26,25 @@ WORKER_RUNNERS: dict[str, WorkerFn] = {
 }
 
 
-def build_harness_worker_runner(harness: Any) -> Callable[[str, str, dict[str, Any], dict[str, Any]], dict[str, Any]]:
+def build_harness_worker_runner(
+    harness: Any,
+    *,
+    use_react: bool = True,
+) -> Callable[[str, str, dict[str, Any], dict[str, Any]], dict[str, Any]]:
     def runner(
         worker_id: str,
         goal: str,
         session_state: dict[str, Any],
         context: dict[str, Any],
     ) -> dict[str, Any]:
+        if use_react and llm_enabled():
+            return run_worker_react(
+                harness,
+                worker_id=worker_id,
+                goal=goal,
+                session_state=session_state,
+                context=context,
+            )
         fn = WORKER_RUNNERS.get(worker_id)
         if fn is None:
             return {"worker_id": worker_id, "status": "failed", "error": "unknown worker"}
