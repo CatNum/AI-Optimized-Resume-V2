@@ -6,6 +6,7 @@ from career_os.agents.lc.coordinator_llm import (
     analyze_workers,
     chat_only_synthesis_draft,
     explore_intake_draft,
+    explore_repeat_draft,
     fallback_analyze_workers,
     is_small_talk,
     jd_prerequisites_draft,
@@ -24,7 +25,7 @@ from career_os.harness.session_activity import (
     explore_continue_synthesis_draft,
     explore_flow_active,
 )
-from career_os.harness.explore_intake import enforce_explore_intake
+from career_os.harness.explore_intake import enforce_explore_intake, needs_repeat_intake
 from career_os.harness.explore_guidance import (
     build_explore_guidance_synthesis_draft,
     format_revealed_options,
@@ -93,7 +94,8 @@ def build_coordinator_graph(
         session_state = dict(state.get("session_state") or {})
         session_state.pop("jd_prerequisite_blocked", None)
         session_state.pop("jd_block_reason", None)
-        session_state.pop("explore_intake_blocked", None)
+        if not needs_repeat_intake(session_state):
+            session_state.pop("explore_intake_blocked", None)
         session_state.pop("explore_guidance_reveal_pending", None)
 
         if should_reveal_explore_guidance(state.get("user_message", ""), session_state):
@@ -119,6 +121,11 @@ def build_coordinator_graph(
                 return []
             if result.get("explore_intake_blocked"):
                 session_state["explore_intake_blocked"] = True
+                if result.get("list_type"):
+                    session_state["list_type"] = result["list_type"]
+                return []
+            if result.get("explore_repeat_blocked"):
+                session_state["explore_repeat_blocked"] = True
                 if result.get("list_type"):
                     session_state["list_type"] = result["list_type"]
                 return []
@@ -174,6 +181,13 @@ def build_coordinator_graph(
                 session_state["explore_intake_blocked"] = True
                 if intake_check.get("list_type"):
                     session_state["list_type"] = intake_check["list_type"]
+                pending = []
+            elif intake_check.get("explore_repeat_blocked"):
+                session_state["explore_repeat_blocked"] = True
+                if intake_check.get("list_type"):
+                    session_state["list_type"] = intake_check["list_type"]
+                pending = []
+            elif not intake_check.get("workers"):
                 pending = []
 
         state = {**state, "session_state": session_state}
@@ -311,6 +325,15 @@ def build_coordinator_graph(
             session_state["gates"] = gates
         elif session_state.get("jd_prerequisite_blocked"):
             text = jd_prerequisites_draft(session_state.get("jd_block_reason"))
+        elif session_state.get("explore_repeat_blocked"):
+            text = explore_repeat_draft()
+            gates = dict(session_state.get("gates") or {})
+            gates["pending"] = {
+                "name": "explore_repeat",
+                "prompt": text,
+            }
+            session_state["gates"] = gates
+            session_state.pop("explore_repeat_blocked", None)
         elif session_state.get("explore_intake_blocked"):
             text = explore_intake_draft()
         elif session_state.pop("explore_guidance_reveal_pending", False):

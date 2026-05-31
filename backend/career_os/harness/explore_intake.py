@@ -43,17 +43,53 @@ def is_explore_route(result: dict[str, Any]) -> bool:
     return any(worker_id in {"identity", "capability"} for worker_id in workers)
 
 
+def _gate_flags(session_state: dict[str, Any]) -> dict[str, Any]:
+    return (session_state.get("gates") or {}).get("flags") or {}
+
+
+def needs_repeat_intake(session_state: dict[str, Any]) -> bool:
+    flags = _gate_flags(session_state)
+    if not flags.get("explore_repeat_accepted"):
+        return False
+    baseline = flags.get("explore_repeat_baseline_at")
+    if not baseline:
+        return True
+    profile = ProfileStore().get(["exploration"])
+    intake = (profile.get("exploration") or {}).get("intake") or {}
+    return intake.get("submitted_at") == baseline
+
+
 def enforce_explore_intake(
     result: dict[str, Any],
     session_state: dict[str, Any],
 ) -> dict[str, Any]:
     if not is_explore_route(result):
         return result
-    if explore_intake_submitted():
+
+    flags = _gate_flags(session_state)
+    list_type = result.get("list_type") or "explore"
+
+    if flags.get("explore_repeat_declined"):
+        return {"workers": [], "list_type": list_type}
+
+    if not explore_intake_submitted():
+        return {
+            "workers": [],
+            "list_type": "explore",
+            "explore_intake_blocked": True,
+        }
+
+    if flags.get("explore_repeat_accepted"):
+        if needs_repeat_intake(session_state):
+            return {
+                "workers": [],
+                "list_type": "explore",
+                "explore_intake_blocked": True,
+            }
         return result
-    blocked: dict[str, Any] = {
+
+    return {
         "workers": [],
         "list_type": "explore",
-        "explore_intake_blocked": True,
+        "explore_repeat_blocked": True,
     }
-    return blocked

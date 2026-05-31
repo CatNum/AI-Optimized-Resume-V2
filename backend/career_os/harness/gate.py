@@ -74,6 +74,12 @@ GATE_PATTERNS: list[tuple[str, str, list[str], list[str]]] = [
         [r"放弃", r"换\s*JD\s*不做了", r"不做了"],
         [],
     ),
+    (
+        "explore_repeat",
+        "confirm",
+        [r"再次", r"需要", r"^是$", r"是的", r"要", r"好", r"确认", r"继续"],
+        [r"不用", r"不需要", r"^否$", r"先不", r"算了", r"不要"],
+    ),
 ]
 
 

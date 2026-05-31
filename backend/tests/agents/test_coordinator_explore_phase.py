@@ -14,7 +14,7 @@ from career_os.harness.explore_closure import (
 )
 from career_os.harness.executor import Harness
 from career_os.platform.store.profile import ProfileStore
-from tests.conftest import seed_explore_intake_profile
+from tests.conftest import explore_repeat_cleared_gates, seed_explore_intake_profile
 
 
 @pytest.fixture(autouse=True)
@@ -106,7 +106,7 @@ def test_explore_in_progress_stops_delegate_chain():
             "session_id": "sess_phase",
             "list_type": "explore",
             "prior_results": {},
-            "gates": {"flags": {}},
+            "gates": explore_repeat_cleared_gates(),
             "explore_closure": init_explore_closure(),
         },
         user_message="帮我理清职业方向",
@@ -145,7 +145,7 @@ def test_explore_segment_complete_can_chain_next_worker():
             "session_id": "sess_chain",
             "list_type": "explore",
             "prior_results": {},
-            "gates": {"flags": {}},
+            "gates": explore_repeat_cleared_gates(),
             "explore_closure": init_explore_closure(),
         },
         user_message="继续",
@@ -197,7 +197,7 @@ def test_explore_continuation_when_llm_returns_empty_workers(monkeypatch):
                     "user_visible_summary": "一年只允许你解决一件和职业相关的事，你会选什么？",
                 }
             },
-            "gates": {"flags": {}},
+            "gates": explore_repeat_cleared_gates(),
             "explore_closure": init_explore_closure(),
         },
         user_message="你能给我一些选项吗，你说的和职业有关的事指的是什么？",
@@ -220,7 +220,7 @@ def test_identity_first_question_offers_options_without_listing_them():
             "session_id": "sess_offer",
             "list_type": "explore",
             "prior_results": {},
-            "gates": {"flags": {}},
+            "gates": explore_repeat_cleared_gates(),
             "explore_closure": init_explore_closure(),
         },
         user_message="帮我理清职业方向",
@@ -253,7 +253,7 @@ def test_capability_first_question_offers_options_without_listing_them():
             "prior_results": {
                 "identity": {"phase_status": PHASE_SEGMENT_COMPLETE},
             },
-            "gates": {"flags": {}},
+            "gates": explore_repeat_cleared_gates(),
             "explore_closure": {
                 **init_explore_closure(),
                 "worker_done": {"identity": True, "capability": False},
@@ -318,7 +318,7 @@ def test_explore_guidance_reveal_skips_worker_when_options_pending(monkeypatch):
                 ],
                 "revealed": False,
             },
-            "gates": {"flags": {}},
+            "gates": explore_repeat_cleared_gates(),
             "explore_closure": init_explore_closure(),
         },
         user_message="你能给我一些选项吗？",

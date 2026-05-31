@@ -187,6 +187,29 @@ def test_chat_explore_intake_event(client):
     assert "初探信息表" in body
 
 
+def test_explore_repeat_gate_when_intake_already_submitted(client):
+    payload = {
+        "resume_text": (
+            "李四\n3年工作经验\n当前薪资：25k\n期望岗位：Java开发\n期望薪资：30k\n"
+            "项目：订单系统重构"
+        ),
+        "years_of_experience": "6年",
+    }
+    client.post("/v1/profile/explore-intake", json=payload)
+    sid = client.post("/v1/sessions/new").json()["session_id"]
+
+    with client.stream(
+        "POST",
+        "/v1/chat",
+        json={"session_id": sid, "message": "帮我理清职业方向"},
+        headers={"Accept": "text/event-stream"},
+    ) as response:
+        body = "".join(response.iter_text())
+
+    assert "event: explore_intake" not in body
+    assert "再次" in body or "explore_repeat" in body
+
+
 def test_chat_jd_gate_chain(client):
     session = client.post("/v1/sessions/new").json()["session_id"]
     client.post(

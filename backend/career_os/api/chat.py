@@ -14,6 +14,7 @@ from career_os.harness.executor import Harness
 from career_os.harness.gate import match_gate_intent
 from career_os.harness.orchestrator import ChatOrchestrator
 from career_os.harness.session_activity import build_session_activity
+from career_os.platform.store.profile import ProfileStore
 from career_os.platform.store.session import SessionStore
 from career_os.runtime.sse import format_sse, stream_tokens
 
@@ -53,12 +54,26 @@ def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str
             gates["flags"] = flags
             session_state["gates"] = gates
             return []
+        if gate_name == "explore_repeat":
+            flags["explore_repeat_accepted"] = True
+            profile = ProfileStore().get(["exploration"])
+            intake = (profile.get("exploration") or {}).get("intake") or {}
+            flags["explore_repeat_baseline_at"] = intake.get("submitted_at")
+            gates["pending"] = None
+            gates["flags"] = flags
+            session_state["gates"] = gates
+            session_state["explore_intake_blocked"] = True
+            session_state["list_type"] = "explore"
+            return []
         gates["flags"] = flags
         session_state["gates"] = gates
         return []
 
     if match.get("matched") and match.get("intent") == "reject":
         gates["pending"] = None
+        if gate_name == "explore_repeat":
+            flags["explore_repeat_declined"] = True
+            gates["flags"] = flags
         session_state["gates"] = gates
         return []
 

@@ -67,6 +67,10 @@ def explore_intake_draft() -> str:
     )
 
 
+def explore_repeat_draft() -> str:
+    return "您已完成初探，是否需要再次进行？"
+
+
 def is_small_talk(user_message: str) -> bool:
     text = user_message.strip().lower()
     if not text:

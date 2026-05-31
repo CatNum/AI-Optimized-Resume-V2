@@ -1,8 +1,20 @@
 import importlib
 
+from typing import Any
+
 import pytest
 
 from career_os.platform.store.profile import ProfileStore
+
+
+def explore_repeat_cleared_gates() -> dict[str, Any]:
+    """Gates flags for sessions that may enter explore after global intake submit."""
+    return {
+        "flags": {
+            "explore_repeat_accepted": True,
+            "explore_repeat_baseline_at": "2026-05-30T00:00:00Z",
+        }
+    }
 
 
 def seed_explore_intake_profile(store: ProfileStore | None = None) -> ProfileStore:

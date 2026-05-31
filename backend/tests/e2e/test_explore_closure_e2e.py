@@ -10,6 +10,7 @@ from career_os.harness.explore_closure import (
     init_explore_closure,
 )
 from career_os.harness.executor import Harness
+from tests.conftest import explore_repeat_cleared_gates
 
 
 @pytest.fixture
@@ -31,7 +32,7 @@ def test_explore_first_turn_in_progress_no_gate(harness):
         "session_id": "sess_exp",
         "list_type": "explore",
         "prior_results": {},
-        "gates": {"flags": {}},
+        "gates": explore_repeat_cleared_gates(),
         "explore_closure": init_explore_closure(),
     }
     state = run_coordinator_turn(
@@ -50,7 +51,7 @@ def test_explore_first_turn_in_progress_no_gate(harness):
         PHASE_IN_PROGRESS
     )
     draft = state.get("synthesis_draft") or ""
-    assert "看重" in draft or "了解" in draft
+    assert "职业" in draft
 
 
 def test_explore_gate_after_both_segments_complete(harness):
@@ -59,7 +60,7 @@ def test_explore_gate_after_both_segments_complete(harness):
         "session_id": "sess_exp2",
         "list_type": "explore",
         "prior_results": {},
-        "gates": {"flags": {}},
+        "gates": explore_repeat_cleared_gates(),
         "explore_closure": init_explore_closure(),
     }
 
