@@ -4,7 +4,7 @@
 |------|------|
 | 文档版本 | v0.4 |
 | 父文档 | [00-架构总览.md](./00-架构总览.md) |
-| 最后更新 | 2026-05-30（I2 410 session_expired） |
+| 最后更新 | 2026-05-31（M1 history_notice） |
 
 ## 1. 设计原则
 
@@ -79,7 +79,8 @@ data: {"finish_reason":"stop"}
 | `token` | `{"delta":"你"}` | 面向用户的 **模型增量**（一字或子词） | 追加到当前 assistant 气泡，实现 **逐字输出** |
 | `task_snapshot` | `{"list_id":"...","tasks":[...]}` | **任务列表快照**变更（建 list、claim/complete 等） | 刷新只读进度条；**不**提供「开始/放弃」按钮 |
 | `form_request` | `{"type":"onboarding"}` | 协调者判定应 **弹出建档表单** | 打开 onboarding UI；提交走 `POST /v1/profile/onboarding` |
-| `gate` | `{"name":"optimize_confirm","prompt":"..."}` | 可选 **UI 提示**：当前处于某对话闸门 | **仅**高亮/提示；用户 **必须**在输入框确认；语义以 `match_gate_intent` + [10 §2](./10-会话闸门与state.md#2-gates-闸门) 为准 |
+| `gate` | `{"name":"optimize_confirm","prompt":"..."}` | 可选 **UI 提示**：当前处于某对话闸门 | **仅**高亮/提示；用户 **必须**在输入框确认；语义以 `match_gate_intent` + [10 §2](./10-会话闸门与state.md#2-gates闸门) 为准 |
+| `history_notice` | `{"trimmed":true,"usage_ratio":0.97,"recommend_new_session":true}` | **M1-R**：对话窗口已裁剪或接近上限 | 可选轻提示条：「建议新开对话」→ `POST /v1/sessions/new`；**不**阻断 chat |
 | `error` | `{"code":"...","message":"..."}` | 本轮出错（模型不可用、超时等） | 展示错误；保留已收到的 `token`  partial 文本 |
 | `done` | `{"finish_reason":"stop"}` | 对 **本条用户消息** 的处理结束 | 结束 loading；允许发送下一条消息 |
 
@@ -218,7 +219,7 @@ Worker 内部 LLM: 仅 Run 内 messages，不接入 SSE 管道
 
 ## 7. Harness Tool：`register_outputs_index`（asset）
 
-> **非 REST**：由 **资产 Worker** 在 Run 内经 Harness 调用；入参通常来自协调者 `delegate_worker` 注入的 `context.html_deliveries`（即 resume `structured_output` 的同名数组）。协作流程见 [01 §4.3](./01-协调者与Worker.md#43-html-交付协作resume-写盘--asset-登记)、[02 §5](./02-平台服务.md#5-存储层)。
+> **非 REST**：由 **资产 Worker** 在 Run 内经 Harness 调用；入参通常来自协调者 `delegate_worker` 注入的 `context.html_deliveries`（即 resume `structured_output` 的同名数组）。协作流程见 [01 §4.3](./01-协调者与Worker.md#43-html-交付协作resume-写盘--asset-登记)、[02 §6](./02-平台服务.md#6-存储层)。
 
 ### 7.1 调用约束
 

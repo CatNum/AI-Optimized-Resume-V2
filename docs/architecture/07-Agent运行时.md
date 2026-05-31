@@ -2,15 +2,15 @@
 
 | 属性 | 内容 |
 |------|------|
-| 文档版本 | v0.6 |
+| 文档版本 | v0.7 |
 | 父文档 | [00-架构总览.md](./00-架构总览.md) |
-| 最后更新 | 2026-05-30（B1 无跨请求 checkpoint） |
+| 最后更新 | 2026-05-31（M1 对话裁剪） |
 
 ## 1. 选型结论：二者结合
 
 v0.1 采用：**LangChain** 提供 Prompts / Models / Tools；**LangGraph** 编排协调者主图与各 Worker 子图。
 
-**能力选型原则**：协调者只 **派工 + 附索引**；Worker 在子图 **ReAct 循环** 内自行 `load_skill` 与调用业务 tool（见 [02-平台服务 §2–3](./02-平台服务.md)）。
+**能力选型原则**：协调者只 **派工 + 附索引**（Run 启动读 **worker_index**，派工读 **capability_bundle**）；Worker 在子图 **ReAct 循环** 内自行 `load_skill` 与调用业务 tool（见 [02-平台服务 §2–4](./02-平台服务.md)）。
 
 ## 2. 固定约束
 
@@ -25,11 +25,15 @@ v0.1 采用：**LangChain** 提供 Prompts / Models / Tools；**LangGraph** 编�
 
 ## 3. 协调者主图（LangGraph）
 
-**状态字段**：`messages`、`session_id`、`session_state`（含 `prior_results`）、`last_worker_result` 等。
+**状态字段**：`messages`、`session_id`、`worker_index`、`session_state`（含 `prior_results`、`explore_closure`）、`last_worker_result` 等。
 
-**节点**：`analyze` →（`gate_check`）→ `delegate` → `synthesize`。
+**节点**：`analyze` →（`gate_check`）→ `delegate` → `synthesize`（含 **E2** explore 齐套发问）。
 
-`delegate` 调用 Harness `delegate_worker`：**不传 `skill_name`**，由 Harness 写入 `capability_bundle`（skill/tool 索引）。
+`begin_chat`：读 `messages.json` + `state.json`，按 **M1** 裁剪后注入协调者 messages，更新 `messages_meta`；加载 **`worker_index`**。
+
+`synthesize`：若 `explore_closure` 全部 `required_workers` 已 `worker_done` 且 `!gate_pending` → 生成 explore 确认话术并写 `gates.pending`（不等待 Worker `gate_prompt`）。若 **M1-R**（`messages_meta.trimmed` 或 `usage_ratio≥0.95`）→ 在回复 **末尾** 追加新会话推荐。
+
+`delegate` 调用 Harness `delegate_worker`：**不传 `skill_name`**，由 Harness 写入 **`capability_bundle`**。Worker Run `completed` 时 Harness 更新 `explore_closure.worker_done`（[10 §2.5](./10-会话闸门与state.md#25-explore_closuree2-双-worker-收束)）。
 
 ## 4. Worker 子图（自选 Skill + Tool）
 
@@ -44,7 +48,7 @@ stateDiagram-v2
 
 | 阶段 | 行为 |
 |------|------|
-| **boot** | `platform.prompt(worker_id)` + `goal` + `context` + **索引**（无 skill 正文） |
+| **boot** | `platform.prompt(worker_id)` + `goal` + `context` + **索引**（无 skill 正文；**无**全量 session messages，M1） |
 | **react** | LangChain `bind_tools`：`load_skill`、`list_skills`（可选）、业务 tools；LLM 或规则决定下一步 |
 | **load_skill 之后** | 将 `SkillBundle.body` 追加到 `messages`（或 state.skill_context），**后续 token 可见** |
 | **emit** | Pydantic 校验 `structured_output` 返回协调者 |

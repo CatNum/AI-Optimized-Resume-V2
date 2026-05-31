@@ -2,9 +2,9 @@
 
 | 属性 | 内容 |
 |------|------|
-| 文档版本 | v0.3 |
+| 文档版本 | v0.5 |
 | 父文档 | [00-架构总览.md](./00-架构总览.md) |
-| 最后更新 | 2026-05-30 |
+| 最后更新 | 2026-05-31（E2 explore_closure） |
 
 ## 1. 架构原则
 
@@ -75,7 +75,7 @@ stateDiagram-v2
 | `create_task_list` / `create_task` | 多步流程时建图（通常协调者决策后调用） |
 | `start_task_list` | 用户对话表达「开始执行」后调用 |
 | `abandon_task_list` | 用户对话表达放弃后调用 |
-| `complete_task` | milestone 在用户确认话术后 |
+| `complete_task` | 用户确认话术后 **协调者** 调用（**B3**）；Worker 仅可返 `proposed_task_completions` |
 | `profile_get` / `profile_patch` | 协调者提议更新时（须用户确认后 patch） |
 
 协调者 **没有** `load_skill`；该能力仅在 Worker 的 `worker_meta_tools` 中（见 [02-平台服务 §2](./02-平台服务.md#2-skill-管理注册表--worker-自选)）。
@@ -98,7 +98,7 @@ stateDiagram-v2
 
 ```json
 {
-  "run_id": "run_8f2c...",              // 本次 Worker Run 唯一 ID（Agent 运行时，见 02 §4.1）
+  "run_id": "run_8f2c...",              // 本次 Worker Run 唯一 ID（Agent 运行时，见 02 §5.1）
   "worker_id": "opportunity",           // 派工目标 Worker：岗位/机会智能体
   "goal": "解析用户粘贴的 JD，输出推荐结论与结构化匹配要点",  // 协调者下发的任务目标（自然语言指令）
   "capability_bundle": {                // 能力索引包：仅元数据，不含 skill 正文
@@ -151,12 +151,13 @@ stateDiagram-v2
     "user_visible_summary": "供协调者合成对话的摘要"  // 供协调者 synthesize 转述的摘要（非直出 SSE）
   },
   "proposed_profile_patches": [],       // 建议写入 profile 的 patch 列表（Harness 白名单校验后落档）
-  "proposed_task_completions": [],      // 建议完成的 task_id 列表（milestone/work）
+  "proposed_task_completions": [],      // 建议完成的 task_id；由 **协调者** 在用户确认/gate 后 execute complete_task（B3）
   "internal_notes": "可选：供协调者 synthesize 参考的内部要点，不对用户展示"  // 协调者汇总用；不映射 SSE
 }
 ```
 
 - 落档：Harness 校验 `proposed_profile_patches` 白名单后写入；或由 Worker 通过 `profile_patch` 工具提交。
+- **任务完成（B3）**：Worker **不** 调用 `complete_task` / `claim_task`；在 `WorkerResult.proposed_task_completions` 建议 task_id，由协调者在 gate confirm 或 resume/asset 成功后代为 `complete_task`。
 - **对用户可见文案**：**仅** 协调者 `synthesize` 流式输出；Worker **不** 向 SSE 推送 `token`。协调者根据 `structured_output` / `internal_notes` 汇总后回复用户。
 
 ### 4.3 HTML 交付协作（resume 写盘 → asset 登记）
@@ -186,28 +187,33 @@ stateDiagram-v2
 
 ## 5. 典型派工链（JD 主路径）
 
-PRD 阶段顺序不变；**调用拓扑**为星型：
+> **非固定全局流水线**：协调者依据 [02 §3 Worker 注册表](./02-平台服务.md#3-worker-管理注册表--协调者-worker_index) 的 `worker_index` 选人；下图仅为 **golden path 参考**。v0.1 **同轮内顺序连派、不真并行**（C3 遇 gate 则停）。
+
+PRD 阶段顺序不变；**调用拓扑**为星型。**JD 评估**须 **先** `market` **再** `opportunity`（JD-R1：后者依赖前者调研结论注入 `context`）。
 
 ```mermaid
 sequenceDiagram
   participant C as 协调者
+  participant M as market
   participant O as opportunity
   participant S as strategy
   participant Cap as capability
   participant R as resume
   participant A as asset
 
-  C->>O: delegate(JD 评估)
+  C->>M: delegate(市场/公开情报, JD 背景)
+  M-->>C: structured_output → prior_results.market
+  C->>O: delegate(JD 评估, context 含 market)
   O-->>C: structured_output
   C->>C: 对话：推荐/不推荐 + 闸门
-  C->>S: delegate(投递策略, context含 O 结果)
+  C->>S: delegate(投递策略, context 含 O 结果)
   S-->>C: 三时间维度等
   C->>C: 对话：优化确认
   C->>A: delegate(复用建议)
   A-->>C: 复用方案
   C->>Cap: delegate(可选深挖)
   Cap-->>C: bank 更新提议
-  C->>R: delegate(按档优化 + write_resume_html)
+  C->>R: delegate(用户所选档位 × N, write_resume_html)
   R-->>C: html_deliveries[] + 正文摘要
   C->>A: delegate(context 含 html_deliveries)
   A->>A: register_outputs_index（只读校验 + 写索引）
@@ -215,9 +221,12 @@ sequenceDiagram
   C->>C: 合成面向用户的总结
 ```
 
+- **三档 HTML**：用户 **多选** `保守`/`标准`/`进取`（≥1）；同轮 resume Run 内按 **保守→标准→进取** 顺序 `write_resume_html` × N（对齐 [B06 §5.5.1](../prd/B06.%20流程-简历优化%20PRD.md#551-三档选项可多选--通用优化与针对-jd-优化共用)）。
+- **档位解析（Opt-1）**：协调者从 **对话** 解析所选档位（无 UI 多选、无单独 gate）；解析完成后 **直接** `delegate(resume)`，`context.selected_optimization_levels` 注入；默认参考 `profile.resume.last_optimization_levels[]`（跨 session）。详见 [§9 Opt-1](#9-协调者路由策略)。
+
 ## 5.1 典型派工链（`list_type=plan` 纯规划）
 
-无具体 JD、**不生成 HTML**；协调者星型派工，Preset 见 [02 §4.4 Preset `plan`](./02-平台服务.md#44-典型任务流程预设preset)。
+无具体 JD、**不生成 HTML**；协调者星型派工（选人见 [02 §3](./02-平台服务.md#3-worker-管理注册表--协调者-worker_index)），Preset 见 [02 §5.4 Preset `plan`](./02-平台服务.md#54-典型任务流程预设preset)。
 
 ```mermaid
 sequenceDiagram
@@ -236,21 +245,30 @@ sequenceDiagram
 ```
 
 - `strategy` 可读 `profile.json` 全档；**不要求** `opportunity_snapshots`。
-- 用户确认的路径写入 `strategy.*`、`career.*` 后，可 `complete_task` 结束 `plan` list。
+- 用户确认的路径写入 `strategy.*`、`career.*` 后，协调者 **`complete_task`** 结束 `plan` list（B3）。
 
 ## 6. 闸门与对话确认
 
-[PRD 附录 B](../prd/00.%20职业规划%20Agent%20PRD.md#附录-b确认话术建议) 闸门：**领域 Worker** 在 `structured_output` 中产出确认问句（如 `gate_prompt`）；**协调者** `synthesize` 转述后经 SSE 对用户呈现。Harness 提供 `match_gate_intent(user_text)`（**M2**：规则优先，未命中时轻量 LLM 分类），**不**提供独立确认 API。闸门临时态见 [10 §2](./10-会话闸门与state.md#2-gates-闸门)；`gate_prompt` 必填/禁止规则见 [09](./09-Worker结构化输出.md)。
+[PRD 附录 B](../prd/00.%20职业规划%20Agent%20PRD.md#附录-b确认话术建议) 闸门分两类：
+
+1. **Worker 闸门**：领域 Worker 在 `structured_output` 中产出 `gate_prompt`；协调者 `synthesize` 转述后经 SSE 对用户呈现。
+2. **协调者闸门（E2）**：`explore_complete` / `explore_review_complete` — `explore_closure` 齐套后 **由协调者 synthesize 发问**（identity/capability **禁止** explore 类 `gate_prompt`）。
+
+Harness 提供 `match_gate_intent(user_text)`（**M2**）。闸门临时态见 [10 §2](./10-会话闸门与state.md#2-gates闸门)；Worker `gate_prompt` 规则见 [09](./09-Worker结构化输出.md)；explore 收束见 [10 §2.5](./10-会话闸门与state.md#25-explore_closuree2-双-worker-收束)。
 
 | `gate_name` | 产出者 | `gate_prompt` | 用户确认后（不可见域白名单 / 可见前置） |
 |-------------|--------|---------------|----------------------------------------|
 | 进入深度探讨 | 协调者自拟邀请 | — | `gates.flags.deep_explore_accepted`；可弹建档表单 |
-| 初探完成 | **E1**：`context.gate_owner` 指定 `identity` **或** `capability` | **仅 owner 必填**；另一 Worker **禁止** 出现 | patch `exploration.*` + `exploration.completed_at`（[10 §3](./10-会话闸门与state.md#3-profile-落档双路径-p3)） |
+| 初探完成 | **协调者（E2）** | Worker **禁止** | `apply_proposed_patches` + `exploration.completed_at`（[10 §3](./10-会话闸门与state.md#3-profile-落档双路径-p3)） |
+| 初探复盘完成 | **协调者（E2）** | Worker **禁止** | 同上 + **刷新** `exploration.completed_at` |
 | 不推荐仍继续 | `opportunity`（**O1**） | `not_recommended` 时 **必填** | `career.jd_override[]` + `jd_continue_despite_not_recommended` |
-| 优化确认 | `strategy`（**St1**，JD 路径） | `requires_optimize_gate` 时 **必填**；`plan` **禁止** | `optimize_confirmed` → 允许 **可见** `write_resume_html`（[V1](./10-会话闸门与state.md#1-会话工作区生命周期)） |
+| 优化确认 | `strategy`（**St1**，JD 路径） | `requires_optimize_gate` 时 **必填**；`plan` **禁止** | `optimize_confirmed` → 允许 **可见** `write_resume_html`（[13 §3](./13-Profile-写入权限.md#3-可见域html-闸门链)） |
 | 复用确认 | `asset`（`run_kind=reuse`） | **必填** | 用户选定复用/新建/跳过后再派 `resume` |
 
-**协调者路由**：任一 Worker 返回 `gate_prompt` → **C3** 停链 synthesize，等用户下一条消息后再继续 delegate（见 [§9](#9-协调者路由策略)）。
+**协调者路由（C3）**：
+
+- Worker 返回 **`gate_prompt`** → synthesize 后 **结束本轮**，等用户下一条消息。
+- **`explore_closure` 齐套** 且协调者已 synthesize 确认问句（`gate_pending=true`）→ 同上，等用户 confirm。
 
 **未初探走 JD（B1）**：协调者软引导；**不** HTTP 403；不可见域仍可按白名单写入评估 snapshot（O-P1）。
 
@@ -262,6 +280,7 @@ sequenceDiagram
 | 策略 Agent 直接读 opportunity 内存 | 协调者 delegate 时注入 `context` |
 | 子 Agent 互相 `invoke` | 禁止；仅 `delegate_worker` |
 | 协调者预指定 `skill_name` | 禁止；Worker Run 内自选 + `load_skill` |
+| E1 `gate_owner` 指定 explore gate 产出 Worker | **废弃** → **E2** `explore_closure` + 协调者发问（[10 §2.5](./10-会话闸门与state.md#25-explore_closuree2-双-worker-收束)） |
 
 ## 8. 单轮用户消息内的协作（总览）
 
@@ -274,16 +293,33 @@ flowchart LR
   C --> U[合成回复]
 ```
 
-同一 **用户消息触发的协调者循环** 内，**无 `gate_prompt` 时可连续** `delegate` 多个 Worker；**一旦出现 `gate_prompt` 必须 synthesize 并等待用户下一条消息**（C3，见 [§9](#9-协调者路由策略)）。
+同一 **用户消息触发的协调者循环** 内，**无 Worker `gate_prompt` 且 explore 未齐套时可顺序连派**；**Worker 返回 `gate_prompt`** 或 **`explore_closure` 已齐套并待发/coordinator 已问 explore gate** → synthesize 后 **结束本轮**（C3，见 [§9](#9-协调者路由策略)）。
 
 ## 9. 协调者路由策略
 
 | 决策 | 规则 |
 |------|------|
-| **C3** | 无 `gate_prompt` → 可同轮连派；有 `gate_prompt` → synthesize 后 **结束本轮**，等下一条用户消息 |
+| **WR** | Run 启动注入 `worker_index`（`config/workers.registry.json`）；协调者 LLM 据此选人、写 `goal` / `context` |
+| **C3** | 无 Worker `gate_prompt` 且 explore 收束未齐 → 可同轮 **顺序** 连派；Worker `gate_prompt` 或 explore 齐套待发 gate → synthesize 后 **结束本轮** |
+| **E2** | `explore_closure`：`required_workers` + `worker_done`；齐套后 **协调者** 发问；不在 required 内 Worker **视为已结束**；默认首次 `["identity","capability"]` |
+| **Opt-1** | 三档多选：**纯对话**解析 → **无 gate** → 直接 `delegate(resume)`；`context.selected_optimization_levels`；默认读 `profile.resume.last_optimization_levels[]`；**不**写 `state.json` 档位临时位 |
+| **B3** | **`complete_task` 仅协调者**；Worker 返 `proposed_task_completions`；milestone 须在 gate/对话 confirm 后；`work` 在 resume 成功 + `html_deliveries` 校验后按档 complete |
+| **M1** | 协调者 messages：**首条 user + 最近 40 条 / 12k tokens**；Worker 不读全量；见 [10 §1.5](./10-会话闸门与state.md#15-m1-对话历史上限与裁剪) |
+| **M1-R** | `trimmed` 或 `usage_ratio≥0.95` → synthesize **推荐新会话**（不强制） |
+| **JD-R1** | `list_type=jd` → `opportunity` 前 **须** 已有 `prior_results.market`（Harness 硬拦） |
 | **T6-1** | `explore` / `jd` / `plan` 主路径 **必须** `create_task_list`；闲聊/单次 FAQ **不建** list |
-| **Harness** | 硬约束（`optimize_confirmed`、tool 权限、task 状态机） |
-| **协调者 LLM** | 意图识别、Worker 选择、`goal` / `context`（含 `gate_owner`、`requires_optimize_gate` 等） |
+| **Harness** | 硬约束（`optimize_confirmed`、tool 权限、task 状态机、JD-R1、explore 类 Worker 禁 `gate_prompt`） |
+| **协调者 LLM** | 意图识别、Worker 选择、`goal` / `context`（含 `explore_closure.required_workers`、`selected_optimization_levels`、`requires_optimize_gate` 等） |
+
+#### Opt-1：三档多选（纯对话）
+
+| 项 | 约定 |
+|----|------|
+| **触发** | `optimize_confirmed` 且（可选）B06 §5.5.0 深挖已跳过/完成 |
+| **解析** | 协调者从用户消息识别 `保守`/`标准`/`进取`（≥1）；未明说时 **默认** `profile.resume.last_optimization_levels[]`（空则协调者 synthesize 询问，**仍无** formal gate） |
+| **存储** | **不**在 `state.json` 存档位；仅 Run 内 `context.selected_optimization_levels` + 成功后 `resume` → `profile_patch` → `last_optimization_levels[]` |
+| **派工** | 解析齐 → **直接** `delegate(resume)`；协调者按需先 `create_task` × N（Preset jd work） |
+| **前端** | 无多选控件（[06 §3](./06-前端架构.md#3-流式-ui-行为)） |
 
 `structured_output` 字段契约见 [09-Worker结构化输出.md](./09-Worker结构化输出.md)。
 

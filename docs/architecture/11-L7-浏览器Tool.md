@@ -74,7 +74,7 @@ flowchart TB
 
 ## 4. 与 Worker 输出衔接
 
-Worker 将引用写入 `structured_output.external_sources` 或经 `profile_patch` 写入 `market.trend_notes[]` / `opportunity_snapshots[].external_sources[]`（须 `source_url`、`fetched_at`）。
+Worker 将引用写入 `structured_output.external_sources` 或经 `profile_patch` 写入 `market.trend_notes[]` / `market.opportunity_snapshots[].external_sources[]`（须 `source_url`、`fetched_at`）。
 
 ## 5. 配置
 

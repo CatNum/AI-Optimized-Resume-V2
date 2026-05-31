@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "workers": [
+    {
+      "worker_id": "identity",
+      "label": "身份智能体",
+      "summary": "内心五主题、exploration 归纳、初探/复盘价值锚点",
+      "when_to_use": [
+        "职业初探 identity 线",
+        "初探复盘（exploration 意向变化）",
+        "需要更新 exploration.* 草案"
+      ],
+      "outputs": ["exploration_draft", "exploration.*（gate 后）"],
+      "skills": ["career-inner-exploration"],
+      "tools": ["profile_patch"],
+      "gates_can_emit": [],
+      "notes": "初探/复盘收束 gate 由协调者 E2 发问；本 Worker 仅交 proposed_profile_patches / exploration_draft"
+    },
+    {
+      "worker_id": "capability",
+      "label": "能力智能体",
+      "summary": "experience_bank、capability 图谱、简历深挖与 JD 后素材补齐",
+      "when_to_use": [
+        "初探能力线 / 简历深挖",
+        "JD 优化前经历素材评估（B06 §5.5.0）",
+        "更新 resume.experience_bank 与 capability.*"
+      ],
+      "outputs": ["bank_delta_summary", "capability.*"],
+      "skills": ["career-inner-exploration"],
+      "tools": ["profile_patch", "resume_read"],
+      "gates_can_emit": ["jd_bank_deep_dive"],
+      "notes": "explore 收束 gate 由协调者 E2；JD 后深挖仍产 gate_prompt（B06）；与 identity 共享 skill mode（K2）"
+    },
+    {
+      "worker_id": "market",
+      "label": "市场智能体",
+      "summary": "岗位族、行业趋势、技术周期、公开情报（browser_fetch）",
+      "when_to_use": [
+        "用户咨询市场/岗位方向（可无具体 JD）",
+        "JD 流程：岗位/机会评估前的市场与公开情报调研（B03）",
+        "更新 market.trend_notes、market.role_families"
+      ],
+      "outputs": ["topics", "market.trend_notes[]"],
+      "skills": [],
+      "tools": ["profile_patch", "browser_fetch"],
+      "gates_can_emit": [],
+      "notes": "JD 主路径须先于 opportunity 派工（JD-R1）"
+    },
+    {
+      "worker_id": "opportunity",
+      "label": "岗位/机会智能体",
+      "summary": "JD 解析、匹配评估、推荐/不推荐、opportunity_snapshots",
+      "when_to_use": [
+        "用户粘贴 JD 或描述具体机会",
+        "JD 流程：在市场调研完成后做机会匹配（B03）"
+      ],
+      "outputs": [
+        "recommendation",
+        "market.opportunity_snapshots[]",
+        "jd_fingerprint"
+      ],
+      "skills": [],
+      "tools": ["profile_patch", "browser_fetch"],
+      "gates_can_emit": ["jd_continue_despite_not_recommended"],
+      "hard_prerequisites": [
+        "list_type=jd 时须 session_state.prior_results.market 已存在（JD-R1）"
+      ],
+      "notes": "依赖 market 结论注入 context；不得跳过 market 直接评估 JD"
+    },
+    {
+      "worker_id": "strategy",
+      "label": "策略智能体",
+      "summary": "多路径推演、三时间维度、投递策略与优化确认 gate",
+      "when_to_use": [
+        "JD 路径：机会评估后的投递策略（须 context 含 opportunity 结论）",
+        "plan 路径：无 JD 的长期规划推演"
+      ],
+      "outputs": ["path_options", "three_horizons", "strategy.*", "career.*"],
+      "skills": ["career-jd-alignment"],
+      "tools": ["profile_patch"],
+      "gates_can_emit": ["optimize_confirm"],
+      "notes": "list_type=plan 时禁止 optimize_confirm gate（St1）"
+    },
+    {
+      "worker_id": "resume",
+      "label": "简历智能体",
+      "summary": "按档位优化简历正文并 write_resume_html 落盘",
+      "when_to_use": [
+        "optimize_confirmed 后按用户所选档位生成 HTML（B06）"
+      ],
+      "outputs": ["html_deliveries[]"],
+      "skills": ["resume-module-optimize"],
+      "tools": ["write_resume_html", "profile_patch", "resume_read"],
+      "gates_can_emit": [],
+      "hard_prerequisites": ["optimize_confirmed=true（Harness 硬拦）"],
+      "notes": "用户多选 N 档（N≥1，Opt-1 纯对话）；context.selected_optimization_levels；完成后 patch last_optimization_levels"
+    },
+    {
+      "worker_id": "asset",
+      "label": "资产智能体",
+      "summary": "复用建议、outputs_index 登记、产物删除",
+      "when_to_use": [
+        "优化前复用判断（run_kind=reuse，B05）",
+        "resume 落盘后 register_outputs_index（run_kind=register，B07）"
+      ],
+      "outputs": ["reuse_recommendation", "registered_deliveries"],
+      "skills": [],
+      "tools": ["register_outputs_index", "delete_output"],
+      "gates_can_emit": ["reuse_confirm"],
+      "notes": "禁止 write_resume_html；登记须收到 html_deliveries"
+    }
+  ]
+}

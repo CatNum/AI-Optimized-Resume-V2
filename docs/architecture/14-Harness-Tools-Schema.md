@@ -33,7 +33,7 @@ Worker **仅可见** 其 `tool_index` 内工具；执行统一走 `Harness.execu
 }
 ```
 
-**Harness 硬约束**：无 `optimize_confirmed` → `worker_id=resume` 拒绝（`gate_blocked`）。
+**Harness 硬约束**：无 `optimize_confirmed` → `worker_id=resume` 拒绝（`gate_blocked`）。`list_type=jd` 且无 `session_state.prior_results.market` → `worker_id=opportunity` 拒绝（`delegate_blocked`，JD-R1）。
 
 ### 2.2 Task 工具
 
@@ -186,6 +186,7 @@ Harness 校验 `allowed_workers[mode]`（见 [A03](../prd/A03.%20机制-技能�
 | code | 场景 |
 |------|------|
 | `gate_blocked` | 闸门未满足（如 resume 无 optimize_confirmed） |
+| `delegate_blocked` | 派工前置未满足（如 JD-R1：缺 `prior_results.market`） |
 | `profile_patch_rejected` | 白名单 / actor / 并发冲突 |
 | `task_blocked` | `blockedBy` / `ready` list / milestone 未完成 |
 | `skill_not_allowed` | `load_skill` actor 不在 `allowed_workers` |

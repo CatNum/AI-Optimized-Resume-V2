@@ -2,9 +2,9 @@
 
 | 属性 | 内容 |
 |------|------|
-| 文档版本 | v0.1 |
+| 文档版本 | v0.6 |
 | 父文档 | [01-协调者与Worker.md](./01-协调者与Worker.md) |
-| 最后更新 | 2026-05-30 |
+| 最后更新 | 2026-05-31（Opt-1 三档纯对话解析） |
 
 ## 1. 通则（S2）
 
@@ -14,7 +14,9 @@
 | 校验 | Worker 子图 `emit` 节点；**核心字段严格**，`model_config = extra="allow"` |
 | 失败 | 校验失败 → Run `status: failed` → 协调者 synthesize 说明未完成 |
 | 用户可见 | **仅**协调者 synthesize；Worker **不**映射 SSE `token` |
-| 外层 | `internal_notes`、`proposed_profile_patches` 在 `WorkerResult` 上，非 `structured_output` 内 |
+| **explore 收束（E2）** | `explore_complete` / `explore_review_complete`：**禁止** Worker `gate_prompt`；由协调者在 `explore_closure` 齐套后发问（[10 §2.5](./10-会话闸门与state.md#25-explore_closuree2-双-worker-收束)） |
+| 外层 | `internal_notes`、`proposed_profile_patches`、`proposed_task_completions` 在 `WorkerResult` 上，非 `structured_output` 内 |
+| **B3** | Worker **禁止** `complete_task`；`proposed_task_completions` 供协调者 gate/Run 成功后代为 complete（[02 §5.5](./02-平台服务.md#55-任务完成b3)） |
 
 ## 2. 各 Worker 契约
 
@@ -23,9 +25,8 @@
 | 字段 | 必填 | 说明 |
 |------|:----:|------|
 | `user_visible_summary` | ✓ | 协调者 synthesize |
-| `exploration_draft` | ✓ | 本轮提议的 exploration 片段（gate 前为草案） |
-| `gate_prompt` | 条件 | `context.milestone=explore_complete` 且 `context.gate_owner=identity` 时 **必填** |
-| `gate_prompt` | 禁止 | `gate_owner=capability` 时不得出现 |
+| `exploration_draft` | ✓ | 本轮提议的 exploration 片段（gate 前为草案，经 `proposed_profile_patches`） |
+| `gate_prompt` | **禁止** | explore / explore_review 收束（E2）；其他 gate 不适用 |
 | `is_review_mode` | 可选 | 初探复盘短路径 |
 
 ### 2.2 `capability`
@@ -34,8 +35,8 @@
 |------|:----:|------|
 | `user_visible_summary` | ✓ | |
 | `bank_delta_summary` | ✓ | 无变更时写「沿用既有 bank」 |
-| `gate_prompt` | 条件 | `gate_owner=capability` 且 `explore_complete` 时 **必填** |
-| `gate_prompt` | 禁止 | `gate_owner=identity` 时不得出现 |
+| `gate_prompt` | **禁止** | explore / explore_review 收束（E2） |
+| `gate_prompt` | 条件 | `jd_bank_deep_dive`（B06 §5.5.0）时 **必填** |
 
 ### 2.3 `market`
 
@@ -77,7 +78,7 @@
 | `user_visible_summary` | ✓ | |
 | `html_deliveries` | ✓ | 与 [05 §8](./05-API与流式协议.md#8-harness-toolwrite_resume_htmlresume) 同构；`status=completed` 时 **≥1** |
 
-**约束**：仅 `optimize_confirmed` 后可派工；Run 内须调用 `write_resume_html`，次数与 `html_deliveries.length` 一致。
+**约束**：仅 `optimize_confirmed` 后可派工；Run 内须调用 `write_resume_html`，次数与 `context.selected_optimization_levels.length` 一致（**顺序** 保守→标准→进取，N≥1）。Run 成功后 **`profile_patch`** 更新 `resume.last_optimization_levels[]` 为本次所选（跨 session 默认档）。
 
 ### 2.7 `asset`
 

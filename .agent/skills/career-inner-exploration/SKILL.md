@@ -29,7 +29,7 @@ modes:
 | 头脑风暴（Superpowers） | 本技能包 |
 |------------------------------|----------|
 | 产出技术/产品设计 spec | 产出 `profile.json` → `exploration.*` + `resume.experience_bank` |
-| 下一步 `writing-plans` | 下一步：用户确认初探 → `complete_task` 里程碑 → 解锁岗位描述流程 |
+| 下一步 `writing-plans` | 下一步：用户确认初探（E2 协调者 gate）→ 协调者 `complete_task` 里程碑 → 解锁 JD 流程 |
 | 禁止写代码 | 禁止 JD 评估、简历 HTML、建 `list_type=jd` 的任务 list；**禁止** 在本阶段改写 `resume.source_path` 指向的基线 Markdown |
 
 ## HARD-GATE
@@ -44,7 +44,7 @@ modes:
 
 允许：在用户已提交表单后阅读 `profile.json`、在当前 `list_type=explore`（或 `plan`）的 list 下创建/推进里程碑与对话。`preference_tags.custom[]` 由 HTML 交付命名后系统沉淀，初探阶段不维护（见 [A01 §5.1.5](../../docs/prd/A01.%20机制-职业档案%20PRD.md)）。
 
-初探 **落档完成** 的唯一出口：用户发送附录 B 话术（如 `确认完成初探`）且各探索字段已写入后，调用 `complete_task` 并设置 `exploration.completed_at`。
+初探 **落档完成**的唯一出口：用户发送附录 B 话术（如 `确认完成初探`）且各探索字段已写入后，由 **协调者**（E2 gate confirm 后）设置 `exploration.completed_at` 并 `complete_task`；Worker 可返 `proposed_task_completions`（B3）。
 
 ---
 
@@ -77,7 +77,7 @@ Worker Run 内 **自行** 调用 `load_skill("career-inner-exploration", mode=�
 9. **交叉与深挖** — 内心五主题与简历素材是否矛盾；**一个** 追问澄清；镜像倾听。
 10. **路径草案（可选）** — 2–3 种职业方向/节奏 trade-off；写入 `career.next_hop` / `career.horizon_3_5y` **草案** 前须分段确认。
 11. **初探摘要 + 经历素材摘要** — `exploration.summary`（200–400 字）与 `resume.experience_bank.narrative_summary`（200–500 字）**分段呈现**，分别确认。
-12. **落档** — 写入 `exploration.*`、`resume.experience_bank`、更新 `career.*` 草案；`exploration.completed_at`；`complete_task` 初探 milestone；提示可粘贴 JD。
+12. **落档** — 写入 `exploration.*`、`resume.experience_bank`、更新 `career.*` 草案（`proposed_profile_patches`）；在 `proposed_task_completions` 建议初探 milestone；**不** 自行 `complete_task`（协调者 E2 confirm 后执行）。
 
 **交织原则**：步骤 4、6 的简历对照问用于 **轻触达**；步骤 8 为 **集中深挖**，不可省略（有 `resume.source_path` 时）。
 
@@ -92,7 +92,7 @@ Worker Run 内 **自行** 调用 `load_skill("career-inner-exploration", mode=�
 3. **简历素材探针（一次一问）** — 「有没有 **新经历或新成果** 要补进档案？（简历里没写全的也算）」— 若 **无**，保留原 `experience_bank`；若 **有**，走 2–4 轮短追问并更新 `items[]` / `narrative_summary`。
 4. **交叉深挖** — 仅针对 **发生变化** 的内心字段追问 2–4 轮；未变字段保留原值。
 5. **更新 summary** — 修订 `exploration.summary`（及按需修订 `narrative_summary`），**分段确认**。
-6. **落档** — 更新有变字段；刷新 `exploration.completed_at`；用户 `确认完成初探` / `确认复盘完成` 后 `complete_task`。
+6. **落档** — 更新有变字段；在 `proposed_task_completions` 建议 milestone；用户 `确认完成初探` / `确认复盘完成` 后由协调者刷新 `completed_at` 并 `complete_task`（E2 + B3）。
 
 ---
 

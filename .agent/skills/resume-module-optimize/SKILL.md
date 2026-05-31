@@ -57,7 +57,7 @@ description: >-
    - 全文连贯性 pass（可选 work）
    - **大语言模型选取文件名标签**（见下）→ 对 **每个所选档位** 生成 `{YYYY-MM-DD}-{能力偏好摘要}-{保守|标准|进取}.html`
    - 更新 `index.html` 列表（每档一行，`outputs_index[].optimization_level`）
-6. **单模块循环** — 每个 work：`claim_task` → 产出修改片段（内部推理）→ 合并进当前稿 → `complete_task`（删除该 task 文件）
+6. **单模块循环** — 每个 work：产出修改片段 → 合并进当前稿 → 在 `proposed_task_completions` 建议对应 `work` task_id；**不** 自行 `claim_task` / `complete_task`（协调者 resume Run 成功后 B3 代为 complete）
 7. **文件名标签（大语言模型）** — 生成网页前，根据 `profile.json`（含 exploration/career/简历）+ **当前岗位描述 + 当轮对话** 选 1–3 个标签；`custom[]` = 默认词表外，交付确认后沉淀新词表外标签：
    - 优先级：`selected[]` > 默认词表**未选**项 > `custom[]` > 必要时生成新词表外标签（简历交付确认后写入 `custom[]`）
    - **禁止** 照搬历史文件名/`outputs_index` 组合
