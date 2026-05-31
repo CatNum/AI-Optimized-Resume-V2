@@ -7,6 +7,11 @@ description: >-
   user confirms resume optimization. Loads exploration.* from profile.json.
   One question per turn; updates career.* fields. MUST NOT optimize resume or
   generate HTML. Invoked by strategy Worker via Harness load_skill in Run.
+modes:
+  jd_alignment:
+    allowed_workers: [strategy]
+  jd_plan:
+    allowed_workers: [strategy]
 ---
 
 # 岗位对齐探讨

@@ -2,6 +2,7 @@ from typing import Any
 
 from career_os.harness.errors import HarnessError
 from career_os.platform.skill.registry import SkillRegistry
+from career_os.platform.trace.writer import TraceWriter
 from career_os.platform.worker.registry import WorkerRegistry
 
 
@@ -14,6 +15,13 @@ def load_skill(actor: str, args: dict[str, Any]) -> dict[str, Any] | HarnessErro
     )
     if hasattr(bundle, "code"):
         return HarnessError("skill_not_allowed", bundle.message)
+    TraceWriter().emit(
+        "skill.load",
+        actor=actor,
+        tool_name=bundle.name,
+        status="ok",
+        detail={"mode": bundle.mode, "hash": bundle.hash},
+    )
     return {
         "name": bundle.name,
         "mode": bundle.mode,
