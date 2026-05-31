@@ -8,7 +8,7 @@
 |------|------|
 | pytest 总 case | **94** |
 | `-m not llm` 通过 | **88**（6 条 `@pytest.mark.llm` deselect） |
-| `-m llm` 真推理 | **6**（market/opportunity/strategy/resume + golden） |
+| `-m llm` 真推理 | **1 passed / 4 skipped**（无 Key）· 配置 Key 后复跑 4 条 |
 | 分类覆盖（去重后） | **≥23**（见下表，允许跨层） |
 
 ## 分类分布
