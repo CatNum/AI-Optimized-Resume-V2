@@ -53,10 +53,11 @@ def test_chat_jd_gate_chain(client):
     assert "event: done" in body1
 
     body2 = chat("继续制定策略")
-    assert "event: gate" in body2 or "optimize" in body2
+    assert "是否确认" in body2 or "optimize" in body2
 
     body3 = chat("确认优化")
     assert "event: done" in body3
+    assert "context_usage" in body3
 
     outputs = client.get("/v1/outputs").json().get("outputs_index") or []
     assert len(outputs) >= 1

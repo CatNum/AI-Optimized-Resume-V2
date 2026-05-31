@@ -102,13 +102,7 @@ class SessionStore:
     ) -> tuple[list[dict[str, str]], dict[str, Any]]:
         total_count = len(messages)
         if total_count == 0:
-            meta = {
-                "total_count": 0,
-                "loaded_count": 0,
-                "trimmed": False,
-                "usage_ratio": 0.0,
-            }
-            return [], meta
+            return [], self._build_messages_meta([], [], trimmed=False)
 
         first_user = next((m for m in messages if m["role"] == "user"), None)
         loaded = self._trim_by_count(messages, first_user)
@@ -116,16 +110,34 @@ class SessionStore:
 
         loaded_count = len(loaded)
         trimmed = loaded_count < total_count
-        denominator = min(total_count, self._max_messages)
-        usage_ratio = loaded_count / denominator if denominator > 0 else 0.0
+        meta = self._build_messages_meta(messages, loaded, trimmed=trimmed)
+        return loaded, meta
 
-        meta = {
+    def _build_messages_meta(
+        self,
+        all_messages: list[dict[str, str]],
+        loaded_messages: list[dict[str, str]],
+        *,
+        trimmed: bool,
+    ) -> dict[str, Any]:
+        total_count = len(all_messages)
+        loaded_count = len(loaded_messages)
+        token_count = self._estimate_tokens(all_messages)
+        message_ratio = (
+            total_count / self._max_messages if self._max_messages > 0 else 0.0
+        )
+        token_ratio = token_count / self._max_tokens if self._max_tokens > 0 else 0.0
+        usage_ratio = max(message_ratio, token_ratio)
+        return {
             "total_count": total_count,
             "loaded_count": loaded_count,
             "trimmed": trimmed,
+            "message_count": total_count,
+            "max_messages": self._max_messages,
+            "token_count": token_count,
+            "max_tokens": self._max_tokens,
             "usage_ratio": round(usage_ratio, 4),
         }
-        return loaded, meta
 
     def _trim_by_count(
         self, messages: list[dict[str, str]], first_user: dict[str, str] | None

@@ -1,12 +1,19 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { ContextUsageIndicator } from "../components/ContextUsageIndicator";
 import { TaskProgress } from "../components/TaskProgress";
 import { ThinkingIndicator } from "../components/ThinkingIndicator";
 import { useChatSSE } from "../hooks/useChatSSE";
+import type { ContextUsage } from "../lib/contextUsage";
 import { OnboardingForm } from "./OnboardingForm";
 
 type Message = { role: "user" | "assistant"; content: string };
-type PendingGate = { name: string; prompt: string };
+
+async function fetchSessionContext(sessionId: string): Promise<ContextUsage | null> {
+  const r = await fetch(`/v1/sessions/${sessionId}/context`);
+  if (!r.ok) return null;
+  return r.json();
+}
 
 export function ChatPage() {
   const [sessionId, setSessionId] = useState<string | null>(
@@ -15,7 +22,7 @@ export function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
-  const [pendingGate, setPendingGate] = useState<PendingGate | null>(null);
+  const [contextUsage, setContextUsage] = useState<ContextUsage | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [tasks, setTasks] = useState<{ id: string; title: string; status: string }[]>([]);
   const { sendMessage, loading } = useChatSSE();
@@ -30,17 +37,31 @@ export function ChatPage() {
       (lastMessage.role === "assistant" && !lastMessage.content.trim()));
 
   useEffect(() => {
+    if (!sessionId) return;
+    void fetchSessionContext(sessionId).then((usage) => {
+      if (usage) setContextUsage(usage);
+    });
+  }, [sessionId]);
+
+  useEffect(() => {
     if (!stickToBottomRef.current) return;
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, [messages, loading, pendingGate, isThinking]);
+  }, [messages, loading, isThinking]);
 
   function handleScroll() {
     const el = scrollRef.current;
     if (!el) return;
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     stickToBottomRef.current = distanceFromBottom < 96;
+  }
+
+  function applyContextUsage(usage: ContextUsage) {
+    setContextUsage(usage);
+    if (usage.recommend_new_session || usage.trimmed) {
+      setNotice("对话较长，建议新开对话；档案与 HTML 仍保留。");
+    }
   }
 
   async function refreshSession() {
@@ -50,6 +71,8 @@ export function ChatPage() {
     localStorage.setItem("session_id", data.session_id);
     setMessages([]);
     setTasks([]);
+    setContextUsage(null);
+    setNotice(null);
     stickToBottomRef.current = true;
   }
 
@@ -58,7 +81,6 @@ export function ChatPage() {
     if (!input.trim() || loading) return;
     const userText = input.trim();
     setInput("");
-    setPendingGate(null);
     stickToBottomRef.current = true;
     setMessages((prev) => [...prev, { role: "user", content: userText }]);
     let assistant = "";
@@ -80,18 +102,11 @@ export function ChatPage() {
           return [...next, { role: "assistant", content: assistant }];
         });
       },
-      onGate: (payload) => {
-        if (payload.prompt) {
-          setPendingGate({
-            name: payload.name ?? "confirm",
-            prompt: payload.prompt,
-          });
+      onHistoryNotice: applyContextUsage,
+      onDone: async (payload) => {
+        if (payload.context_usage) {
+          applyContextUsage(payload.context_usage);
         }
-      },
-      onHistoryNotice: () => {
-        setNotice("对话较长，建议新开对话；档案与 HTML 仍保留。");
-      },
-      onDone: async () => {
         const taskRes = await fetch("/v1/tasks");
         if (taskRes.ok) {
           const data = await taskRes.json();
@@ -106,9 +121,10 @@ export function ChatPage() {
 
   return (
     <div className="mx-auto flex h-screen max-w-3xl flex-col p-4">
-      <header className="mb-4 shrink-0 flex items-center justify-between">
+      <header className="mb-4 shrink-0 flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">Career OS</h1>
-        <div className="flex gap-3 text-sm">
+        <div className="flex items-center gap-3 text-sm">
+          <ContextUsageIndicator usage={contextUsage} />
           <button className="text-slate-400" onClick={() => setShowForm(true)}>
             建档
           </button>
@@ -124,28 +140,6 @@ export function ChatPage() {
       {notice && (
         <div className="mb-3 shrink-0 rounded border border-amber-700/50 bg-amber-950/40 px-3 py-2 text-sm text-amber-200">
           {notice}
-        </div>
-      )}
-
-      {pendingGate && (
-        <div className="mb-3 shrink-0 rounded border border-sky-700/50 bg-sky-950/40 px-4 py-3 text-sm">
-          <p className="mb-2 text-sky-100">{pendingGate.prompt}</p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className="rounded bg-emerald-700 px-3 py-1 text-white hover:bg-emerald-600"
-              onClick={() => setInput("确认")}
-            >
-              确认
-            </button>
-            <button
-              type="button"
-              className="rounded border border-slate-600 px-3 py-1 text-slate-300 hover:bg-slate-800"
-              onClick={() => setInput("取消")}
-            >
-              取消
-            </button>
-          </div>
         </div>
       )}
 

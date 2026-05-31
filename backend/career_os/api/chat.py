@@ -79,11 +79,7 @@ async def _chat_stream(
     if begin.get("recommend_new_session"):
         yield format_sse(
             "history_notice",
-            {
-                "trimmed": meta.get("trimmed", False),
-                "usage_ratio": meta.get("usage_ratio", 0),
-                "recommend_new_session": True,
-            },
+            orchestrator.context_usage_payload(meta),
         )
 
     session_store.append_message(session_id, "user", body.message)
@@ -130,11 +126,10 @@ async def _chat_stream(
 
     session_store.append_message(session_id, "assistant", text)
 
-    gates = result["session_state"].get("gates", {})
-    if gates.get("pending"):
-        yield format_sse("gate", gates["pending"])
+    _, meta_after = session_store.load_messages_for_coordinator(session_id)
+    context_usage = orchestrator.context_usage_payload(meta_after)
 
-    yield format_sse("done", {"finish_reason": "stop"})
+    yield format_sse("done", {"finish_reason": "stop", "context_usage": context_usage})
     orchestrator.end_chat(session_id)
 
 

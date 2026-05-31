@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from career_os.config import settings
+from career_os.platform.trace.labels import annotate_trace_record
 
 _lock = threading.Lock()
 
@@ -34,18 +35,20 @@ class TraceWriter:
         latency_ms: int | None = None,
         detail: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        record = {
-            "ts": datetime.now(UTC).isoformat(),
-            "event": event,
-            "run_id": run_id or f"run_{uuid.uuid4().hex[:12]}",
-            "session_id": session_id,
-            "worker_id": worker_id,
-            "tool_name": tool_name,
-            "actor": actor,
-            "status": status,
-            "latency_ms": latency_ms,
-            "detail": detail or {},
-        }
+        record = annotate_trace_record(
+            {
+                "ts": datetime.now(UTC).isoformat(),
+                "event": event,
+                "run_id": run_id or f"run_{uuid.uuid4().hex[:12]}",
+                "session_id": session_id,
+                "worker_id": worker_id,
+                "tool_name": tool_name,
+                "actor": actor,
+                "status": status,
+                "latency_ms": latency_ms,
+                "detail": detail or {},
+            }
+        )
         with _lock:
             with self._path_for_today().open("a", encoding="utf-8") as f:
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")

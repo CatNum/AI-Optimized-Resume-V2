@@ -31,6 +31,30 @@ def test_session_expired(orchestrator):
     assert result.code == "session_expired"
 
 
+def test_recommend_new_session_near_limit(orchestrator):
+    state = {"last_activity_at": datetime.now(UTC).isoformat()}
+    meta = {
+        "trimmed": False,
+        "usage_ratio": 0.96,
+        "message_count": 38,
+        "max_messages": 40,
+        "token_count": 100,
+        "max_tokens": 12000,
+    }
+    result = orchestrator.begin_chat("sess_near", state, meta)
+    assert result["recommend_new_session"] is True
+    assert "history_notice" in result
+    orchestrator.end_chat("sess_near")
+
+
+def test_no_recommend_at_low_usage(orchestrator):
+    state = {"last_activity_at": datetime.now(UTC).isoformat()}
+    meta = {"trimmed": False, "usage_ratio": 0.1, "message_count": 4, "max_messages": 40}
+    result = orchestrator.begin_chat("sess_low", state, meta)
+    assert result["recommend_new_session"] is False
+    orchestrator.end_chat("sess_low")
+
+
 def test_recommend_new_session_on_trim(orchestrator):
     state = {"last_activity_at": datetime.now(UTC).isoformat()}
     meta = {"trimmed": True, "usage_ratio": 0.5}

@@ -5,12 +5,14 @@ from pydantic import BaseModel
 
 from career_os.harness.executor import Harness
 from career_os.platform.tool.handlers.outputs import dedupe_outputs_index
+from career_os.harness.orchestrator import ChatOrchestrator
 from career_os.platform.store.profile import ProfileStore
 from career_os.platform.store.session import SessionStore
 from career_os.platform.store.task import TaskStore
 
 router = APIRouter(prefix="/v1")
 harness = Harness()
+orchestrator = ChatOrchestrator()
 
 
 class NewSessionResponse(BaseModel):
@@ -46,6 +48,16 @@ def ping_session(session_id: str):
     now = datetime.now(UTC).isoformat()
     store.update_state(session_id, {"last_activity_at": now})
     return {"session_id": session_id, "last_activity_at": now}
+
+
+@router.get("/sessions/{session_id}/context")
+def session_context(session_id: str):
+    store = SessionStore()
+    state = store.get_state(session_id)
+    if not state.get("last_activity_at"):
+        raise HTTPException(status_code=404, detail="session_not_found")
+    _, meta = store.load_messages_for_coordinator(session_id)
+    return orchestrator.context_usage_payload(meta)
 
 
 @router.post("/profile/onboarding")

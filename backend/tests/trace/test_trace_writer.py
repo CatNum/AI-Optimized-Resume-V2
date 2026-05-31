@@ -33,6 +33,29 @@ def test_execute_tool_writes_tool_call_event(traced_harness):
         and event["actor"] == "identity"
         for event in events
     )
+    event = next(e for e in events if e["event"] == "tool.call")
+    assert "_zh" in event
+    assert "档案补丁 (profile_patch)" in event["_zh"]["tool_name"]
+    assert "身份智能体 (identity)" in event["_zh"]["actor"]
+    assert "工具调用 (tool.call)" in event["_zh"]["event"]
+
+
+def test_trace_zh_summary_for_skill_load(traced_harness):
+    _, writer = traced_harness
+    writer.emit(
+        "skill.load",
+        actor="identity",
+        tool_name="career-inner-exploration",
+        status="ok",
+        detail={"mode": "exploration_first", "hash": "abc123"},
+    )
+    events = writer.read_events()
+    event = events[0]
+    zh = event["_zh"]
+    assert "Skill 加载" in zh["summary"]
+    assert "身份智能体 (identity)" in zh["actor"]
+    assert "职业初探 Skill (career-inner-exploration)" in zh["tool_name"]
+    assert "初探-首次 (exploration_first)" in zh["detail"]["Skill 模式"]
 
 
 def test_delegate_worker_writes_agent_run_start(traced_harness):

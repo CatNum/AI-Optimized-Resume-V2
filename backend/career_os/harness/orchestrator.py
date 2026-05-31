@@ -63,3 +63,9 @@ class ChatOrchestrator:
             return True
         usage_ratio = messages_meta.get("usage_ratio") or 0.0
         return usage_ratio >= self._warn_ratio
+
+    def context_usage_payload(self, messages_meta: dict[str, Any]) -> dict[str, Any]:
+        return {
+            **messages_meta,
+            "recommend_new_session": self._should_recommend_new_session(messages_meta),
+        }
