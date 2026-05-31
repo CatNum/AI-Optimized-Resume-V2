@@ -282,6 +282,63 @@ def test_chat_without_session_id_creates_and_indexes(client):
     assert listed[0]["title_source"] == "fallback"
 
 
+def test_get_tasks_by_session_id(client):
+    sid = client.post("/v1/sessions/new").json()["session_id"]
+    from career_os.platform.store.task import TaskStore
+
+    store = TaskStore()
+    list_id = store.create_task_list(sid, list_type="explore", status="active")
+    store.create_task(list_id, "milestone_1", "初探", kind="milestone")
+
+    r = client.get("/v1/tasks", params={"session_id": sid})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["session_id"] == sid
+    assert body["active_list_id"] == list_id
+    assert len(body["lists"]) == 1
+    assert body["lists"][0]["list_id"] == list_id
+    assert body["lists"][0]["list_type"] == "explore"
+    assert body["lists"][0]["status"] == "active"
+    assert len(body["lists"][0]["tasks"]) == 1
+    assert body["all_tasks_completed"] is False
+
+
+def test_get_tasks_by_session_id_all_completed(client):
+    sid = client.post("/v1/sessions/new").json()["session_id"]
+    from career_os.platform.store.task import TaskStore
+
+    store = TaskStore()
+    list_id = store.create_task_list(sid, status="active")
+    store.create_task(list_id, "milestone_1", "Done step")
+    store.complete_task(list_id, "milestone_1")
+
+    r = client.get("/v1/tasks", params={"session_id": sid})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["all_tasks_completed"] is True
+    assert body["active_list_id"] == list_id
+
+
+def test_get_tasks_without_session_id_v01_compat(client):
+    from career_os.platform.store.task import TaskStore
+
+    store = TaskStore()
+    list_id = store.create_task_list("sess_legacy", status="active")
+    store.create_task(list_id, "milestone_1", "Legacy task")
+
+    r = client.get("/v1/tasks")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["list_id"] == list_id
+    assert len(body["tasks"]) == 1
+
+
+def test_get_tasks_invalid_session_id_400(client):
+    r = client.get("/v1/tasks", params={"session_id": "bad-id"})
+    assert r.status_code == 400
+    assert r.json()["detail"] == "invalid_session_id"
+
+
 def test_chat_sse_llm_stream_multiple_tokens(client, monkeypatch):
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     import career_os.agents.lc.models as models_mod

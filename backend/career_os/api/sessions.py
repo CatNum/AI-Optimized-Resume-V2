@@ -275,18 +275,30 @@ def get_profile():
 
 
 @router.get("/tasks")
-def get_tasks():
-    tasks_dir = TaskStore()._tasks_dir  # noqa: SLF001
-    active_path = tasks_dir / "_active.json"
-    if not active_path.exists():
-        return {"tasks": []}
-    import json
+def get_tasks(session_id: str | None = Query(default=None)):
+    store = TaskStore()
+    if session_id is None:
+        active = store.get_active()
+        list_id = active.get("list_id")
+        if not list_id:
+            return {"tasks": []}
+        return {"list_id": list_id, "tasks": store.list_tasks(list_id)}
 
-    active = json.loads(active_path.read_text(encoding="utf-8"))
-    list_id = active.get("list_id")
-    if not list_id:
-        return {"tasks": []}
-    return {"list_id": list_id, "tasks": TaskStore().list_tasks(list_id)}
+    _validate_session_id(session_id)
+    lists = store.list_lists_for_session(session_id)
+    active = store.get_active()
+    active_list_id = (
+        active.get("list_id")
+        if active.get("session_id") == session_id
+        else None
+    )
+    all_tasks_completed = all(not item["tasks"] for item in lists)
+    return {
+        "session_id": session_id,
+        "active_list_id": active_list_id,
+        "lists": lists,
+        "all_tasks_completed": all_tasks_completed,
+    }
 
 
 @router.get("/outputs")

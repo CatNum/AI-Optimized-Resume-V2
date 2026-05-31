@@ -45,6 +45,40 @@ def test_ready_list_blocks_claim_and_complete(task_store):
     assert complete_err.code == "task_blocked"
 
 
+def test_list_lists_for_session_orders_active_then_ready(task_store):
+    active = task_store.create_task_list("sess_a", status="active")
+    ready = task_store.create_task_list("sess_a", status="ready")
+    rows = task_store.list_lists_for_session("sess_a")
+    assert len(rows) == 2
+    assert rows[0]["list_id"] == active
+    assert rows[1]["list_id"] == ready
+
+
+def test_list_lists_for_session_ready_sorted_by_updated_at(task_store, tmp_path):
+    older = task_store.create_task_list("sess_a", status="ready")
+    newer = task_store.create_task_list("sess_a", status="ready")
+    import json
+
+    older_meta_path = tmp_path / "tasks" / older / "meta.json"
+    newer_meta_path = tmp_path / "tasks" / newer / "meta.json"
+    older_meta = json.loads(older_meta_path.read_text(encoding="utf-8"))
+    newer_meta = json.loads(newer_meta_path.read_text(encoding="utf-8"))
+    older_meta["updated_at"] = "2026-01-01T00:00:00+00:00"
+    newer_meta["updated_at"] = "2026-06-01T00:00:00+00:00"
+    older_meta_path.write_text(json.dumps(older_meta), encoding="utf-8")
+    newer_meta_path.write_text(json.dumps(newer_meta), encoding="utf-8")
+
+    rows = task_store.list_lists_for_session("sess_a")
+    assert [r["list_id"] for r in rows] == [newer, older]
+
+
+def test_list_lists_for_session_filters_other_sessions(task_store):
+    task_store.create_task_list("sess_a", status="active")
+    task_store.create_task_list("sess_b", status="active")
+    rows = task_store.list_lists_for_session("sess_a")
+    assert len(rows) == 1
+
+
 def test_delete_lists_for_session(task_store, tmp_path):
     list_id = task_store.create_task_list("sess_a")
     task_store.create_task(list_id, "milestone_1", "Step")

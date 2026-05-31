@@ -119,6 +119,43 @@ class TaskStore:
             task_path.unlink()
             return None
 
+    def get_active(self) -> dict[str, Any]:
+        with _lock:
+            return self._read_active_unlocked()
+
+    def list_lists_for_session(self, session_id: str) -> list[dict[str, Any]]:
+        with _lock:
+            if not self._tasks_dir.exists():
+                return []
+            metas: list[dict[str, Any]] = []
+            for list_dir in self._tasks_dir.iterdir():
+                if not list_dir.is_dir():
+                    continue
+                meta_path = list_dir / "meta.json"
+                if not meta_path.exists():
+                    continue
+                meta = self._read_json(meta_path)
+                if meta.get("session_id") != session_id:
+                    continue
+                metas.append(meta)
+            active = [m for m in metas if m.get("status") == "active"]
+            ready = sorted(
+                (m for m in metas if m.get("status") == "ready"),
+                key=lambda m: m.get("updated_at") or m.get("created_at") or "",
+                reverse=True,
+            )
+            other = [m for m in metas if m.get("status") not in ("active", "ready")]
+            sorted_metas = active + ready + other
+            return [
+                {
+                    "list_id": meta["list_id"],
+                    "list_type": meta.get("list_type"),
+                    "status": meta.get("status"),
+                    "tasks": self._list_tasks_unlocked(meta["list_id"]),
+                }
+                for meta in sorted_metas
+            ]
+
     def delete_lists_for_session(self, session_id: str) -> None:
         with _lock:
             if not self._tasks_dir.exists():
