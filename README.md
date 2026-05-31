@@ -9,10 +9,10 @@
 make install
 # 编辑 backend/.env：LLM_PROVIDER / LLM_API_KEY
 
-# 演示（data/demo）· 默认
-make dev
-# 手测 / 联调（data/test，会话持久保存）
-make dev-test
+# 空白环境（data/blank）
+make dev blank
+# 手测：make dev test · 演示：make dev demo
+# 清空某环境数据：make clean demo
 ```
 
 访问：**http://localhost:15173**
@@ -46,22 +46,26 @@ make dev-test
 
 **环境**：Python ≥ 3.11、[uv](https://docs.astral.sh/uv/)、Node.js（前端）。
 
-**一键启动**（项目根目录，后端 `:18080` + 前端 `:15173`）：
-
-| 命令 | 数据目录 | 用途 |
-|------|----------|------|
-| `make dev` / `make dev-demo` | `backend/data/demo`、`backend/output/demo` | 演示、对外展示 |
-| `make dev-test` | `backend/data/test`、`backend/output/test` | 手测、联调（会话长期保留） |
+**一键启动**（后端 `:18080` + 前端 `:15173`）：
 
 ```bash
-make dev-demo   # 演示
-make dev-test   # 手测
-# 或
-./scripts/dev.sh .env.demo
-./scripts/dev.sh .env.test
+make dev blank      # 空白档案
+make dev test       # 手测（data/test）
+make dev demo       # 演示环境（空档案结构，无预填业务数据）
+make dev sandbox    # 任意后缀，数据完全隔离
 ```
 
-LLM Key 等共用配置写在 **`backend/.env`**；`backend/.env.demo` / `.env.test` 只覆盖 `DATA_DIR` / `OUTPUT_DIR`。pytest 仍用临时目录，不会写入上述路径。
+数据落在 `backend/data/{后缀}/`、`backend/output/{后缀}/`。启动时会创建 **`profile.json` 空结构**（无姓名、JD 等预填值）；业务数据仅在「建档」或对话落档后写入。`data/profile.example.json` 仅供文档/测试参考。
+
+**清空某环境数据**（删除该后缀下的档案、会话、trace、HTML 产出；不影响其它后缀）：
+
+```bash
+make clean demo       # 清除 data/demo 与 output/demo
+make clean test
+./scripts/clean.sh blank
+```
+
+清除后重新启动：`make dev demo`。若浏览器仍连着旧会话，请无痕打开或执行 `localStorage.removeItem('session_id')`。
 
 **分步启动**（需两个终端）：
 
@@ -81,14 +85,15 @@ cd web && npm install && npm run dev
 # → http://localhost:15173
 ```
 
-本地数据与产出（按环境隔离，均不入 Git）：
+本地数据与产出（`backend/data/{SUFFIX}/`、`backend/output/{SUFFIX}/`，均不入 Git）：
 
-| 环境 | 档案 / 会话 | HTML 产出 |
-|------|-------------|-----------|
-| 演示 | `backend/data/demo/` | `backend/output/demo/` |
-| 手测 | `backend/data/test/` | `backend/output/test/` |
+| 后缀 | 典型用途 |
+|------|----------|
+| `blank` | 一次性空白验证 |
+| `test` | 长期手测 |
+| `demo` | 演示（与 blank 相同，档案按需产生） |
 
-端口冲突时可覆盖：`BACKEND_PORT=19080 FRONTEND_PORT=16173 make dev-test`（需同步改 `web/vite.config.ts` 中 proxy 与 `backend/career_os/config.py` 的 CORS）。
+端口冲突：`BACKEND_PORT=19080 FRONTEND_PORT=16173 make dev blank`
 
 ## 仓库结构
 
@@ -101,8 +106,9 @@ cd web && npm install && npm run dev
 ├── docs/prd/              # 产品规格
 ├── docs/architecture/     # 架构与协议
 ├── docs/superpowers/plans/ # 迭代实施计划
-├── scripts/dev.sh         # 本地一键启动（make dev）
-└── Makefile               # make dev / make install
+├── scripts/dev.sh         # make dev <suffix>
+├── scripts/clean.sh       # make clean <suffix>
+└── Makefile
 ```
 
 ## 测试

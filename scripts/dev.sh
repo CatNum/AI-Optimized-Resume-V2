@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKEND_PORT="${BACKEND_PORT:-18080}"
 FRONTEND_PORT="${FRONTEND_PORT:-15173}"
-ENV_PROFILE="${1:-${CAREER_OS_ENV_FILE:-.env.demo}}"
+CAREER_OS_SUFFIX="${1:-${CAREER_OS_SUFFIX:-}}"
 
 # make / 非 login shell 常不含 ~/.local/bin（uv 默认安装路径）
 export PATH="${HOME}/.local/bin:${HOME}/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:${PATH}"
@@ -35,6 +35,24 @@ load_dotenv() {
   fi
 }
 
+validate_suffix() {
+  if [[ ! "${1}" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    echo "错误: 后缀「${1}」非法，仅允许字母、数字、_、-" >&2
+    exit 1
+  fi
+}
+
+if [[ -z "${CAREER_OS_SUFFIX}" ]]; then
+  echo "用法: make dev <suffix>   或   ./scripts/dev.sh <suffix>" >&2
+  echo "示例: make dev blank" >&2
+  exit 1
+fi
+
+prepare_data_dirs() {
+  mkdir -p "${ROOT}/backend/data/${CAREER_OS_SUFFIX}" \
+    "${ROOT}/backend/output/${CAREER_OS_SUFFIX}"
+}
+
 require_cmd uv
 require_cmd npm
 
@@ -48,12 +66,22 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# LLM 等共用配置 + 环境专用 DATA_DIR / OUTPUT_DIR
-load_dotenv "${ROOT}/backend/.env"
-load_dotenv "${ROOT}/backend/${ENV_PROFILE}"
+validate_suffix "${CAREER_OS_SUFFIX}"
 
-echo ">>> 环境配置 ${ENV_PROFILE}"
-echo ">>> DATA_DIR=${DATA_DIR:-./data}  OUTPUT_DIR=${OUTPUT_DIR:-./output}"
+export DATA_DIR="./data/${CAREER_OS_SUFFIX}"
+export OUTPUT_DIR="./output/${CAREER_OS_SUFFIX}"
+
+load_dotenv "${ROOT}/backend/.env"
+prepare_data_dirs
+
+echo ">>> 初始化空档案结构（无预填业务数据）..."
+(
+  cd "${ROOT}/backend"
+  export DATA_DIR OUTPUT_DIR
+  uv run python -c "from career_os.platform.store.profile import ProfileStore; ProfileStore().ensure_empty_profile()"
+)
+
+echo ">>> 环境 ${CAREER_OS_SUFFIX}  DATA_DIR=${DATA_DIR}  OUTPUT_DIR=${OUTPUT_DIR}"
 
 echo ">>> 同步后端依赖..."
 (cd "${ROOT}/backend" && uv sync)
@@ -61,8 +89,7 @@ echo ">>> 同步后端依赖..."
 echo ">>> 启动后端 http://127.0.0.1:${BACKEND_PORT}"
 (
   cd "${ROOT}/backend"
-  export DATA_DIR="${DATA_DIR:-./data}"
-  export OUTPUT_DIR="${OUTPUT_DIR:-./output}"
+  export DATA_DIR OUTPUT_DIR
   uv run uvicorn career_os.main:app --reload --port "${BACKEND_PORT}"
 ) &
 

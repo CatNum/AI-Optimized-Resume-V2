@@ -14,6 +14,10 @@ output/**
 # --- Git worktrees (superpowers isolated development) ---
 .worktrees/
 
+# --- 前端构建产物 ---
+web/dist/
+web/tsconfig.tsbuildinfo
+
 # --- IDE / 编辑器 ---
 .idea/
 .vscode/
