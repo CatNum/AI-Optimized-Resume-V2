@@ -59,8 +59,6 @@ class ChatOrchestrator:
         return datetime.now(UTC) - last_dt > timedelta(seconds=self._session_idle_ttl)
 
     def _should_recommend_new_session(self, messages_meta: dict[str, Any]) -> bool:
-        if messages_meta.get("trimmed"):
-            return True
         usage_ratio = messages_meta.get("usage_ratio") or 0.0
         return usage_ratio >= self._warn_ratio
 

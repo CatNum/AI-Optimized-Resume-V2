@@ -3,9 +3,15 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from career_os.api.explore_intake import (
+    ExploreIntakeRequest,
+    get_explore_intake_status,
+    submit_explore_intake,
+)
 from career_os.harness.executor import Harness
 from career_os.platform.tool.handlers.outputs import dedupe_outputs_index
 from career_os.harness.orchestrator import ChatOrchestrator
+from career_os.harness.session_activity import build_session_activity
 from career_os.platform.store.profile import ProfileStore
 from career_os.platform.store.session import SessionStore
 from career_os.platform.store.task import TaskStore
@@ -57,7 +63,20 @@ def session_context(session_id: str):
     if not state.get("last_activity_at"):
         raise HTTPException(status_code=404, detail="session_not_found")
     _, meta = store.load_messages_for_coordinator(session_id)
-    return orchestrator.context_usage_payload(meta)
+    return {
+        **orchestrator.context_usage_payload(meta),
+        "session_activity": build_session_activity(state),
+    }
+
+
+@router.get("/profile/explore-intake/status")
+def explore_intake_status():
+    return get_explore_intake_status()
+
+
+@router.post("/profile/explore-intake")
+def explore_intake(body: ExploreIntakeRequest):
+    return submit_explore_intake(body)
 
 
 @router.post("/profile/onboarding")

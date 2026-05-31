@@ -2,6 +2,7 @@ from typing import Any
 
 from career_os.harness.errors import HarnessError
 from career_os.harness.jd_prerequisites import jd_delegate_block_error
+from career_os.harness.explore_intake import worker_context_from_intake
 from career_os.platform.trace.writer import TraceWriter
 
 
@@ -94,6 +95,8 @@ def delegate_worker(
     merged_context = dict(context or {})
     merged_context["capability_bundle"] = _build_capability_bundle(worker_id)
     merged_context.setdefault("constraints", {"no_fabrication": True})
+    if worker_id in {"identity", "capability"} and session_state.get("list_type") == "explore":
+        merged_context.update(worker_context_from_intake())
 
     return {
         "worker_id": worker_id,

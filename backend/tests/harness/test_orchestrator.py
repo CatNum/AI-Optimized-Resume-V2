@@ -59,6 +59,5 @@ def test_recommend_new_session_on_trim(orchestrator):
     state = {"last_activity_at": datetime.now(UTC).isoformat()}
     meta = {"trimmed": True, "usage_ratio": 0.5}
     result = orchestrator.begin_chat("sess_trim", state, meta)
-    assert result["recommend_new_session"] is True
-    assert "history_notice" in result
+    assert result["recommend_new_session"] is False
     orchestrator.end_chat("sess_trim")

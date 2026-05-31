@@ -13,6 +13,7 @@ from career_os.agents.lc.coordinator_llm import build_synthesis_messages
 from career_os.harness.executor import Harness
 from career_os.harness.gate import match_gate_intent
 from career_os.harness.orchestrator import ChatOrchestrator
+from career_os.harness.session_activity import build_session_activity
 from career_os.platform.store.session import SessionStore
 from career_os.runtime.sse import format_sse, stream_tokens
 
@@ -105,6 +106,10 @@ async def _chat_stream(
         worker_runner=build_harness_worker_runner(harness),
     )
     session_store.update_state(session_id, result["session_state"])
+
+    if result["session_state"].get("explore_intake_blocked"):
+        yield format_sse("explore_intake", {"required": True})
+
     draft = result.get("synthesis_draft") or result.get("synthesis_text") or "已完成处理。"
 
     if llm_enabled():
@@ -128,6 +133,7 @@ async def _chat_stream(
 
     _, meta_after = session_store.load_messages_for_coordinator(session_id)
     context_usage = orchestrator.context_usage_payload(meta_after)
+    context_usage["session_activity"] = build_session_activity(result["session_state"])
 
     yield format_sse("done", {"finish_reason": "stop", "context_usage": context_usage})
     orchestrator.end_chat(session_id)

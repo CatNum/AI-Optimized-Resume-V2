@@ -10,6 +10,14 @@ def test_explore_complete_confirm():
     assert result["intent"] == "confirm"
 
 
+def test_explore_complete_confirm_natural_phrases():
+    pending = {"name": "explore_complete", "prompt": "请确认是否完成初探？"}
+    for message in ("确认完成", "足够完整梳理了", "到位了", "初探已经到位"):
+        result = match_gate_intent(message, pending_gate=pending)
+        assert result["matched"] is True, message
+        assert result["intent"] == "confirm", message
+
+
 def test_optimize_confirm_reject():
     result = match_gate_intent(
         "先不优化",

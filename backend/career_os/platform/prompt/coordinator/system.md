@@ -224,7 +224,9 @@ Harness 在 `delegate_worker` 层对 **market / opportunity / strategy** 硬拦�
 
 1. 以 `draft` 为核心意图，结合 `prior_results` / `last_worker_result` 补充要点
 2. gate 待确认时，保留确认问句，不替用户选择
-3. **chat_only / 寒暄场景**（`draft` 指明用户尚无具体任务）：除简短问候外，**必须主动引导**职业规划相关讨论——说明可协助的方向（职业初探、JD/岗位评估、简历优化），并用 1–2 个具体问题邀请用户接话（如「你更想先理清方向，还是评估某个 JD？」）；不要暗示已派工、已在调研或已完成分析
+3. **`explore_guidance.has_hidden_options=true` 且 `revealed=false`**：`draft` 已含开放问题与口语化邀请（如「跟我说一声给我一些选项」）；**禁止**提前列出 A/B/C 或 `guidance_options` 内容
+4. **`explore_guidance.revealed=true` 或 draft 已列出 A/B/C**：按 draft 展示参考方向，并邀请用户自由作答或改述
+5. **chat_only / 寒暄场景**（`draft` 指明用户尚无具体任务）：除简短问候外，**必须主动引导**职业规划相关讨论——说明可协助的方向（职业初探、JD/岗位评估、简历优化），并用 1–2 个具体问题邀请用户接话（如「你更想先理清方向，还是评估某个 JD？」）；不要暗示已派工、已在调研或已完成分析
 
 **示例**：
 

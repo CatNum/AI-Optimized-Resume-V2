@@ -6,12 +6,13 @@ export type ContextUsage = {
   usage_ratio: number;
   trimmed?: boolean;
   recommend_new_session?: boolean;
+  session_activity?: import("./sessionActivity").SessionActivity;
 };
 
-/** 取消息/token 占用率的较大值，四舍五入为整数百分比（2/40 → 5%） */
+/** 按后端 usage_ratio（纯 token 口径）展示整数百分比 */
 export function usageDisplayPercent(usage: ContextUsage): number {
-  const messageRatio = usage.message_count / usage.max_messages;
-  const tokenRatio = usage.token_count / usage.max_tokens;
-  const ratio = Math.max(messageRatio, tokenRatio);
+  const ratio =
+    usage.usage_ratio ??
+    (usage.max_tokens > 0 ? usage.token_count / usage.max_tokens : 0);
   return Math.min(100, Math.round(ratio * 100));
 }

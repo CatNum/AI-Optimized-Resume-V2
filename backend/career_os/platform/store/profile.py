@@ -23,6 +23,9 @@ EMPTY_PROFILE: dict[str, Any] = {
         "priorities_now": "",
         "current_problems": "",
         "summary": "",
+        "intake": {
+            "submitted_at": None,
+        },
     },
     "career": {
         "current_assessment": {},

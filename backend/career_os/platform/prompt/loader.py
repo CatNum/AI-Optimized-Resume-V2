@@ -10,10 +10,43 @@ _FRONTMATTER_RE = re.compile(r"^---\s*\n.*?\n---\s*\n", re.DOTALL)
 _SECTION_RE = re.compile(r"^### ([^\n]+)\n", re.MULTILINE)
 
 
+def _strip_frontmatter(text: str) -> str:
+    return _FRONTMATTER_RE.sub("", text, count=1).strip()
+
+
+def _read_system_document(path: Path) -> str:
+    return _strip_frontmatter(path.read_text(encoding="utf-8"))
+
+
+def _parse_sections(body: str) -> dict[str, str]:
+    matches = list(_SECTION_RE.finditer(body))
+    sections: dict[str, str] = {}
+    for index, match in enumerate(matches):
+        name = match.group(1).strip()
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(body)
+        sections[name] = body[start:end].strip()
+    return sections
+
+
+@lru_cache(maxsize=32)
+def load_worker_system_prompt(worker_id: str) -> str:
+    """Load worker agent prompt from platform/prompt/{worker_id}/system.md."""
+    md_path = _PROMPT_DIR / worker_id / "system.md"
+    if md_path.exists():
+        return _read_system_document(md_path)
+    legacy_path = _PROMPT_DIR / worker_id / "default.tmpl"
+    if legacy_path.exists():
+        return legacy_path.read_text(encoding="utf-8")
+    return f"You are the {worker_id} worker."
+
+
 def load_prompt(worker_id: str, name: str = "default") -> str:
+    if name == "default":
+        return load_worker_system_prompt(worker_id)
     path = _PROMPT_DIR / worker_id / f"{name}.tmpl"
     if not path.exists():
-        return f"You are the {worker_id} worker."
+        return load_worker_system_prompt(worker_id)
     return path.read_text(encoding="utf-8")
 
 
@@ -39,21 +72,6 @@ class CoordinatorPrompt:
     chat_only_draft: str
     jd_prerequisite_draft_onboarding: str
     jd_prerequisite_draft_explore: str
-
-
-def _strip_frontmatter(text: str) -> str:
-    return _FRONTMATTER_RE.sub("", text, count=1).strip()
-
-
-def _parse_sections(body: str) -> dict[str, str]:
-    matches = list(_SECTION_RE.finditer(body))
-    sections: dict[str, str] = {}
-    for index, match in enumerate(matches):
-        name = match.group(1).strip()
-        start = match.end()
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(body)
-        sections[name] = body[start:end].strip()
-    return sections
 
 
 @lru_cache(maxsize=1)

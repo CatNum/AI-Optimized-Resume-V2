@@ -1,9 +1,32 @@
+import pytest
+
 from career_os.platform.prompt.loader import (
     load_coordinator_prompt,
     load_prompt,
     load_worker_llm_prompt,
+    load_worker_system_prompt,
     render_prompt,
 )
+
+WORKER_IDS = (
+    "identity",
+    "capability",
+    "market",
+    "opportunity",
+    "strategy",
+    "resume",
+    "asset",
+)
+
+WORKER_ROLE_MARKERS = {
+    "identity": "身份智能体",
+    "capability": "能力智能体",
+    "market": "市场智能体",
+    "opportunity": "岗位/机会智能体",
+    "strategy": "策略智能体",
+    "resume": "简历智能体",
+    "asset": "资产智能体",
+}
 
 
 def test_load_coordinator_prompt_is_single_document():
@@ -28,6 +51,17 @@ def test_load_worker_react_boot_user_template():
     assert '{"goal": "test"}' in rendered
 
 
-def test_load_worker_default_prompt():
-    text = load_prompt("market")
-    assert "market worker" in text
+@pytest.mark.parametrize("worker_id", WORKER_IDS)
+def test_load_worker_system_prompt_structure(worker_id: str):
+    text = load_worker_system_prompt(worker_id)
+    assert WORKER_ROLE_MARKERS[worker_id] in text
+    assert "## 1. 角色" in text
+    assert "## 5. ReAct 执行" in text
+    assert "输出契约" in text
+    assert "## 6. 安全与合规" in text
+    assert "gate_prompt" in text or worker_id in {"market", "resume"}
+
+
+def test_load_prompt_delegates_to_system_md():
+    assert load_prompt("market") == load_worker_system_prompt("market")
+    assert "市场智能体" in load_prompt("market")

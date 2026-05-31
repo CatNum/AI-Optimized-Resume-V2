@@ -1,4 +1,4 @@
-def test_usage_ratio_scales_with_message_count(tmp_path, monkeypatch):
+def test_usage_ratio_is_token_based(tmp_path, monkeypatch):
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     monkeypatch.setenv("CHAT_HISTORY_MAX_MESSAGES", "40")
     monkeypatch.setenv("CHAT_HISTORY_MAX_TOKENS", "12000")
@@ -18,8 +18,32 @@ def test_usage_ratio_scales_with_message_count(tmp_path, monkeypatch):
     _, meta = s.load_messages_for_coordinator(sid)
     assert meta["message_count"] == 4
     assert meta["max_messages"] == 40
-    assert meta["usage_ratio"] == 0.1
+    assert meta["token_count"] == 4
+    assert meta["usage_ratio"] == round(4 / 12000, 4)
     assert meta["trimmed"] is False
+
+
+def test_usage_ratio_not_inflated_by_message_count(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("CHAT_HISTORY_MAX_MESSAGES", "40")
+    monkeypatch.setenv("CHAT_HISTORY_MAX_TOKENS", "12000")
+    import importlib
+
+    import career_os.config as config_mod
+    import career_os.platform.store.session as session_mod
+
+    importlib.reload(config_mod)
+    importlib.reload(session_mod)
+    SessionStore = session_mod.SessionStore
+
+    s = SessionStore()
+    sid = s.create_session()
+    for i in range(38):
+        s.append_message(sid, "user" if i % 2 == 0 else "assistant", "x")
+    _, meta = s.load_messages_for_coordinator(sid)
+    assert meta["message_count"] == 38
+    assert meta["usage_ratio"] == round(38 / 12000, 4)
+    assert meta["usage_ratio"] < 0.95
 
 
 def test_messages_trim_keeps_first_user(tmp_path, monkeypatch):

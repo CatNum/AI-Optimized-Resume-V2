@@ -10,9 +10,14 @@ from career_os.main import app
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     monkeypatch.setenv("OUTPUT_DIR", str(tmp_path / "output"))
+    monkeypatch.setenv("LLM_API_KEY", "")
     import career_os.config as config_mod
+    import career_os.platform.store.profile as profile_mod
+    from career_os.agents.lc import models as models_mod
 
     importlib.reload(config_mod)
+    importlib.reload(profile_mod)
+    models_mod.model_settings.__init__()
     return TestClient(app)
 
 
@@ -30,6 +35,40 @@ def test_profile_onboarding(client):
     assert r.status_code == 200
     profile = client.get("/v1/profile").json()
     assert profile["basic"]["name"] == "测试"
+
+
+def test_explore_intake_submit(client):
+    payload = {
+        "resume_text": (
+            "李四\n3年工作经验\n当前薪资：25k\n期望岗位：Java开发\n期望薪资：30k\n"
+            "项目：订单系统重构"
+        ),
+        "years_of_experience": "6年",
+    }
+    r = client.post("/v1/profile/explore-intake", json=payload)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["submitted"] is True
+    status = client.get("/v1/profile/explore-intake/status").json()
+    assert status["submitted"] is True
+    assert status["intake"]["resolved_fields"]["years_of_experience"] == "6年"
+    assert status["intake"]["resolved_fields"]["target_role"] == "Java开发"
+    assert status["intake"]["resolved_fields"]["current_salary"] == "25K"
+
+
+def test_chat_explore_intake_event(client):
+    session = client.post("/v1/sessions/new").json()["session_id"]
+
+    with client.stream(
+        "POST",
+        "/v1/chat",
+        json={"session_id": session, "message": "帮我理清职业方向"},
+        headers={"Accept": "text/event-stream"},
+    ) as response:
+        body = "".join(response.iter_text())
+
+    assert "event: explore_intake" in body
+    assert "初探信息表" in body
 
 
 def test_chat_jd_gate_chain(client):

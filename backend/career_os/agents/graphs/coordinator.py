@@ -5,14 +5,33 @@ from langgraph.graph import END, StateGraph
 from career_os.agents.lc.coordinator_llm import (
     analyze_workers,
     chat_only_synthesis_draft,
+    explore_intake_draft,
     fallback_analyze_workers,
     is_small_talk,
     jd_prerequisites_draft,
 )
 from career_os.agents.state.coordinator import CoordinatorState
 from career_os.harness.explore_closure import (
+    EXPLORE_WORKERS,
     can_set_explore_gate_pending,
+    explore_continuation_analyze,
+    explore_phase_status,
+    is_explore_segment_complete,
     mark_worker_done,
+    plan_explore_worker_dispatch,
+)
+from career_os.harness.session_activity import (
+    explore_continue_synthesis_draft,
+    explore_flow_active,
+)
+from career_os.harness.explore_intake import enforce_explore_intake
+from career_os.harness.explore_guidance import (
+    build_explore_guidance_synthesis_draft,
+    format_revealed_options,
+    mark_explore_guidance_revealed,
+    persist_worker_guidance,
+    should_reveal_explore_guidance,
+    supports_explore_guidance,
 )
 from career_os.harness.errors import HarnessError
 from career_os.harness.jd_prerequisites import parse_jd_b1_block_reason
@@ -74,6 +93,19 @@ def build_coordinator_graph(
         session_state = dict(state.get("session_state") or {})
         session_state.pop("jd_prerequisite_blocked", None)
         session_state.pop("jd_block_reason", None)
+        session_state.pop("explore_intake_blocked", None)
+        session_state.pop("explore_guidance_reveal_pending", None)
+
+        if should_reveal_explore_guidance(state.get("user_message", ""), session_state):
+            mark_explore_guidance_revealed(session_state)
+            return {
+                **state,
+                "session_state": session_state,
+                "current_worker_id": None,
+                "pending_workers": [],
+                "stop_delegate": True,
+            }
+
         analysis: dict[str, Any] | None = None
         source: str | None = None
 
@@ -84,6 +116,11 @@ def build_coordinator_graph(
             if result.get("jd_prerequisite_blocked"):
                 session_state["jd_prerequisite_blocked"] = True
                 session_state["jd_block_reason"] = result.get("jd_block_reason")
+                return []
+            if result.get("explore_intake_blocked"):
+                session_state["explore_intake_blocked"] = True
+                if result.get("list_type"):
+                    session_state["list_type"] = result["list_type"]
                 return []
             workers = result.get("workers") or []
             if result.get("list_type"):
@@ -116,6 +153,29 @@ def build_coordinator_graph(
                     source = "none"
                     pending = []
 
+        if (
+            not pending
+            and not session_state.get("explore_intake_blocked")
+            and not is_small_talk(state.get("user_message", ""))
+        ):
+            continued = explore_continuation_analyze(session_state)
+            if continued and continued.get("workers"):
+                pending = continued["workers"]
+                if continued.get("list_type"):
+                    session_state["list_type"] = continued["list_type"]
+                source = "continuation" if source in (None, "llm", "none", "fallback") else source
+
+        if pending and not session_state.get("explore_intake_blocked"):
+            intake_payload: dict[str, Any] = {"workers": pending}
+            if session_state.get("list_type"):
+                intake_payload["list_type"] = session_state["list_type"]
+            intake_check = enforce_explore_intake(intake_payload, session_state)
+            if intake_check.get("explore_intake_blocked"):
+                session_state["explore_intake_blocked"] = True
+                if intake_check.get("list_type"):
+                    session_state["list_type"] = intake_check["list_type"]
+                pending = []
+
         state = {**state, "session_state": session_state}
 
         if source:
@@ -127,6 +187,8 @@ def build_coordinator_graph(
                 list_type=session_state.get("list_type"),
             )
 
+        planned = plan_explore_worker_dispatch(pending, session_state)
+
         if not pending:
             return {
                 **state,
@@ -134,11 +196,18 @@ def build_coordinator_graph(
                 "current_worker_id": None,
                 "pending_workers": [],
             }
+        if not planned:
+            return {
+                **state,
+                "session_state": session_state,
+                "current_worker_id": None,
+                "pending_workers": pending,
+            }
         return {
             **state,
             "session_state": session_state,
             "pending_workers": pending,
-            "current_worker_id": pending[0],
+            "current_worker_id": planned[0],
         }
 
     def delegate(state: CoordinatorState) -> CoordinatorState:
@@ -178,19 +247,31 @@ def build_coordinator_graph(
             prior_results[worker_id] = worker_result.get("structured_output") or {}
         session_state["prior_results"] = prior_results
 
+        structured = worker_result.get("structured_output") or {}
+        if worker_result.get("status") == "completed" and supports_explore_guidance(worker_id):
+            persist_worker_guidance(session_state, worker_id, structured)
+        gate_prompt = structured.get("gate_prompt")
         explore_closure = mark_worker_done(
-            session_state.get("explore_closure"), worker_id
+            session_state.get("explore_closure"),
+            worker_id,
+            structured_output=structured,
         )
         session_state["explore_closure"] = explore_closure
 
-        structured = worker_result.get("structured_output") or {}
-        gate_prompt = structured.get("gate_prompt")
         stop_delegate = bool(gate_prompt)
-        if can_set_explore_gate_pending(explore_closure):
+        if (
+            worker_id in EXPLORE_WORKERS
+            and explore_phase_status(structured) != "segment_complete"
+        ):
+            stop_delegate = True
+        elif can_set_explore_gate_pending(explore_closure):
             stop_delegate = True
 
         pending = list(state.get("pending_workers") or [])
-        if worker_id in pending:
+        if worker_id in pending and (
+            worker_id not in EXPLORE_WORKERS
+            or is_explore_segment_complete(worker_id, structured)
+        ):
             pending.remove(worker_id)
 
         return {
@@ -230,9 +311,21 @@ def build_coordinator_graph(
             session_state["gates"] = gates
         elif session_state.get("jd_prerequisite_blocked"):
             text = jd_prerequisites_draft(session_state.get("jd_block_reason"))
+        elif session_state.get("explore_intake_blocked"):
+            text = explore_intake_draft()
+        elif session_state.pop("explore_guidance_reveal_pending", False):
+            text = format_revealed_options(session_state.get("explore_guidance") or {})
         else:
             if state.get("delegate_count", 0) == 0 and not structured:
-                text = chat_only_synthesis_draft()
+                if explore_flow_active(session_state):
+                    text = explore_continue_synthesis_draft(session_state)
+                else:
+                    text = chat_only_synthesis_draft()
+            elif worker_id := (last.get("worker_id") or state.get("current_worker_id")):
+                if supports_explore_guidance(worker_id) and structured:
+                    text = build_explore_guidance_synthesis_draft(structured, session_state)
+                else:
+                    text = structured.get("user_visible_summary") or "已完成本轮处理。"
             else:
                 text = structured.get("user_visible_summary") or "已完成本轮处理。"
 

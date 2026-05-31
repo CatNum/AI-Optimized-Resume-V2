@@ -1,10 +1,12 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ContextUsageIndicator } from "../components/ContextUsageIndicator";
 import { TaskProgress } from "../components/TaskProgress";
 import { ThinkingIndicator } from "../components/ThinkingIndicator";
 import { useChatSSE } from "../hooks/useChatSSE";
 import type { ContextUsage } from "../lib/contextUsage";
+import type { SessionActivity } from "../lib/sessionActivity";
+import { ExploreIntakeForm } from "./ExploreIntakeForm";
 import { OnboardingForm } from "./OnboardingForm";
 
 type Message = { role: "user" | "assistant"; content: string };
@@ -24,10 +26,12 @@ export function ChatPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [contextUsage, setContextUsage] = useState<ContextUsage | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [tasks, setTasks] = useState<{ id: string; title: string; status: string }[]>([]);
+  const [showExploreIntake, setShowExploreIntake] = useState(false);
+  const [sessionActivity, setSessionActivity] = useState<SessionActivity | null>(null);
   const { sendMessage, loading } = useChatSSE();
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
+  const pendingExploreMessageRef = useRef<string | null>(null);
 
   const lastMessage = messages[messages.length - 1];
   const isThinking =
@@ -39,7 +43,8 @@ export function ChatPage() {
   useEffect(() => {
     if (!sessionId) return;
     void fetchSessionContext(sessionId).then((usage) => {
-      if (usage) setContextUsage(usage);
+      if (!usage) return;
+      applyContextUsage(usage);
     });
   }, [sessionId]);
 
@@ -59,8 +64,13 @@ export function ChatPage() {
 
   function applyContextUsage(usage: ContextUsage) {
     setContextUsage(usage);
-    if (usage.recommend_new_session || usage.trimmed) {
+    if (usage.session_activity?.items?.length) {
+      setSessionActivity(usage.session_activity);
+    }
+    if (usage.recommend_new_session) {
       setNotice("对话较长，建议新开对话；档案与 HTML 仍保留。");
+    } else if (usage.trimmed) {
+      setNotice("较早的对话未纳入当前上下文；如有遗漏可简要复述。");
     }
   }
 
@@ -70,22 +80,21 @@ export function ChatPage() {
     setSessionId(data.session_id);
     localStorage.setItem("session_id", data.session_id);
     setMessages([]);
-    setTasks([]);
+    setSessionActivity(null);
     setContextUsage(null);
     setNotice(null);
     stickToBottomRef.current = true;
   }
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!input.trim() || loading) return;
-    const userText = input.trim();
-    setInput("");
+  async function dispatchChat(userText: string, appendUserMessage: boolean) {
+    if (!userText.trim() || loading) return;
     stickToBottomRef.current = true;
-    setMessages((prev) => [...prev, { role: "user", content: userText }]);
+    if (appendUserMessage) {
+      setMessages((prev) => [...prev, { role: "user", content: userText.trim() }]);
+    }
     let assistant = "";
 
-    await sendMessage(userText, sessionId, {
+    await sendMessage(userText.trim(), sessionId, {
       onSession: (id) => {
         setSessionId(id);
         localStorage.setItem("session_id", id);
@@ -103,20 +112,49 @@ export function ChatPage() {
         });
       },
       onHistoryNotice: applyContextUsage,
+      onExploreIntake: () => {
+        pendingExploreMessageRef.current = userText.trim();
+        setShowExploreIntake(true);
+      },
       onDone: async (payload) => {
         if (payload.context_usage) {
           applyContextUsage(payload.context_usage);
-        }
-        const taskRes = await fetch("/v1/tasks");
-        if (taskRes.ok) {
-          const data = await taskRes.json();
-          setTasks(data.tasks || []);
         }
       },
       onError: async (message) => {
         if (message === "session_expired") await refreshSession();
       },
     });
+  }
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!input.trim() || loading) return;
+    const userText = input.trim();
+    setInput("");
+    await dispatchChat(userText, true);
+  }
+
+  async function handleExploreIntakeSubmitted() {
+    const pending = pendingExploreMessageRef.current;
+    pendingExploreMessageRef.current = null;
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "user",
+        content: "【已提交初探信息表】简历与补充信息已填写，请继续职业初探。",
+      },
+    ]);
+    if (!pending) return;
+    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+    await dispatchChat(pending, false);
+  }
+
+  function handleInputKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key !== "Enter" || e.shiftKey) return;
+    e.preventDefault();
+    if (!input.trim() || loading) return;
+    void onSubmit(e as unknown as FormEvent);
   }
 
   return (
@@ -144,7 +182,7 @@ export function ChatPage() {
       )}
 
       <div className="shrink-0">
-        <TaskProgress tasks={tasks} />
+        <TaskProgress activity={sessionActivity} />
       </div>
 
       <div
@@ -169,11 +207,13 @@ export function ChatPage() {
       </div>
 
       <form onSubmit={onSubmit} className="flex shrink-0 gap-2 border-t border-slate-800 pt-4">
-        <input
-          className="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-4 py-2"
+        <textarea
+          className="flex-1 resize-none rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 leading-relaxed"
+          rows={2}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="输入消息…（纯对话控制，无任务按钮/档位多选）"
+          onKeyDown={handleInputKeyDown}
+          placeholder="输入消息… Enter 发送，Shift+Enter 换行"
           disabled={loading}
         />
         <button
@@ -186,6 +226,12 @@ export function ChatPage() {
       </form>
 
       {showForm && <OnboardingForm onClose={() => setShowForm(false)} />}
+      {showExploreIntake && (
+        <ExploreIntakeForm
+          onClose={() => setShowExploreIntake(false)}
+          onSubmitted={() => void handleExploreIntakeSubmitted()}
+        />
+      )}
     </div>
   );
 }

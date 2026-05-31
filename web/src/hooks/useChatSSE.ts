@@ -5,6 +5,7 @@ type ChatHandlers = {
   onSession: (sessionId: string) => void;
   onToken: (delta: string) => void;
   onHistoryNotice: (payload: ContextUsage) => void;
+  onExploreIntake: () => void;
   onDone: (payload: { context_usage?: ContextUsage }) => void;
   onError: (message: string) => void;
 };
@@ -61,6 +62,7 @@ export function useChatSSE() {
             if (event === "session") handlers.onSession(data.session_id);
             if (event === "token") handlers.onToken(data.delta);
             if (event === "history_notice") handlers.onHistoryNotice(data);
+            if (event === "explore_intake") handlers.onExploreIntake();
             if (event === "done") handlers.onDone(data);
             if (event === "error") handlers.onError(data.message);
           }

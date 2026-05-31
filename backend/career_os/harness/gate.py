@@ -1,12 +1,36 @@
 import re
 from typing import Any
 
+_EXPLORE_COMPLETE_AFFIRMATIVE = [
+    r"确认完成初探",
+    r"确认.*初探.*完成",
+    r"初探完成",
+    r"完成初探",
+    r"^确认完成$",
+    r"确认.*完成",
+    r"足够.*梳理",
+    r"已经到位",
+    r"初探.*到位",
+    r"^到位了?$",
+    r"梳理.*到位",
+    r"聊得差不多",
+    r"可以进入下一",
+    r"没问题了",
+    r"够了",
+]
+
 GATE_PATTERNS: list[tuple[str, str, list[str], list[str]]] = [
     (
         "explore_complete",
         "confirm",
-        [r"确认完成初探", r"初探完成", r"完成初探"],
-        [r"还要改", r"再改改", r"还没好"],
+        [
+            r"确认完成初探",
+            r"初探完成",
+            r"完成初探",
+            r"^确认完成$",
+            r"确认.*完成",
+        ],
+        [r"还要改", r"再改改", r"还没好", r"再聊聊", r"继续聊"],
     ),
     (
         "explore_review_complete",
@@ -53,12 +77,24 @@ GATE_PATTERNS: list[tuple[str, str, list[str], list[str]]] = [
 ]
 
 
+def _matches_explore_complete_affirmative(message: str) -> bool:
+    return any(re.search(pattern, message, re.IGNORECASE) for pattern in _EXPLORE_COMPLETE_AFFIRMATIVE)
+
+
 def match_gate_intent(
     user_message: str,
     pending_gate: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     message = user_message.strip()
     pending_name = (pending_gate or {}).get("name")
+
+    if pending_name == "explore_complete" and _matches_explore_complete_affirmative(message):
+        return {
+            "matched": True,
+            "gate_name": "explore_complete",
+            "intent": "confirm",
+            "confidence": 0.95,
+        }
 
     for gate_name, _default_intent, confirm_patterns, reject_patterns in GATE_PATTERNS:
         if pending_name and gate_name != pending_name:

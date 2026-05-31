@@ -123,11 +123,7 @@ class SessionStore:
         total_count = len(all_messages)
         loaded_count = len(loaded_messages)
         token_count = self._estimate_tokens(all_messages)
-        message_ratio = (
-            total_count / self._max_messages if self._max_messages > 0 else 0.0
-        )
         token_ratio = token_count / self._max_tokens if self._max_tokens > 0 else 0.0
-        usage_ratio = max(message_ratio, token_ratio)
         return {
             "total_count": total_count,
             "loaded_count": loaded_count,
@@ -136,7 +132,7 @@ class SessionStore:
             "max_messages": self._max_messages,
             "token_count": token_count,
             "max_tokens": self._max_tokens,
-            "usage_ratio": round(usage_ratio, 4),
+            "usage_ratio": round(token_ratio, 4),
         }
 
     def _trim_by_count(

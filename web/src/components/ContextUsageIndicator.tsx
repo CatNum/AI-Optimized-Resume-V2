@@ -9,8 +9,6 @@ export function ContextUsageIndicator({ usage }: Props) {
 
   const percent = usageDisplayPercent(usage);
   const warn = usage.recommend_new_session || usage.trimmed;
-  const messageCount = usage.message_count ?? 0;
-  const maxMessages = usage.max_messages ?? 40;
   const tokenCount = usage.token_count ?? 0;
   const maxTokens = usage.max_tokens ?? 12000;
 
@@ -33,9 +31,6 @@ export function ContextUsageIndicator({ usage }: Props) {
       >
         <span className="block tabular-nums whitespace-nowrap">
           Token：{tokenCount}/{maxTokens}
-        </span>
-        <span className="mt-0.5 block tabular-nums whitespace-nowrap">
-          消息：{messageCount}/{maxMessages}
         </span>
       </span>
     </span>

@@ -13,11 +13,23 @@ class GatePrompt(BaseModel):
     prompt: str
 
 
+class GuidanceOption(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    id: str | None = None
+    label: str
+    hint: str | None = None
+    description: str | None = None
+    summary: str | None = None
+
+
 class IdentityOutput(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     user_visible_summary: str
     exploration_draft: dict[str, Any] | str
+    phase_status: Literal["in_progress", "segment_complete"] = "in_progress"
+    guidance_options: list[GuidanceOption] | None = None
     gate_prompt: GatePrompt | None = None
 
     @model_validator(mode="after")
@@ -37,6 +49,8 @@ class CapabilityOutput(BaseModel):
 
     user_visible_summary: str
     bank_delta_summary: str
+    phase_status: Literal["in_progress", "segment_complete"] = "in_progress"
+    guidance_options: list[GuidanceOption] | None = None
     gate_prompt: GatePrompt | None = None
 
     @model_validator(mode="after")

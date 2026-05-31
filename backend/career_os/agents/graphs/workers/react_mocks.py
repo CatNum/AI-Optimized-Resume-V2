@@ -3,7 +3,18 @@ import hashlib
 from typing import Any
 
 from career_os.agents.graphs.workers.base import finalize_worker_result
+from career_os.harness.explore_closure import (
+    PHASE_IN_PROGRESS,
+    PHASE_SEGMENT_COMPLETE,
+)
 from career_os.platform.tool.handlers.resume_html import sort_optimization_levels
+
+
+def _next_explore_phase_status(worker_id: str, session_state: dict[str, Any]) -> str:
+    prior = (session_state.get("prior_results") or {}).get(worker_id) or {}
+    if prior.get("phase_status") == PHASE_IN_PROGRESS:
+        return PHASE_SEGMENT_COMPLETE
+    return PHASE_IN_PROGRESS
 
 
 def mock_run_worker_react(
@@ -119,6 +130,57 @@ def mock_run_worker_react(
         )
 
     if worker_id == "identity":
+        phase_status = _next_explore_phase_status(worker_id, session_state)
+        pending = context.get("explore_intake_pending_fields") or []
+        pending_labels = context.get("explore_intake_pending_labels") or {}
+        if phase_status == PHASE_IN_PROGRESS and pending:
+            labels = [pending_labels.get(key, key) for key in pending[:3]]
+            question = "、".join(labels)
+            return finalize_worker_result(
+                "identity",
+                {
+                    "user_visible_summary": (
+                        f"我已阅读你的简历。还有几项信息需要确认：{question}。"
+                        "请直接回复补充；若暂不方便也可说明。"
+                    ),
+                    "exploration_draft": {"summary": "待补充结构化字段"},
+                    "phase_status": PHASE_IN_PROGRESS,
+                },
+            )
+        if phase_status == PHASE_IN_PROGRESS:
+            return finalize_worker_result(
+                "identity",
+                {
+                    "user_visible_summary": (
+                        "抛开简历和 JD，如果接下来一年只允许你解决一件和职业相关的事，"
+                        "你会选什么？为什么是它而不是别的？"
+                    ),
+                    "exploration_draft": {"summary": "待补充"},
+                    "phase_status": PHASE_IN_PROGRESS,
+                    "guidance_options": [
+                        {
+                            "id": "A",
+                            "label": "在核心技术栈上建立不可替代的深度",
+                            "hint": "如 Go 基础设施、数据治理或安全工程某一垂直做深",
+                        },
+                        {
+                            "id": "B",
+                            "label": "补齐业务/产品视角，向 Tech Lead 过渡",
+                            "hint": "能独立负责模块交付并带 small team",
+                        },
+                        {
+                            "id": "C",
+                            "label": "换到更匹配的行业或公司阶段",
+                            "hint": "如同一技术栈换到更重视工程文化的团队",
+                        },
+                        {
+                            "id": "D",
+                            "label": "先稳住收入与节奏，再规划下一步",
+                            "hint": "短期以可预期的工作与生活平衡为主",
+                        },
+                    ],
+                },
+            )
         harness.execute_tool(
             "identity",
             "profile_patch",
@@ -134,15 +196,52 @@ def mock_run_worker_react(
             {
                 "user_visible_summary": "已完成 identity 初探线，归纳内心诉求草案。",
                 "exploration_draft": {"summary": "用户重视技术深度与稳定团队。"},
+                "phase_status": PHASE_SEGMENT_COMPLETE,
             },
         )
 
     if worker_id == "capability":
+        phase_status = _next_explore_phase_status(worker_id, session_state)
+        if phase_status == PHASE_IN_PROGRESS:
+            return finalize_worker_result(
+                "capability",
+                {
+                    "user_visible_summary": (
+                        "简历里往往还有「做过但没写全」的经历。"
+                        "你觉得哪一段项目或工作，最值得单独拿出来讲一讲？"
+                    ),
+                    "bank_delta_summary": "待用户补充代表性经历",
+                    "phase_status": PHASE_IN_PROGRESS,
+                    "guidance_options": [
+                        {
+                            "id": "A",
+                            "label": "石犀数据流动治理平台",
+                            "hint": "数据治理、流动编排或平台化建设中的核心贡献",
+                        },
+                        {
+                            "id": "B",
+                            "label": "矢安 BAS 安全产品",
+                            "hint": "安全产品后端、攻防仿真或高并发场景",
+                        },
+                        {
+                            "id": "C",
+                            "label": "db-migrate 自研工具",
+                            "hint": "数据库迁移治理、工具链或开源/自研项目影响力",
+                        },
+                        {
+                            "id": "D",
+                            "label": "跨团队协作或带人经历",
+                            "hint": "推动方案落地、协调多方或 mentor 他人",
+                        },
+                    ],
+                },
+            )
         return finalize_worker_result(
             "capability",
             {
                 "user_visible_summary": "已补充经历素材与能力图谱要点。",
                 "bank_delta_summary": "新增 2 条项目经历要点",
+                "phase_status": PHASE_SEGMENT_COMPLETE,
             },
         )
 
