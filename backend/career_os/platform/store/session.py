@@ -73,6 +73,7 @@ class SessionStore:
         session_id: str,
         *,
         title: str | None = None,
+        title_source: str | None = None,
         archived: bool | None = None,
     ) -> None:
         with _lock:
@@ -85,7 +86,7 @@ class SessionStore:
                 raise KeyError(session_id)
             if title is not None:
                 row["title"] = title
-                row["title_source"] = "user"
+                row["title_source"] = title_source if title_source is not None else "user"
             if archived is not None:
                 row["archived"] = archived
             index["version"] = _INDEX_VERSION
@@ -133,6 +134,7 @@ class SessionStore:
         return session_id
 
     def append_message(self, session_id: str, role: str, content: str) -> None:
+        schedule_title = False
         with _lock:
             messages = self._read_messages_unlocked(session_id)
             messages.append({"role": role, "content": content})
@@ -141,6 +143,15 @@ class SessionStore:
             state["last_activity_at"] = datetime.now(UTC).isoformat()
             self._write_state_unlocked(session_id, state)
             self._touch_index_unlocked(session_id)
+            if role == "user":
+                user_count = sum(1 for m in messages if m.get("role") == "user")
+                if user_count == 1:
+                    self._apply_first_user_fallback_unlocked(session_id, messages)
+                    schedule_title = True
+        if schedule_title:
+            from career_os.platform.store.session_title import schedule_maybe_generate_title
+
+            schedule_maybe_generate_title(session_id)
 
     def load_messages_for_coordinator(
         self, session_id: str
@@ -321,6 +332,25 @@ class SessionStore:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", encoding="utf-8") as f:
             json.dump(index, f, ensure_ascii=False, indent=2)
+
+    def _apply_first_user_fallback_unlocked(
+        self, session_id: str, messages: list[dict[str, str]]
+    ) -> None:
+        index = self._read_index_unlocked()
+        row = next(
+            (r for r in index.get("sessions", []) if r.get("session_id") == session_id),
+            None,
+        )
+        if row is None or row.get("title_source") == "user":
+            return
+        first_user = next((m for m in messages if m.get("role") == "user"), None)
+        if first_user is None:
+            return
+        content = (first_user.get("content") or "").strip()
+        row["title"] = content[:20] if content else _DEFAULT_TITLE
+        row["title_source"] = "fallback"
+        index["version"] = _INDEX_VERSION
+        self._write_index_unlocked(index)
 
     @staticmethod
     def _compute_preview(messages: list[dict[str, str]]) -> str:

@@ -143,6 +143,31 @@ def get_session_messages(session_id: str):
     return {"messages": store.load_messages_full(session_id)}
 
 
+@router.post("/sessions/{session_id}/generate-title")
+def generate_session_title(
+    session_id: str,
+    force: bool = Query(default=False),
+):
+    from career_os.agents.lc.client import llm_enabled
+    from career_os.platform.store.session_title import maybe_generate_title
+
+    _validate_session_id(session_id)
+    if not llm_enabled():
+        raise HTTPException(status_code=503, detail="llm_unavailable")
+    store = SessionStore()
+    if not store.session_exists(session_id):
+        raise _session_not_found()
+    row = _index_row(store, session_id)
+    if row is None:
+        raise _session_not_found()
+    if not force and row.get("title_source") == "user":
+        raise HTTPException(status_code=409, detail="title_locked")
+    maybe_generate_title(session_id, store, force=force)
+    row = _index_row(store, session_id)
+    assert row is not None
+    return _enrich_row(store, row)
+
+
 @router.patch("/sessions/{session_id}")
 def patch_session(session_id: str, body: PatchSessionRequest):
     _validate_session_id(session_id)

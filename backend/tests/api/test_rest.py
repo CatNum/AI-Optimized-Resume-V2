@@ -64,6 +64,51 @@ def test_get_messages_returns_history(client):
     assert messages[0]["content"] == "hello history"
 
 
+def test_generate_title_without_llm_returns_503(client):
+    sid = client.post("/v1/sessions/new").json()["session_id"]
+    r = client.post(f"/v1/sessions/{sid}/generate-title")
+    assert r.status_code == 503
+    assert r.json()["detail"] == "llm_unavailable"
+
+
+def test_generate_title_locked_when_user_title(client, monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    import career_os.agents.lc.models as models_mod
+
+    models_mod.model_settings.__init__()
+
+    sid = client.post("/v1/sessions/new").json()["session_id"]
+    client.patch(f"/v1/sessions/{sid}", json={"title": "锁定标题"})
+    r = client.post(f"/v1/sessions/{sid}/generate-title")
+    assert r.status_code == 409
+    assert r.json()["detail"] == "title_locked"
+
+
+def test_generate_title_force_overrides_user(client, monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    import career_os.agents.lc.models as models_mod
+
+    models_mod.model_settings.__init__()
+
+    sid = client.post("/v1/sessions/new").json()["session_id"]
+    from career_os.platform.store.session import SessionStore
+
+    store = SessionStore()
+    store.append_message(sid, "user", "讨论 Go 后端职业规划")
+
+    client.patch(f"/v1/sessions/{sid}", json={"title": "用户自定义"})
+    monkeypatch.setattr(
+        "career_os.platform.store.session_title._generate_title_llm",
+        lambda _content: "LLM 新标题",
+    )
+
+    r = client.post(f"/v1/sessions/{sid}/generate-title", params={"force": "true"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["title"] == "LLM 新标题"
+    assert body["title_source"] == "auto"
+
+
 def test_patch_title_and_archived(client):
     sid = client.post("/v1/sessions/new").json()["session_id"]
     r = client.patch(
@@ -233,7 +278,8 @@ def test_chat_without_session_id_creates_and_indexes(client):
 
     listed = client.get("/v1/sessions").json()["sessions"]
     assert len(listed) >= 1
-    assert listed[0]["title"] == "未命名会话"
+    assert listed[0]["title"] == "hi"
+    assert listed[0]["title_source"] == "fallback"
 
 
 def test_chat_sse_llm_stream_multiple_tokens(client, monkeypatch):
