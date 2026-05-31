@@ -2,7 +2,7 @@ import importlib
 
 import pytest
 
-from career_os.agents.graphs.workers import resume as resume_worker
+from career_os.agents.graphs.workers.react_mocks import mock_run_worker_react
 from career_os.harness.executor import Harness
 
 
@@ -12,7 +12,6 @@ def harness(tmp_path, monkeypatch):
     monkeypatch.setenv("OUTPUT_DIR", str(tmp_path / "output"))
     import career_os.config as config_mod
     import career_os.platform.store.profile as profile_mod
-
     import career_os.platform.store.output as output_mod
 
     importlib.reload(config_mod)
@@ -27,11 +26,12 @@ def test_resume_writes_multiple_levels(harness, tmp_path):
         "gates": {"flags": {"optimize_confirmed": True}},
         "prior_results": {},
     }
-    result = resume_worker.run(
+    result = mock_run_worker_react(
         harness,
-        "optimize",
-        session_state,
-        {"selected_optimization_levels": ["标准", "进取"]},
+        worker_id="resume",
+        goal="optimize",
+        session_state=session_state,
+        context={"selected_optimization_levels": ["标准", "进取"]},
     )
     assert result["status"] == "completed"
     assert len(result["structured_output"]["html_deliveries"]) == 2

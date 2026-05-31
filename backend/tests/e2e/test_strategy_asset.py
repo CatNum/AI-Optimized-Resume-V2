@@ -2,7 +2,7 @@ import importlib
 
 import pytest
 
-from career_os.agents.graphs.workers import strategy as strategy_worker
+from career_os.agents.graphs.workers.react_mocks import mock_run_worker_react
 from career_os.harness.executor import Harness
 
 
@@ -16,20 +16,22 @@ def harness(tmp_path, monkeypatch):
 
 
 def test_strategy_emits_optimize_gate_on_jd(harness):
-    result = strategy_worker.run(
+    result = mock_run_worker_react(
         harness,
-        "plan strategy",
-        {"list_type": "jd", "session_id": "s1"},
-        {"requires_optimize_gate": True},
+        worker_id="strategy",
+        goal="plan strategy",
+        session_state={"list_type": "jd", "session_id": "s1"},
+        context={"requires_optimize_gate": True},
     )
     assert result["structured_output"]["gate_prompt"]["name"] == "optimize_confirm"
 
 
 def test_strategy_no_optimize_gate_on_plan(harness):
-    result = strategy_worker.run(
+    result = mock_run_worker_react(
         harness,
-        "plan",
-        {"list_type": "plan", "session_id": "s1"},
-        {"requires_optimize_gate": True},
+        worker_id="strategy",
+        goal="plan",
+        session_state={"list_type": "plan", "session_id": "s1"},
+        context={"requires_optimize_gate": True},
     )
     assert not result["structured_output"].get("gate_prompt")

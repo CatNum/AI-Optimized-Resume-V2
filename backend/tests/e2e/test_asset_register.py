@@ -2,8 +2,7 @@ import importlib
 
 import pytest
 
-from career_os.agents.graphs.workers import asset as asset_worker
-from career_os.agents.graphs.workers import resume as resume_worker
+from career_os.agents.graphs.workers.react_mocks import mock_run_worker_react
 from career_os.harness.executor import Harness
 from career_os.platform.store.profile import ProfileStore
 
@@ -28,18 +27,20 @@ def test_asset_registers_resume_deliveries(harness):
         "gates": {"flags": {"optimize_confirmed": True}},
         "prior_results": {},
     }
-    resume_result = resume_worker.run(
+    resume_result = mock_run_worker_react(
         harness,
-        "optimize",
-        session_state,
-        {"selected_optimization_levels": ["标准"]},
+        worker_id="resume",
+        goal="optimize",
+        session_state=session_state,
+        context={"selected_optimization_levels": ["标准"]},
     )
     session_state["prior_results"]["resume"] = resume_result["structured_output"]
-    asset_result = asset_worker.run(
+    asset_result = mock_run_worker_react(
         harness,
-        "register",
-        session_state,
-        {"run_kind": "register"},
+        worker_id="asset",
+        goal="register",
+        session_state=session_state,
+        context={"run_kind": "register"},
     )
     assert asset_result["status"] == "completed"
     index = ProfileStore().get(["outputs_index"])["outputs_index"]
