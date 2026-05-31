@@ -28,6 +28,28 @@ def check_delegate_rules(
     return None
 
 
+def _build_capability_bundle(worker_id: str) -> dict[str, Any]:
+    from career_os.platform.skill.registry import SkillRegistry
+    from career_os.platform.worker.registry import WorkerRegistry
+
+    worker = WorkerRegistry().get_worker(worker_id) or {}
+    skill_registry = SkillRegistry()
+    skill_index = []
+    for name in worker.get("skills") or []:
+        entry = next((e for e in skill_registry.list_skills() if e.name == name), None)
+        if entry:
+            skill_index.append(
+                {
+                    "name": entry.name,
+                    "description": entry.description,
+                    "when_to_use": entry.when_to_use,
+                    "modes": entry.modes,
+                }
+            )
+    tool_index = [{"name": t} for t in worker.get("tools") or []]
+    return {"skill_index": skill_index, "tool_index": tool_index}
+
+
 def delegate_worker(
     actor: str,
     worker_id: str,
@@ -64,9 +86,13 @@ def delegate_worker(
             status="ok",
         )
 
+    merged_context = dict(context or {})
+    merged_context["capability_bundle"] = _build_capability_bundle(worker_id)
+    merged_context.setdefault("constraints", {"no_fabrication": True})
+
     return {
         "worker_id": worker_id,
         "goal": goal,
-        "context": context or {},
+        "context": merged_context,
         "status": "delegated",
     }
