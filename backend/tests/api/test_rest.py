@@ -198,6 +198,44 @@ def test_chat_sse_events(client):
     assert "event: done" in body
 
 
+def test_ping_expired_returns_410_disk_intact(client, monkeypatch):
+    monkeypatch.setenv("SESSION_IDLE_TTL", "1")
+    import career_os.config as config_mod
+
+    importlib.reload(config_mod)
+
+    sid = client.post("/v1/sessions/new").json()["session_id"]
+    from datetime import UTC, datetime, timedelta
+
+    from career_os.platform.store.session import SessionStore
+
+    store = SessionStore()
+    old = (datetime.now(UTC) - timedelta(seconds=5)).isoformat()
+    store.update_state(sid, {"last_activity_at": old})
+
+    r = client.post(f"/v1/sessions/{sid}/ping")
+    assert r.status_code == 410
+    assert r.json()["detail"] == "session_expired"
+    assert store.get_state(sid)["last_activity_at"] == old
+
+    assert client.get(f"/v1/sessions/{sid}/messages").status_code == 200
+
+
+def test_chat_without_session_id_creates_and_indexes(client):
+    with client.stream(
+        "POST",
+        "/v1/chat",
+        json={"message": "hi"},
+        headers={"Accept": "text/event-stream"},
+    ) as response:
+        assert response.status_code == 200
+        "".join(response.iter_text())
+
+    listed = client.get("/v1/sessions").json()["sessions"]
+    assert len(listed) >= 1
+    assert listed[0]["title"] == "未命名会话"
+
+
 def test_chat_sse_llm_stream_multiple_tokens(client, monkeypatch):
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     import career_os.agents.lc.models as models_mod

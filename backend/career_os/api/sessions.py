@@ -191,6 +191,8 @@ def ping_session(session_id: str):
     state = store.get_state(session_id)
     if not state.get("last_activity_at"):
         raise HTTPException(status_code=404, detail="session_not_found")
+    if SessionStore.is_expired(state):
+        raise HTTPException(status_code=410, detail="session_expired")
     now = datetime.now(UTC).isoformat()
     store.update_state(session_id, {"last_activity_at": now})
     return {"session_id": session_id, "last_activity_at": now}

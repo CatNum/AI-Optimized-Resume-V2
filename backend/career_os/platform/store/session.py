@@ -53,6 +53,8 @@ class SessionStore:
 
     @staticmethod
     def is_expired(session_state: dict[str, Any]) -> bool:
+        from career_os.config import settings
+
         last_activity = session_state.get("last_activity_at")
         if not last_activity:
             return False
@@ -138,6 +140,7 @@ class SessionStore:
             state = self._read_state_unlocked(session_id)
             state["last_activity_at"] = datetime.now(UTC).isoformat()
             self._write_state_unlocked(session_id, state)
+            self._touch_index_unlocked(session_id)
 
     def load_messages_for_coordinator(
         self, session_id: str
@@ -157,8 +160,11 @@ class SessionStore:
     def update_state(self, session_id: str, patch: dict[str, Any]) -> None:
         with _lock:
             state = self._read_state_unlocked(session_id)
+            old_list_type = state.get("list_type")
             state.update(patch)
             self._write_state_unlocked(session_id, state)
+            if "list_type" in patch and patch.get("list_type") != old_list_type:
+                self._touch_index_unlocked(session_id)
 
     def delete_session(self, session_id: str) -> None:
         with _lock:
