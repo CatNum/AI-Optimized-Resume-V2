@@ -7,6 +7,9 @@ from pydantic import BaseModel
 
 from career_os.agents.graphs.coordinator import run_coordinator_turn
 from career_os.agents.graphs.workers.registry import build_harness_worker_runner
+from career_os.agents.lc.client import llm_enabled, stream_text
+from career_os.agents.lc.models import LLMRole
+from career_os.agents.lc.worker_llm import build_synthesis_messages
 from career_os.harness.executor import Harness
 from career_os.harness.gate import match_gate_intent
 from career_os.harness.orchestrator import ChatOrchestrator
@@ -106,11 +109,26 @@ async def _chat_stream(
         worker_runner=build_harness_worker_runner(harness),
     )
     session_store.update_state(session_id, result["session_state"])
-    text = result.get("synthesis_text") or "已完成处理。"
-    session_store.append_message(session_id, "assistant", text)
+    draft = result.get("synthesis_draft") or result.get("synthesis_text") or "已完成处理。"
 
-    async for chunk in stream_tokens(text):
-        yield chunk
+    if llm_enabled():
+        system, user = build_synthesis_messages(
+            body.message,
+            draft,
+            result["session_state"],
+            result.get("last_worker_result"),
+        )
+        parts: list[str] = []
+        for token in stream_text(system, user, role=LLMRole.COORDINATOR):
+            parts.append(token)
+            yield format_sse("token", {"delta": token})
+        text = "".join(parts) or draft
+    else:
+        text = draft
+        async for chunk in stream_tokens(text):
+            yield chunk
+
+    session_store.append_message(session_id, "assistant", text)
 
     gates = result["session_state"].get("gates", {})
     if gates.get("pending"):

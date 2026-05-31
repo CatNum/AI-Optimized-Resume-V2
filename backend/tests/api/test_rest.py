@@ -74,3 +74,26 @@ def test_chat_sse_events(client):
     assert "event: session" in body
     assert "event: token" in body
     assert "event: done" in body
+
+
+def test_chat_sse_llm_stream_multiple_tokens(client, monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    import career_os.agents.lc.models as models_mod
+
+    models_mod.model_settings.__init__()
+
+    def fake_stream(*args, **kwargs):
+        yield from ["第一段", "第二段", "第三段"]
+
+    monkeypatch.setattr("career_os.api.chat.stream_text", fake_stream)
+
+    with client.stream(
+        "POST",
+        "/v1/chat",
+        json={"message": "你好"},
+        headers={"Accept": "text/event-stream"},
+    ) as response:
+        assert response.status_code == 200
+        body = "".join(response.iter_text())
+
+    assert body.count("event: token") >= 3

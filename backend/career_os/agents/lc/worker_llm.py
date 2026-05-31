@@ -37,14 +37,12 @@ def plan_workers_with_llm(user_message: str, session_state: dict[str, Any]) -> l
         return None
 
 
-def synthesize_with_llm(
+def build_synthesis_messages(
     user_message: str,
     draft_text: str,
     session_state: dict[str, Any],
     last_worker_result: dict[str, Any] | None,
-) -> str | None:
-    if not llm_enabled():
-        return None
+) -> tuple[str, str]:
     system = (
         "你是面向用户的职业规划协调者。基于 Worker 结果用中文给出简洁、可执行的回复。"
         "不要暴露内部 worker 名称；若存在 gate 问句，保留确认意图。"
@@ -58,6 +56,20 @@ def synthesize_with_llm(
             "gates": session_state.get("gates"),
         },
         ensure_ascii=False,
+    )
+    return system, user
+
+
+def synthesize_with_llm(
+    user_message: str,
+    draft_text: str,
+    session_state: dict[str, Any],
+    last_worker_result: dict[str, Any] | None,
+) -> str | None:
+    if not llm_enabled():
+        return None
+    system, user = build_synthesis_messages(
+        user_message, draft_text, session_state, last_worker_result
     )
     try:
         return invoke_text(system, user, role=LLMRole.COORDINATOR).strip()
