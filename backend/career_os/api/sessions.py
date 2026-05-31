@@ -1,7 +1,8 @@
+import re
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
 
 from career_os.api.explore_intake import (
     ExploreIntakeRequest,
@@ -20,6 +21,56 @@ router = APIRouter(prefix="/v1")
 harness = Harness()
 orchestrator = ChatOrchestrator()
 
+_SESSION_ID_RE = re.compile(r"^sess_[0-9a-f]{32}$")
+
+
+def _validate_session_id(session_id: str) -> None:
+    if not session_id.startswith("sess_") or not _SESSION_ID_RE.match(session_id):
+        raise HTTPException(status_code=400, detail="invalid_session_id")
+
+
+def _session_not_found() -> HTTPException:
+    return HTTPException(status_code=404, detail="session_not_found")
+
+
+def _enrich_row(store: SessionStore, row: dict[str, Any]) -> dict[str, Any]:
+    state = store.get_state(row["session_id"])
+    activity = build_session_activity(state)
+    return {
+        **row,
+        "expired": SessionStore.is_expired(state),
+        "activity_headline": activity.get("headline"),
+    }
+
+
+def _index_row(store: SessionStore, session_id: str) -> dict[str, Any] | None:
+    if not store.session_exists(session_id):
+        return None
+    index = store.load_index()
+    row = next(
+        (r for r in index.get("sessions", []) if r.get("session_id") == session_id),
+        None,
+    )
+    if row is None:
+        store.touch_index(session_id)
+        index = store.load_index()
+        row = next(
+            (r for r in index.get("sessions", []) if r.get("session_id") == session_id),
+            None,
+        )
+    return row
+
+
+def _sort_sessions(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def activity_key(row: dict[str, Any]) -> str:
+        return row.get("last_activity_at") or ""
+
+    non_archived = [r for r in rows if not r.get("archived")]
+    archived = [r for r in rows if r.get("archived")]
+    non_archived.sort(key=activity_key, reverse=True)
+    archived.sort(key=activity_key, reverse=True)
+    return non_archived + archived
+
 
 class NewSessionResponse(BaseModel):
     session_id: str
@@ -36,6 +87,94 @@ class OnboardingRequest(BaseModel):
     preference_tags: dict[str, Any] | None = None
 
 
+class PatchSessionRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=32)
+    archived: bool | None = None
+
+
+@router.get("/sessions")
+def list_sessions(
+    q: str | None = None,
+    archived: str | None = Query(default="false"),
+):
+    store = SessionStore()
+    index = store.load_index()
+    if not index.get("sessions"):
+        store.rebuild_index()
+        index = store.load_index()
+
+    rows = list(index.get("sessions", []))
+    archived_filter = (archived or "false").lower()
+    if archived_filter == "true":
+        rows = [r for r in rows if r.get("archived")]
+    elif archived_filter != "all":
+        rows = [r for r in rows if not r.get("archived")]
+
+    if q:
+        needle = q.casefold()
+        rows = [
+            r
+            for r in rows
+            if needle in (r.get("title") or "").casefold()
+            or needle in (r.get("preview") or "").casefold()
+        ]
+
+    enriched = [_enrich_row(store, row) for row in rows]
+    return {"sessions": _sort_sessions(enriched)}
+
+
+@router.get("/sessions/{session_id}")
+def get_session(session_id: str):
+    _validate_session_id(session_id)
+    store = SessionStore()
+    row = _index_row(store, session_id)
+    if row is None:
+        raise _session_not_found()
+    payload = _enrich_row(store, row)
+    return payload
+
+
+@router.get("/sessions/{session_id}/messages")
+def get_session_messages(session_id: str):
+    _validate_session_id(session_id)
+    store = SessionStore()
+    if not store.session_exists(session_id):
+        raise _session_not_found()
+    return {"messages": store.load_messages_full(session_id)}
+
+
+@router.patch("/sessions/{session_id}")
+def patch_session(session_id: str, body: PatchSessionRequest):
+    _validate_session_id(session_id)
+    if body.title is None and body.archived is None:
+        raise HTTPException(status_code=400, detail="empty_patch_body")
+    store = SessionStore()
+    if not store.session_exists(session_id):
+        raise _session_not_found()
+    _index_row(store, session_id)
+    try:
+        store.patch_index(
+            session_id,
+            title=body.title,
+            archived=body.archived,
+        )
+    except KeyError:
+        raise _session_not_found() from None
+    row = _index_row(store, session_id)
+    assert row is not None
+    return _enrich_row(store, row)
+
+
+@router.delete("/sessions/{session_id}")
+def delete_session(session_id: str):
+    _validate_session_id(session_id)
+    store = SessionStore()
+    if not store.session_exists(session_id):
+        raise _session_not_found()
+    store.delete_session(session_id)
+    return {"ok": True}
+
+
 @router.post("/sessions/new", response_model=NewSessionResponse)
 def new_session():
     store = SessionStore()
@@ -47,6 +186,7 @@ def new_session():
 def ping_session(session_id: str):
     from datetime import UTC, datetime
 
+    _validate_session_id(session_id)
     store = SessionStore()
     state = store.get_state(session_id)
     if not state.get("last_activity_at"):
@@ -58,6 +198,7 @@ def ping_session(session_id: str):
 
 @router.get("/sessions/{session_id}/context")
 def session_context(session_id: str):
+    _validate_session_id(session_id)
     store = SessionStore()
     state = store.get_state(session_id)
     if not state.get("last_activity_at"):

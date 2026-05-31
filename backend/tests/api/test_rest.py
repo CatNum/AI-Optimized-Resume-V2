@@ -13,10 +13,14 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("LLM_API_KEY", "")
     import career_os.config as config_mod
     import career_os.platform.store.profile as profile_mod
+    import career_os.platform.store.session as session_mod
+    import career_os.platform.store.task as task_mod
     from career_os.agents.lc import models as models_mod
 
     importlib.reload(config_mod)
     importlib.reload(profile_mod)
+    importlib.reload(session_mod)
+    importlib.reload(task_mod)
     models_mod.model_settings.__init__()
     return TestClient(app)
 
@@ -25,6 +29,73 @@ def test_new_session(client):
     r = client.post("/v1/sessions/new")
     assert r.status_code == 200
     assert r.json()["session_id"].startswith("sess_")
+
+
+def test_list_sessions_empty_rebuilds(client):
+    r = client.get("/v1/sessions")
+    assert r.status_code == 200
+    assert r.json()["sessions"] == []
+
+
+def test_new_session_does_not_delete_old(client):
+    a = client.post("/v1/sessions/new").json()["session_id"]
+    from career_os.platform.store.session import SessionStore
+
+    SessionStore().append_message(a, "user", "first session message")
+    b = client.post("/v1/sessions/new").json()["session_id"]
+    listed = client.get("/v1/sessions").json()["sessions"]
+    ids = {s["session_id"] for s in listed}
+    assert {a, b} <= ids
+
+
+def test_get_messages_returns_history(client):
+    sid = client.post("/v1/sessions/new").json()["session_id"]
+    from career_os.platform.store.session import SessionStore
+
+    store = SessionStore()
+    store.append_message(sid, "user", "hello history")
+    store.append_message(sid, "assistant", "hi back")
+
+    r = client.get(f"/v1/sessions/{sid}/messages")
+    assert r.status_code == 200
+    messages = r.json()["messages"]
+    assert len(messages) == 2
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == "hello history"
+
+
+def test_patch_title_and_archived(client):
+    sid = client.post("/v1/sessions/new").json()["session_id"]
+    r = client.patch(
+        f"/v1/sessions/{sid}",
+        json={"title": "我的会话", "archived": True},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["title"] == "我的会话"
+    assert body["title_source"] == "user"
+    assert body["archived"] is True
+
+    listed = client.get("/v1/sessions").json()["sessions"]
+    assert sid not in {s["session_id"] for s in listed}
+
+    archived_list = client.get("/v1/sessions", params={"archived": "true"}).json()[
+        "sessions"
+    ]
+    assert sid in {s["session_id"] for s in archived_list}
+
+
+def test_delete_session_404_after(client):
+    sid = client.post("/v1/sessions/new").json()["session_id"]
+    assert client.delete(f"/v1/sessions/{sid}").status_code == 200
+    assert client.get(f"/v1/sessions/{sid}/messages").status_code == 404
+    assert client.get(f"/v1/sessions/{sid}").status_code == 404
+
+
+def test_invalid_session_id_format_400(client):
+    r = client.get("/v1/sessions/not-a-valid-id/messages")
+    assert r.status_code == 400
+    assert r.json()["detail"] == "invalid_session_id"
 
 
 def test_profile_onboarding(client):

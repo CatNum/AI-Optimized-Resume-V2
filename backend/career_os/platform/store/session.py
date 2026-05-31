@@ -1,8 +1,9 @@
 import json
+import re
 import shutil
 import threading
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,7 @@ _DEFAULT_STATE: dict[str, Any] = {
 
 _INDEX_VERSION = 1
 _DEFAULT_TITLE = "未命名会话"
+SESSION_ID_PATTERN = re.compile(r"^sess_[0-9a-f]{32}$")
 
 
 class SessionStore:
@@ -44,6 +46,48 @@ class SessionStore:
     def load_index(self) -> dict[str, Any]:
         with _lock:
             return self._read_index_unlocked()
+
+    @staticmethod
+    def is_valid_session_id(session_id: str) -> bool:
+        return bool(SESSION_ID_PATTERN.match(session_id))
+
+    @staticmethod
+    def is_expired(session_state: dict[str, Any]) -> bool:
+        last_activity = session_state.get("last_activity_at")
+        if not last_activity:
+            return False
+        last_dt = datetime.fromisoformat(last_activity.replace("Z", "+00:00"))
+        return datetime.now(UTC) - last_dt > timedelta(seconds=settings.session_idle_ttl)
+
+    def session_exists(self, session_id: str) -> bool:
+        return self._session_dir(session_id).exists()
+
+    def load_messages_full(self, session_id: str) -> list[dict[str, str]]:
+        with _lock:
+            return self._read_messages_unlocked(session_id)
+
+    def patch_index(
+        self,
+        session_id: str,
+        *,
+        title: str | None = None,
+        archived: bool | None = None,
+    ) -> None:
+        with _lock:
+            index = self._read_index_unlocked()
+            row = next(
+                (r for r in index.get("sessions", []) if r.get("session_id") == session_id),
+                None,
+            )
+            if row is None:
+                raise KeyError(session_id)
+            if title is not None:
+                row["title"] = title
+                row["title_source"] = "user"
+            if archived is not None:
+                row["archived"] = archived
+            index["version"] = _INDEX_VERSION
+            self._write_index_unlocked(index)
 
     def touch_index(self, session_id: str) -> None:
         with _lock:
