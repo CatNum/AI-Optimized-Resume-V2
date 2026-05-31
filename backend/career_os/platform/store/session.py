@@ -16,6 +16,9 @@ _DEFAULT_STATE: dict[str, Any] = {
     "gates": {},
 }
 
+_INDEX_VERSION = 1
+_DEFAULT_TITLE = "未命名会话"
+
 
 class SessionStore:
     def __init__(self) -> None:
@@ -33,6 +36,17 @@ class SessionStore:
     def _state_path(self, session_id: str) -> Path:
         return self._session_dir(session_id) / "state.json"
 
+    def _index_path(self) -> Path:
+        return self._sessions_dir / "_index.json"
+
+    def load_index(self) -> dict[str, Any]:
+        with _lock:
+            return self._read_index_unlocked()
+
+    def touch_index(self, session_id: str) -> None:
+        with _lock:
+            self._touch_index_unlocked(session_id)
+
     def create_session(self) -> str:
         session_id = f"sess_{uuid.uuid4().hex}"
         with _lock:
@@ -47,6 +61,7 @@ class SessionStore:
             }
             self._write_state_unlocked(session_id, state)
             self._write_messages_unlocked(session_id, [])
+            self._touch_index_unlocked(session_id)
         return session_id
 
     def append_message(self, session_id: str, role: str, content: str) -> None:
@@ -206,3 +221,64 @@ class SessionStore:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", encoding="utf-8") as f:
             json.dump(state, f, ensure_ascii=False, indent=2)
+
+    def _read_index_unlocked(self) -> dict[str, Any]:
+        path = self._index_path()
+        if not path.exists():
+            return {"version": _INDEX_VERSION, "sessions": []}
+        with path.open(encoding="utf-8") as f:
+            return json.load(f)
+
+    def _write_index_unlocked(self, index: dict[str, Any]) -> None:
+        path = self._index_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", encoding="utf-8") as f:
+            json.dump(index, f, ensure_ascii=False, indent=2)
+
+    @staticmethod
+    def _compute_preview(messages: list[dict[str, str]]) -> str:
+        for message in reversed(messages):
+            if message.get("role") == "user":
+                return message.get("content", "")[:40]
+        return ""
+
+    def _touch_index_unlocked(self, session_id: str) -> None:
+        index = self._read_index_unlocked()
+        sessions: list[dict[str, Any]] = index.setdefault("sessions", [])
+        existing = next(
+            (row for row in sessions if row.get("session_id") == session_id),
+            None,
+        )
+
+        messages = self._read_messages_unlocked(session_id)
+        state = self._read_state_unlocked(session_id)
+        last_activity_at = state.get("last_activity_at")
+        if last_activity_at is None:
+            last_activity_at = datetime.now(UTC).isoformat()
+
+        preview = self._compute_preview(messages)
+        message_count = len(messages)
+        list_type = state.get("list_type")
+
+        if existing is None:
+            sessions.append(
+                {
+                    "session_id": session_id,
+                    "title": _DEFAULT_TITLE,
+                    "title_source": "fallback",
+                    "preview": preview,
+                    "created_at": last_activity_at,
+                    "last_activity_at": last_activity_at,
+                    "message_count": message_count,
+                    "list_type": list_type,
+                    "archived": False,
+                }
+            )
+        else:
+            existing["preview"] = preview
+            existing["message_count"] = message_count
+            existing["list_type"] = list_type
+            existing["last_activity_at"] = last_activity_at
+
+        index["version"] = _INDEX_VERSION
+        self._write_index_unlocked(index)
