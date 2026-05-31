@@ -31,9 +31,6 @@ export function useChatSSE() {
           return;
         }
         if (response.status === 410) {
-          const fresh = await fetch("/v1/sessions/new", { method: "POST" });
-          const data = await fresh.json();
-          handlers.onSession(data.session_id);
           handlers.onError("session_expired");
           return;
         }
