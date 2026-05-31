@@ -85,3 +85,30 @@ export async function createSession(): Promise<{ session_id: string }> {
   const response = await fetch("/v1/sessions/new", { method: "POST" });
   return parseJson(response);
 }
+
+export type TaskRow = {
+  id: string;
+  title: string;
+  status: string;
+  kind?: string;
+};
+
+export type TaskListRow = {
+  list_id: string;
+  list_type?: string | null;
+  status: string;
+  tasks: TaskRow[];
+};
+
+export type SessionTasksResponse = {
+  session_id: string;
+  active_list_id: string | null;
+  lists: TaskListRow[];
+  all_tasks_completed: boolean;
+};
+
+export async function getTasks(sessionId: string): Promise<SessionTasksResponse> {
+  const params = new URLSearchParams({ session_id: sessionId });
+  const response = await fetch(`/v1/tasks?${params}`);
+  return parseJson(response);
+}

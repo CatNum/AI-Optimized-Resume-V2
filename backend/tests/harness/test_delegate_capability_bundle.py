@@ -10,7 +10,8 @@ def harness(tmp_path, monkeypatch):
     return Harness()
 
 
-def test_delegate_includes_capability_bundle(harness):
+def test_delegate_includes_capability_bundle(harness, jd_ready_profile):
+    _ = jd_ready_profile
     result = harness.delegate_worker(
         "coordinator",
         "strategy",

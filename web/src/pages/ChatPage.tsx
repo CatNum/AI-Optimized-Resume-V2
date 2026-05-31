@@ -337,7 +337,7 @@ export function ChatPage() {
       ) : null}
 
       <div className="shrink-0">
-        <TaskProgress activity={sessionActivity} />
+        <TaskProgress sessionId={sessionId} activity={sessionActivity} />
       </div>
 
       <div
