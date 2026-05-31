@@ -47,6 +47,26 @@ class SessionStore:
         with _lock:
             self._touch_index_unlocked(session_id)
 
+    def rebuild_index(self) -> None:
+        with _lock:
+            session_ids_on_disk: set[str] = set()
+            if self._sessions_dir.exists():
+                for item in self._sessions_dir.iterdir():
+                    if item.is_dir() and item.name.startswith("sess_"):
+                        session_ids_on_disk.add(item.name)
+
+            for session_id in sorted(session_ids_on_disk):
+                self._touch_index_unlocked(session_id)
+
+            index = self._read_index_unlocked()
+            index["sessions"] = [
+                row
+                for row in index.get("sessions", [])
+                if row.get("session_id") in session_ids_on_disk
+            ]
+            index["version"] = _INDEX_VERSION
+            self._write_index_unlocked(index)
+
     def create_session(self) -> str:
         session_id = f"sess_{uuid.uuid4().hex}"
         with _lock:

@@ -50,3 +50,83 @@ def test_touch_index_updates_preview_and_count(tmp_path, monkeypatch):
     row = rows[sid]
     assert row["message_count"] == 4
     assert row["preview"] == "latest user message"
+
+
+def _reload_session_store(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    import importlib
+
+    import career_os.config as config_mod
+    import career_os.platform.store.session as session_mod
+
+    importlib.reload(config_mod)
+    importlib.reload(session_mod)
+    return session_mod.SessionStore()
+
+
+def test_rebuild_index_from_disk_dirs(tmp_path, monkeypatch):
+    s = _reload_session_store(tmp_path, monkeypatch)
+    session_id = "sess_" + "a" * 32
+    session_dir = tmp_path / "sessions" / session_id
+    session_dir.mkdir(parents=True)
+    now = "2026-05-31T08:00:00+00:00"
+    (session_dir / "state.json").write_text(
+        f'{{"session_id": "{session_id}", "last_activity_at": "{now}", '
+        f'"list_type": null, "prior_results": {{}}, "explore_closure": null, '
+        f'"messages_meta": {{}}, "gates": {{}}, "list_id": null}}',
+        encoding="utf-8",
+    )
+    (session_dir / "messages.json").write_text(
+        '{"messages": [{"role": "user", "content": "hello from disk"}]}',
+        encoding="utf-8",
+    )
+
+    s.rebuild_index()
+    index = s.load_index()
+    rows = {r["session_id"]: r for r in index["sessions"]}
+    assert session_id in rows
+    assert rows[session_id]["message_count"] == 1
+    assert rows[session_id]["preview"] == "hello from disk"
+
+
+def test_rebuild_prunes_orphan_index_entries(tmp_path, monkeypatch):
+    s = _reload_session_store(tmp_path, monkeypatch)
+    orphan_id = "sess_" + "0" * 32
+    real_id = "sess_" + "1" * 32
+    sessions_dir = tmp_path / "sessions"
+    sessions_dir.mkdir(parents=True)
+    now = "2026-05-31T08:00:00+00:00"
+    (sessions_dir / "_index.json").write_text(
+        f"""{{
+  "version": 1,
+  "sessions": [
+    {{
+      "session_id": "{orphan_id}",
+      "title": "ghost",
+      "title_source": "fallback",
+      "preview": "",
+      "created_at": "{now}",
+      "last_activity_at": "{now}",
+      "message_count": 0,
+      "list_type": null,
+      "archived": false
+    }}
+  ]
+}}""",
+        encoding="utf-8",
+    )
+    real_dir = sessions_dir / real_id
+    real_dir.mkdir()
+    (real_dir / "state.json").write_text(
+        f'{{"session_id": "{real_id}", "last_activity_at": "{now}", '
+        f'"list_type": null, "prior_results": {{}}, "explore_closure": null, '
+        f'"messages_meta": {{}}, "gates": {{}}, "list_id": null}}',
+        encoding="utf-8",
+    )
+    (real_dir / "messages.json").write_text('{"messages": []}', encoding="utf-8")
+
+    s.rebuild_index()
+    index = s.load_index()
+    rows = {r["session_id"]: r for r in index["sessions"]}
+    assert orphan_id not in rows
+    assert real_id in rows
