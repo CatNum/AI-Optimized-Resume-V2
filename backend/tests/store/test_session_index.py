@@ -130,3 +130,35 @@ def test_rebuild_prunes_orphan_index_entries(tmp_path, monkeypatch):
     rows = {r["session_id"]: r for r in index["sessions"]}
     assert orphan_id not in rows
     assert real_id in rows
+
+
+def test_delete_session_removes_dir_index_and_tasks(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    import importlib
+
+    import career_os.config as config_mod
+    import career_os.platform.store.session as session_mod
+    import career_os.platform.store.task as task_mod
+
+    importlib.reload(config_mod)
+    importlib.reload(session_mod)
+    importlib.reload(task_mod)
+    s = session_mod.SessionStore()
+    t = task_mod.TaskStore()
+    sid = s.create_session()
+    s.append_message(sid, "user", "hello")
+    list_id = t.create_task_list(sid)
+    t.create_task(list_id, "milestone_1", "Step")
+
+    s.delete_session(sid)
+
+    assert not (tmp_path / "sessions" / sid).exists()
+    index = s.load_index()
+    rows = {r["session_id"]: r for r in index["sessions"]}
+    assert sid not in rows
+    assert not (tmp_path / "tasks" / list_id).exists()
+    active_path = tmp_path / "tasks" / "_active.json"
+    assert active_path.exists()
+    import json
+
+    assert json.loads(active_path.read_text(encoding="utf-8")) == {}

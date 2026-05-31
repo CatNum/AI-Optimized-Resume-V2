@@ -1,4 +1,5 @@
 import json
+import shutil
 import threading
 import uuid
 from datetime import UTC, datetime
@@ -6,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from career_os.config import settings
+from career_os.platform.store.task import TaskStore
 
 _lock = threading.Lock()
 
@@ -113,6 +115,21 @@ class SessionStore:
             state = self._read_state_unlocked(session_id)
             state.update(patch)
             self._write_state_unlocked(session_id, state)
+
+    def delete_session(self, session_id: str) -> None:
+        with _lock:
+            session_dir = self._session_dir(session_id)
+            if session_dir.exists():
+                shutil.rmtree(session_dir)
+            index = self._read_index_unlocked()
+            index["sessions"] = [
+                row
+                for row in index.get("sessions", [])
+                if row.get("session_id") != session_id
+            ]
+            index["version"] = _INDEX_VERSION
+            self._write_index_unlocked(index)
+        TaskStore().delete_lists_for_session(session_id)
 
     def reset_session(self, session_id: str) -> None:
         with _lock:
