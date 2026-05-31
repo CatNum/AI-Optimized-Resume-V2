@@ -4,9 +4,11 @@ def test_messages_trim_keeps_first_user(tmp_path, monkeypatch):
     import importlib
 
     import career_os.config as config_mod
+    import career_os.platform.store.session as session_mod
 
     importlib.reload(config_mod)
-    from career_os.platform.store.session import SessionStore
+    importlib.reload(session_mod)
+    SessionStore = session_mod.SessionStore
 
     s = SessionStore()
     sid = s.create_session()
@@ -23,9 +25,11 @@ def test_reset_session_clears_messages_and_state(tmp_path, monkeypatch):
     import importlib
 
     import career_os.config as config_mod
+    import career_os.platform.store.session as session_mod
 
     importlib.reload(config_mod)
-    from career_os.platform.store.session import SessionStore
+    importlib.reload(session_mod)
+    SessionStore = session_mod.SessionStore
 
     s = SessionStore()
     sid = s.create_session()
