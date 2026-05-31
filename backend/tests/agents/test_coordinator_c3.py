@@ -1,9 +1,15 @@
+import importlib
+
+import pytest
+
 from career_os.agents.graphs.coordinator import run_coordinator_turn
 from career_os.agents.graphs.workers.base import build_stub_worker_runner
 from career_os.harness.executor import Harness
+from career_os.platform.store.profile import ProfileStore
+from tests.conftest import seed_jd_ready_profile
 
 
-def test_gate_prompt_stops_delegate_chain_c3():
+def test_gate_prompt_stops_delegate_chain_c3(jd_ready_profile):
     harness = Harness()
 
     def runner(worker_id, goal, session_state, context):
@@ -45,7 +51,7 @@ def test_gate_prompt_stops_delegate_chain_c3():
     )
 
 
-def test_sequential_delegate_without_gate():
+def test_sequential_delegate_without_gate(jd_ready_profile):
     harness = Harness()
     calls: list[str] = []
 

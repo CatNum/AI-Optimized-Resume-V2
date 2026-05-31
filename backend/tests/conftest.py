@@ -1,4 +1,30 @@
+import importlib
+
 import pytest
+
+from career_os.platform.store.profile import ProfileStore
+
+
+def seed_jd_ready_profile(store: ProfileStore | None = None) -> ProfileStore:
+    profile = store or ProfileStore()
+    profile.patch(
+        [
+            {"path": "basic.name", "value": "测试", "op": "set"},
+            {"path": "exploration.completed_at", "value": "2026-05-31T00:00:00Z", "op": "set"},
+        ]
+    )
+    return profile
+
+
+@pytest.fixture
+def jd_ready_profile(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    import career_os.config as config_mod
+    import career_os.platform.store.profile as profile_mod
+
+    importlib.reload(config_mod)
+    importlib.reload(profile_mod)
+    return seed_jd_ready_profile(ProfileStore())
 
 
 @pytest.fixture(autouse=True)

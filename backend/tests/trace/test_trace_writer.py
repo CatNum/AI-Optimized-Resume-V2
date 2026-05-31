@@ -58,7 +58,7 @@ def test_trace_zh_summary_for_skill_load(traced_harness):
     assert "初探-首次 (exploration_first)" in zh["detail"]["Skill 模式"]
 
 
-def test_delegate_worker_writes_agent_run_start(traced_harness):
+def test_delegate_worker_writes_agent_run_start(traced_harness, jd_ready_profile):
     harness, writer = traced_harness
     harness.delegate_worker(
         "coordinator",

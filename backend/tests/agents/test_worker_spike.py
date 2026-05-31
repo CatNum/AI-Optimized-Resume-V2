@@ -8,18 +8,27 @@
    ``tests/harness/test_load_skill.py::test_load_skill_rejects_wrong_worker``.
 """
 
+import importlib
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from career_os.agents.graphs.workers.react_runner import run_worker_react
 from career_os.harness.executor import Harness
+from career_os.platform.store.profile import ProfileStore
+from tests.conftest import seed_jd_ready_profile
 
 
 @pytest.fixture
 def harness(tmp_path, monkeypatch):
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     monkeypatch.setenv("OUTPUT_DIR", str(tmp_path / "output"))
+    import career_os.config as config_mod
+    import career_os.platform.store.profile as profile_mod
+
+    importlib.reload(config_mod)
+    importlib.reload(profile_mod)
+    seed_jd_ready_profile(ProfileStore())
     return Harness()
 
 

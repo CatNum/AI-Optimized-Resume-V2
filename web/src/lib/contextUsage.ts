@@ -8,14 +8,10 @@ export type ContextUsage = {
   recommend_new_session?: boolean;
 };
 
-/** 展示精度 10%：4/40 → 10%，无小数点 */
+/** 取消息/token 占用率的较大值，四舍五入为整数百分比（2/40 → 5%） */
 export function usageDisplayPercent(usage: ContextUsage): number {
   const messageRatio = usage.message_count / usage.max_messages;
   const tokenRatio = usage.token_count / usage.max_tokens;
-  const ratio = Math.max(messageRatio, tokenRatio, usage.usage_ratio ?? 0);
-  return Math.min(100, Math.round((ratio * 100) / 10) * 10);
-}
-
-export function contextUsageTooltip(usage: ContextUsage): string {
-  return `上下文 token：${usage.token_count}/${usage.max_tokens}；消息：${usage.message_count}/${usage.max_messages}`;
+  const ratio = Math.max(messageRatio, tokenRatio);
+  return Math.min(100, Math.round(ratio * 100));
 }

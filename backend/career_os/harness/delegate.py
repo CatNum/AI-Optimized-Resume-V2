@@ -1,6 +1,7 @@
 from typing import Any
 
 from career_os.harness.errors import HarnessError
+from career_os.harness.jd_prerequisites import jd_delegate_block_error
 from career_os.platform.trace.writer import TraceWriter
 
 
@@ -11,6 +12,10 @@ def check_delegate_rules(
     prior_results = session_state.get("prior_results") or {}
     gates = session_state.get("gates") or {}
     flags = gates.get("flags") or {}
+
+    b1 = jd_delegate_block_error(worker_id, session_state)
+    if b1:
+        return b1
 
     if worker_id == "opportunity" and list_type == "jd":
         if "market" not in prior_results:

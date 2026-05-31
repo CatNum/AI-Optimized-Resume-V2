@@ -121,9 +121,9 @@ export function ChatPage() {
 
   return (
     <div className="mx-auto flex h-screen max-w-3xl flex-col p-4">
-      <header className="mb-4 shrink-0 flex items-center justify-between gap-3">
+      <header className="mb-4 shrink-0 flex items-center justify-between gap-3 overflow-visible">
         <h1 className="text-xl font-semibold">Career OS</h1>
-        <div className="flex items-center gap-3 text-sm">
+        <div className="flex items-center gap-3 overflow-visible text-sm">
           <ContextUsageIndicator usage={contextUsage} />
           <button className="text-slate-400" onClick={() => setShowForm(true)}>
             建档
@@ -165,7 +165,7 @@ export function ChatPage() {
             ) : null}
           </div>
         ))}
-        {isThinking ? <ThinkingIndicator /> : null}
+        {isThinking ? <ThinkingIndicator active={isThinking} /> : null}
       </div>
 
       <form onSubmit={onSubmit} className="flex shrink-0 gap-2 border-t border-slate-800 pt-4">

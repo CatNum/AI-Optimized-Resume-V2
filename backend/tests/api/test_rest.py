@@ -38,6 +38,17 @@ def test_chat_jd_gate_chain(client):
         "/v1/profile/onboarding",
         json={"basic": {"name": "E2E"}, "intent": {"target_city": "上海"}},
     )
+    import career_os.platform.store.profile as profile_mod
+
+    profile_mod.ProfileStore().patch(
+        [
+            {
+                "path": "exploration.completed_at",
+                "value": "2026-05-31T00:00:00Z",
+                "op": "set",
+            }
+        ]
+    )
 
     def chat(message: str) -> str:
         with client.stream(

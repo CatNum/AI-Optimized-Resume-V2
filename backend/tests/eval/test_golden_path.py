@@ -5,6 +5,8 @@ import pytest
 from career_os.agents.graphs.coordinator import run_coordinator_turn
 from career_os.agents.graphs.workers.registry import build_harness_worker_runner
 from career_os.harness.executor import Harness
+from career_os.platform.store.profile import ProfileStore
+from tests.conftest import seed_jd_ready_profile
 
 
 @pytest.fixture
@@ -24,6 +26,7 @@ def harness(tmp_path, monkeypatch):
 @pytest.mark.llm
 def test_golden_jd_to_html_structure(harness):
     """Golden path structure: market→opportunity→strategy gate→resume→asset."""
+    seed_jd_ready_profile(ProfileStore())
     runner = build_harness_worker_runner(harness)
     session_state = {
         "session_id": "sess_golden",

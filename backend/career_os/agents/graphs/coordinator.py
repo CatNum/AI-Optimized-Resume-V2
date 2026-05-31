@@ -2,16 +2,49 @@ from typing import Any, Callable
 
 from langgraph.graph import END, StateGraph
 
-from career_os.agents.lc.coordinator_llm import analyze_workers, fallback_analyze_workers
+from career_os.agents.lc.coordinator_llm import (
+    analyze_workers,
+    chat_only_synthesis_draft,
+    fallback_analyze_workers,
+    is_small_talk,
+    jd_prerequisites_draft,
+)
 from career_os.agents.state.coordinator import CoordinatorState
 from career_os.harness.explore_closure import (
     can_set_explore_gate_pending,
     mark_worker_done,
 )
 from career_os.harness.errors import HarnessError
+from career_os.harness.jd_prerequisites import parse_jd_b1_block_reason
 from career_os.platform.worker.registry import WorkerRegistry
 
 WorkerRunner = Callable[[str, str, dict[str, Any], dict[str, Any]], dict[str, Any]]
+
+
+def _emit_coordinator_analyze_trace(
+    harness: Any,
+    *,
+    session_id: str | None,
+    source: str,
+    workers: list[str],
+    list_type: str | None,
+) -> None:
+    trace = getattr(harness, "trace", None)
+    if trace is None:
+        return
+    detail: dict[str, Any] = {"source": source, "workers": workers}
+    if list_type:
+        detail["list_type"] = list_type
+    if workers:
+        detail["next_worker"] = workers[0]
+    trace.emit(
+        "coordinator.analyze",
+        session_id=session_id,
+        actor="coordinator",
+        worker_id=workers[0] if workers else None,
+        status="ok",
+        detail=detail,
+    )
 
 
 def _default_worker_runner(
@@ -38,26 +71,75 @@ def build_coordinator_graph(
         if state.get("stop_delegate"):
             return state
         pending = list(state.get("pending_workers") or [])
-        if not pending:
+        session_state = dict(state.get("session_state") or {})
+        session_state.pop("jd_prerequisite_blocked", None)
+        session_state.pop("jd_block_reason", None)
+        analysis: dict[str, Any] | None = None
+        source: str | None = None
+
+        def _apply_analysis(result: dict[str, Any] | None) -> list[str]:
+            nonlocal session_state
+            if not result:
+                return []
+            if result.get("jd_prerequisite_blocked"):
+                session_state["jd_prerequisite_blocked"] = True
+                session_state["jd_block_reason"] = result.get("jd_block_reason")
+                return []
+            workers = result.get("workers") or []
+            if result.get("list_type"):
+                session_state["list_type"] = result["list_type"]
+            return workers
+
+        if pending:
+            source = "queue" if state.get("delegate_count", 0) > 0 else "preset"
+        elif is_small_talk(state.get("user_message", "")):
+            source = "fallback"
+            pending = []
+        else:
             analysis = analyze_workers(
                 state.get("user_message", ""),
-                state.get("session_state") or {},
+                session_state,
                 state.get("worker_index") or [],
             )
-            if not analysis:
+            if analysis is not None:
+                source = "llm"
+                pending = _apply_analysis(analysis)
+            else:
                 analysis = fallback_analyze_workers(
                     state.get("user_message", ""),
-                    state.get("session_state") or {},
+                    session_state,
                 )
-            if analysis:
-                pending = analysis.get("workers") or []
-                if analysis.get("list_type"):
-                    session_state = dict(state.get("session_state") or {})
-                    session_state["list_type"] = analysis["list_type"]
-                    state = {**state, "session_state": session_state}
+                if analysis is not None:
+                    source = "fallback"
+                    pending = _apply_analysis(analysis)
+                else:
+                    source = "none"
+                    pending = []
+
+        state = {**state, "session_state": session_state}
+
+        if source:
+            _emit_coordinator_analyze_trace(
+                harness,
+                session_id=state.get("session_id"),
+                source=source,
+                workers=pending,
+                list_type=session_state.get("list_type"),
+            )
+
         if not pending:
-            return {**state, "current_worker_id": None, "pending_workers": []}
-        return {**state, "pending_workers": pending, "current_worker_id": pending[0]}
+            return {
+                **state,
+                "session_state": session_state,
+                "current_worker_id": None,
+                "pending_workers": [],
+            }
+        return {
+            **state,
+            "session_state": session_state,
+            "pending_workers": pending,
+            "current_worker_id": pending[0],
+        }
 
     def delegate(state: CoordinatorState) -> CoordinatorState:
         worker_id = state.get("current_worker_id")
@@ -73,8 +155,14 @@ def build_coordinator_graph(
             session_id=state.get("session_id"),
         )
         if isinstance(result, HarnessError):
+            session_state = dict(state.get("session_state") or {})
+            block_reason = parse_jd_b1_block_reason(result.message)
+            if block_reason:
+                session_state["jd_prerequisite_blocked"] = True
+                session_state["jd_block_reason"] = block_reason
             return {
                 **state,
+                "session_state": session_state,
                 "stop_delegate": True,
                 "last_worker_result": {"status": "failed", "error": result.message},
             }
@@ -140,8 +228,13 @@ def build_coordinator_graph(
                 "prompt": text,
             }
             session_state["gates"] = gates
+        elif session_state.get("jd_prerequisite_blocked"):
+            text = jd_prerequisites_draft(session_state.get("jd_block_reason"))
         else:
-            text = structured.get("user_visible_summary") or "已完成本轮处理。"
+            if state.get("delegate_count", 0) == 0 and not structured:
+                text = chat_only_synthesis_draft()
+            else:
+                text = structured.get("user_visible_summary") or "已完成本轮处理。"
 
         return {
             **state,

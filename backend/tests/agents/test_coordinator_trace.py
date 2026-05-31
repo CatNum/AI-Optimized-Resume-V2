@@ -1,0 +1,89 @@
+import importlib
+
+import pytest
+
+from career_os.agents.graphs.coordinator import run_coordinator_turn
+from career_os.agents.lc import coordinator_llm as coordinator_llm_mod
+from career_os.harness.executor import Harness
+from career_os.platform.trace.writer import TraceWriter
+
+
+@pytest.fixture
+def traced_harness(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    import career_os.config as config_mod
+    import career_os.platform.store.profile as profile_mod
+    from tests.conftest import seed_jd_ready_profile
+
+    importlib.reload(config_mod)
+    importlib.reload(profile_mod)
+    seed_jd_ready_profile(profile_mod.ProfileStore())
+    writer = TraceWriter(logs_dir=tmp_path / "logs" / "traces")
+    return Harness(trace_writer=writer), writer
+
+
+def test_coordinator_analyze_emits_trace(traced_harness, monkeypatch):
+    harness, writer = traced_harness
+    monkeypatch.setattr(coordinator_llm_mod, "llm_enabled", lambda: True)
+    monkeypatch.setattr(coordinator_llm_mod, "check_jd_prerequisites", lambda session_state: (True, None))
+    monkeypatch.setattr(
+        coordinator_llm_mod,
+        "invoke_json",
+        lambda system, user, role: {"workers": ["market", "opportunity"], "list_type": "jd"},
+    )
+
+    def runner(worker_id, goal, session_state, context):
+        return {
+            "worker_id": worker_id,
+            "status": "completed",
+            "structured_output": {"user_visible_summary": f"{worker_id} done"},
+        }
+
+    run_coordinator_turn(
+        harness,
+        session_id="sess_coord_trace",
+        session_state={"prior_results": {}, "gates": {"flags": {}}},
+        user_message="帮我分析这份 JD",
+        pending_workers=[],
+        worker_runner=runner,
+    )
+
+    analyze_events = [e for e in writer.read_events() if e["event"] == "coordinator.analyze"]
+    assert analyze_events
+    first = analyze_events[0]
+    assert first["detail"]["source"] == "llm"
+    assert first["detail"]["workers"] == ["market", "opportunity"]
+    assert first["detail"]["list_type"] == "jd"
+    assert "_zh" in first
+    assert "LLM 分析 (llm)" in first["_zh"]["detail"]["选型来源"]
+    assert "市场智能体" in first["_zh"]["detail"]["派工队列"]
+
+    queue_events = [e for e in analyze_events if e["detail"]["source"] == "queue"]
+    assert len(queue_events) == 1
+    assert queue_events[0]["detail"]["workers"] == ["opportunity"]
+
+
+def test_coordinator_preset_workers_emits_trace(traced_harness):
+    harness, writer = traced_harness
+
+    def runner(worker_id, goal, session_state, context):
+        return {
+            "worker_id": worker_id,
+            "status": "completed",
+            "structured_output": {"user_visible_summary": "done"},
+        }
+
+    run_coordinator_turn(
+        harness,
+        session_id="sess_preset",
+        session_state={"prior_results": {}, "gates": {"flags": {"optimize_confirmed": True}}},
+        user_message="确认优化",
+        pending_workers=["resume", "asset"],
+        worker_runner=runner,
+    )
+
+    preset = next(
+        e for e in writer.read_events() if e.get("event") == "coordinator.analyze"
+    )
+    assert preset["detail"]["source"] == "preset"
+    assert preset["detail"]["workers"] == ["resume", "asset"]

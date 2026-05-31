@@ -6,6 +6,7 @@ from career_os.platform.worker.registry import WorkerRegistry
 
 def test_analyze_workers_returns_workers_and_list_type(monkeypatch):
     monkeypatch.setattr(coordinator_llm_mod, "llm_enabled", lambda: True)
+    monkeypatch.setattr(coordinator_llm_mod, "check_jd_prerequisites", lambda session_state: (True, None))
     monkeypatch.setattr(
         coordinator_llm_mod,
         "invoke_json",
@@ -18,7 +19,7 @@ def test_analyze_workers_returns_workers_and_list_type(monkeypatch):
     assert result == {"workers": ["market", "opportunity"], "list_type": "jd"}
 
 
-def test_coordinator_analyze_node_uses_llm_when_pending_empty(monkeypatch):
+def test_coordinator_analyze_node_uses_llm_when_pending_empty(jd_ready_profile, monkeypatch):
     monkeypatch.setattr(coordinator_llm_mod, "llm_enabled", lambda: True)
     monkeypatch.setattr(
         coordinator_llm_mod,

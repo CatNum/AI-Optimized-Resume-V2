@@ -27,7 +27,7 @@ def test_profile_patch_whitelist_rejects_asset(harness):
 
 
 @pytest.mark.no_llm
-def test_jd_r1_blocks_opportunity(harness):
+def test_jd_r1_blocks_opportunity(harness, jd_ready_profile):
     err = harness.delegate_worker(
         "coordinator",
         "opportunity",
@@ -35,6 +35,7 @@ def test_jd_r1_blocks_opportunity(harness):
         {"list_type": "jd", "prior_results": {}, "gates": {"flags": {}}},
     )
     assert err.code == "delegate_blocked"
+    assert "JD-R1" in err.message
 
 
 @pytest.mark.no_llm

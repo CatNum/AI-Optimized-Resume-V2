@@ -9,7 +9,7 @@ from career_os.agents.lc.client import extract_json_object
 from career_os.agents.lc.models import LLMRole, resolve_llm_config
 from career_os.agents.lc.tools import get_litellm_tools_for_worker
 from career_os.agents.state.worker import WorkerState
-from career_os.platform.prompt.loader import load_prompt
+from career_os.platform.prompt.loader import load_prompt, load_worker_llm_prompt, render_prompt
 
 MAX_ITERATIONS = 12
 
@@ -24,12 +24,8 @@ def _format_boot_user(
         "session_state": session_state or {},
         "context": context or {},
     }
-    return (
-        "请围绕以下任务执行 ReAct 循环。你可以调用工具；"
-        "当你准备完成时，请只输出一个 JSON 对象，"
-        "并确保字段满足当前 worker 的 structured_output schema。\n\n"
-        f"{json.dumps(payload, ensure_ascii=False, indent=2)}"
-    )
+    payload = json.dumps(payload, ensure_ascii=False, indent=2)
+    return render_prompt(load_worker_llm_prompt("react_boot_user"), payload=payload)
 
 
 def _build_system_prompt(worker_id: str, context: dict[str, Any]) -> str:

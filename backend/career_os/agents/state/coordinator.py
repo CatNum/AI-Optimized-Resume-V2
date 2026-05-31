@@ -11,5 +11,6 @@ class CoordinatorState(TypedDict, total=False):
     last_worker_result: dict[str, Any] | None
     stop_delegate: bool
     synthesis_text: str
+    synthesis_draft: str
     delegate_count: int
     user_message: str

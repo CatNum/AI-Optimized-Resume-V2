@@ -9,7 +9,7 @@ from career_os.agents.graphs.coordinator import run_coordinator_turn
 from career_os.agents.graphs.workers.registry import build_harness_worker_runner
 from career_os.agents.lc.client import llm_enabled, stream_text
 from career_os.agents.lc.models import LLMRole
-from career_os.agents.lc.worker_llm import build_synthesis_messages
+from career_os.agents.lc.coordinator_llm import build_synthesis_messages
 from career_os.harness.executor import Harness
 from career_os.harness.gate import match_gate_intent
 from career_os.harness.orchestrator import ChatOrchestrator

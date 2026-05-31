@@ -7,6 +7,7 @@ from career_os.agents.graphs.coordinator import run_coordinator_turn
 from career_os.agents.graphs.workers.registry import build_harness_worker_runner
 from career_os.harness.executor import Harness
 from career_os.platform.store.profile import ProfileStore
+from tests.conftest import seed_jd_ready_profile
 
 
 @pytest.fixture
@@ -22,6 +23,7 @@ def harness(tmp_path, monkeypatch):
 
 
 def test_jd_chain_market_then_opportunity(harness):
+    seed_jd_ready_profile(ProfileStore())
     runner = build_harness_worker_runner(harness)
     state = run_coordinator_turn(
         harness,
@@ -42,6 +44,7 @@ def test_jd_chain_market_then_opportunity(harness):
 
 
 def test_market_before_opportunity_order(harness):
+    seed_jd_ready_profile(ProfileStore())
     runner = build_harness_worker_runner(harness)
     calls: list[str] = []
 
