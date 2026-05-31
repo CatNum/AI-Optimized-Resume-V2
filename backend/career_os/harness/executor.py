@@ -2,6 +2,7 @@ from typing import Any
 
 from career_os.harness.delegate import check_delegate_rules, delegate_worker as run_delegate_worker
 from career_os.harness.errors import HarnessError
+from career_os.harness.gate import match_gate_intent as run_match_gate_intent
 from career_os.platform.tool.handlers.profile import (
     apply_proposed_patches,
     profile_get,
@@ -50,6 +51,18 @@ class Harness:
             "apply_proposed_task_completions",
             apply_proposed_task_completions,
             actors={"coordinator"},
+        )
+        self.tools.register(
+            "match_gate_intent",
+            self._match_gate_intent_handler,
+            actors={"coordinator"},
+        )
+
+    @staticmethod
+    def _match_gate_intent_handler(actor: str, args: dict[str, Any]) -> dict[str, Any]:
+        return run_match_gate_intent(
+            args.get("user_message", ""),
+            args.get("pending_gate"),
         )
 
     def execute_tool(
