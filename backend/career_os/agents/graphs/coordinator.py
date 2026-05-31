@@ -2,6 +2,7 @@ from typing import Any, Callable
 
 from langgraph.graph import END, StateGraph
 
+from career_os.agents.lc.worker_llm import synthesize_with_llm
 from career_os.agents.state.coordinator import CoordinatorState
 from career_os.harness.explore_closure import (
     can_set_explore_gate_pending,
@@ -124,6 +125,15 @@ def build_coordinator_graph(
             session_state["gates"] = gates
         else:
             text = structured.get("user_visible_summary") or "已完成本轮处理。"
+
+        polished = synthesize_with_llm(
+            state.get("user_message", ""),
+            text,
+            session_state,
+            last or None,
+        )
+        if polished:
+            text = polished
 
         return {
             **state,

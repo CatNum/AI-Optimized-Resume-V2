@@ -32,6 +32,36 @@ def test_profile_onboarding(client):
     assert profile["basic"]["name"] == "测试"
 
 
+def test_chat_jd_gate_chain(client):
+    session = client.post("/v1/sessions/new").json()["session_id"]
+    client.post(
+        "/v1/profile/onboarding",
+        json={"basic": {"name": "E2E"}, "intent": {"target_city": "上海"}},
+    )
+
+    def chat(message: str) -> str:
+        with client.stream(
+            "POST",
+            "/v1/chat",
+            json={"session_id": session, "message": message},
+            headers={"Accept": "text/event-stream"},
+        ) as response:
+            assert response.status_code == 200
+            return "".join(response.iter_text())
+
+    body1 = chat("请评估这个 JD：后端工程师，要求 Kubernetes")
+    assert "event: done" in body1
+
+    body2 = chat("继续制定策略")
+    assert "event: gate" in body2 or "optimize" in body2
+
+    body3 = chat("确认优化")
+    assert "event: done" in body3
+
+    outputs = client.get("/v1/outputs").json().get("outputs_index") or []
+    assert len(outputs) >= 1
+
+
 def test_chat_sse_events(client):
     with client.stream(
         "POST",

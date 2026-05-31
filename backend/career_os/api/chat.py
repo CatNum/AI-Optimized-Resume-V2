@@ -6,8 +6,10 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from career_os.agents.graphs.coordinator import run_coordinator_turn
+from career_os.agents.lc.worker_llm import plan_workers_with_llm
 from career_os.agents.graphs.workers.registry import build_harness_worker_runner
 from career_os.harness.executor import Harness
+from career_os.harness.gate import match_gate_intent
 from career_os.harness.orchestrator import ChatOrchestrator
 from career_os.platform.store.session import SessionStore
 from career_os.runtime.sse import format_sse, stream_tokens
@@ -23,15 +25,70 @@ class ChatRequest(BaseModel):
     attachments: list[dict[str, Any]] | None = None
 
 
+def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str] | None:
+    gates = dict(session_state.get("gates") or {})
+    pending = gates.get("pending")
+    if not pending:
+        return None
+
+    match = match_gate_intent(message, pending)
+    flags = dict(gates.get("flags") or {})
+    gate_name = match.get("gate_name") or pending.get("name")
+
+    if match.get("matched") and match.get("intent") == "confirm":
+        gates["pending"] = None
+        if gate_name == "optimize_confirm":
+            flags["optimize_confirmed"] = True
+            gates["flags"] = flags
+            session_state["gates"] = gates
+            return ["resume", "asset"]
+        if gate_name == "explore_complete":
+            explore = dict(session_state.get("explore_closure") or {})
+            explore["gate_pending"] = False
+            explore["completed"] = True
+            session_state["explore_closure"] = explore
+            gates["flags"] = flags
+            session_state["gates"] = gates
+            return []
+        gates["flags"] = flags
+        session_state["gates"] = gates
+        return []
+
+    if match.get("matched") and match.get("intent") == "reject":
+        gates["pending"] = None
+        session_state["gates"] = gates
+        return []
+
+    return []
+
+
 def _determine_workers(message: str, session_state: dict[str, Any]) -> list[str]:
+    gate_workers = _apply_pending_gate(message, session_state)
+    if gate_workers is not None:
+        return gate_workers
+
     text = message.lower()
+    prior = session_state.get("prior_results") or {}
+    flags = (session_state.get("gates") or {}).get("flags") or {}
+
     if "jd" in text or "岗位" in message or "job" in text:
+        session_state["list_type"] = "jd"
         return ["market", "opportunity"]
     if "初探" in message or "explore" in text:
+        session_state["list_type"] = "explore"
         return ["identity", "capability"]
-    if "优化" in message or "resume" in text:
-        flags = (session_state.get("gates") or {}).get("flags") or {}
-        if flags.get("optimize_confirmed"):
+
+    if session_state.get("list_type") == "jd":
+        if (
+            "market" in prior
+            and "opportunity" in prior
+            and "strategy" not in prior
+            and any(k in message for k in ("策略", "继续", "下一步", "制定"))
+        ):
+            return ["strategy"]
+
+    if flags.get("optimize_confirmed"):
+        if ("优化" in message or "resume" in text) and "resume" not in prior:
             return ["resume", "asset"]
     return []
 
@@ -59,7 +116,9 @@ async def _chat_stream(
         )
 
     session_store.append_message(session_id, "user", body.message)
-    pending = _determine_workers(body.message, state)
+    pending = plan_workers_with_llm(body.message, state) or _determine_workers(
+        body.message, state
+    )
     context: dict[str, Any] = {}
     if "resume" in pending:
         context["selected_optimization_levels"] = ["标准", "进取"]

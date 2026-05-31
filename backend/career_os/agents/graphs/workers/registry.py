@@ -9,7 +9,7 @@ from career_os.agents.graphs.workers import (
     resume,
     strategy,
 )
-from career_os.agents.graphs.workers.base import finalize_worker_result
+from career_os.agents.lc.worker_llm import enhance_worker_summary_with_llm
 
 WorkerFn = Callable[[Any, str, dict[str, Any], dict[str, Any]], dict[str, Any]]
 
@@ -34,6 +34,12 @@ def build_harness_worker_runner(harness: Any) -> Callable[[str, str, dict[str, A
         fn = WORKER_RUNNERS.get(worker_id)
         if fn is None:
             return {"worker_id": worker_id, "status": "failed", "error": "unknown worker"}
-        return fn(harness, goal, session_state, context)
+        result = fn(harness, goal, session_state, context)
+        structured = result.get("structured_output")
+        if result.get("status") == "completed" and isinstance(structured, dict):
+            enhanced = enhance_worker_summary_with_llm(worker_id, goal, structured)
+            if enhanced:
+                result = {**result, "structured_output": enhanced}
+        return result
 
     return runner
