@@ -2,9 +2,9 @@
 
 | 属性 | 内容 |
 |------|------|
-| 文档版本 | v0.3 |
+| 文档版本 | v0.4 |
 | 父文档 | [00-架构总览.md](./00-架构总览.md) |
-| 最后更新 | 2026-05-30（Session 生命周期、gate 说明） |
+| 最后更新 | 2026-05-30（I2 410 session_expired） |
 
 ## 1. 设计原则
 
@@ -18,6 +18,7 @@
 |------|------|------|
 | `POST` | `/v1/chat` | 用户消息；响应 `text/event-stream` |
 | `POST` | `/v1/sessions/new` | 新建会话（清空旧 session 工作区与绑定任务）；返回 `{ "session_id" }` |
+| `POST` | `/v1/sessions/{session_id}/ping` | 刷新 `last_activity_at`（I2）；不跑 Agent；过期 session 返回 410 |
 | `POST` | `/v1/profile/onboarding` | B01 表单提交（确认进入深度探讨后） |
 | `GET` | `/v1/profile` | 读档案摘要（前端表单回显、简历预览） |
 | `GET` | `/v1/resume/markdown` | 读 `source.md` 渲染用 |
@@ -47,7 +48,7 @@
 }
 ```
 
-- `session_id`：首次可省略，响应 `session` 事件带回新 ID。**浏览器刷新（R2）** 视为新会话：前端调用 `POST /v1/sessions/new` 或不带 `session_id`，服务端清空旧工作区（见 [10 §1](./10-会话闸门与state.md#1-会话工作区生命周期)）。
+- `session_id`：首次可省略，响应 `session` 事件带回新 ID。**浏览器刷新（R2）** 视为新会话：前端调用 `POST /v1/sessions/new` 或不带 `session_id`，服务端清空旧工作区（见 [10 §1](./10-会话闸门与state.md#1-会话工作区生命周期)）。**超过 `SESSION_IDLE_TTL`（I2）** 的 session 返回 **410**（见 [§6](#6-错误码)、[10 §1.4](./10-会话闸门与state.md#14-闲置过期i2)）。
 - `attachments`：拖入历史 HTML 等（B05）。
 - 请求 **仅** 单条 `message`；历史由服务端 `messages.json` 维护（`begin_chat` 读写）。
 
@@ -85,7 +86,7 @@ data: {"finish_reason":"stop"}
 **前端约定**：
 
 - 将所有 `token.data.delta` **字符串拼接** 为完整 assistant 回复。
-- 收到 `done` 之前，通常 **禁用** 再次发送，避免并发两条 chat。
+- 收到 `done` 之前，**禁用** 再次发送；服务端 **A1 单飞** 兜底（见 [§3.5](#35-chat-单飞-a1)）。
 - `session_id` 以首条 `session` 或响应上下文为准（若请求未带则必须保存）。
 
 #### 3.2.2 一轮对话中的事件顺序（示例）
@@ -149,11 +150,53 @@ Worker 内部 LLM: 仅 Run 内 messages，不接入 SSE 管道
 
 详见 [10-会话闸门与state.md](./10-会话闸门与state.md)。
 
+### 3.5 Chat 单飞（A1）
+
+同一 `session_id` **仅允许一条** 进行中的 `POST /v1/chat` Run。
+
+| 场景 | 行为 |
+|------|------|
+| 首条 chat | 注册 in-flight；Run 结束或客户端断开 → 释放 |
+| 第二条并发 chat（双 Tab、连点、重试） | **409** `chat_in_progress`，**不** 启动新图 |
+| 客户端断开 | 取消当前 `asyncio` Run，释放锁 |
+
+前端收到 409 时提示「上一条仍在处理中」；仍须在 `done` 前禁用发送。
+
+### 3.6 Session 过期（I2）
+
+`begin_chat` 在注册 A1 单飞 **之前** 检查 `state.json.last_activity_at`：
+
+| 结果 | 行为 |
+|------|------|
+| 未过期 | 更新 `last_activity_at` → 继续 chat |
+| 已过期 | 清理该 session 工作区（同 R2）→ **410** `session_expired` |
+
+**410 响应体（非 SSE）**：
+
+```json
+{
+  "code": "session_expired",
+  "message": "会话已过期，请新建会话后继续",
+  "hint": "POST /v1/sessions/new"
+}
+```
+
 ## 4. `POST /v1/profile/onboarding`
 
 表单 JSON → `ProfileStore` 初始化 + 写 `resume/source.md` + 协调者后续在对话中 `create_task_list(explore)`（可在提交响应后由后端触发首条系统事件，或等用户下一条消息）。
 
 响应：`201` + `{ "profile_version": 1 }`
+
+## 4.1 `POST /v1/sessions/{session_id}/ping`（I2）
+
+刷新 `state.json.last_activity_at`，**不** 启动 Agent、**不** 消耗 A1 单飞槽位。
+
+| HTTP | 说明 |
+|------|------|
+| `204` | 成功刷新 |
+| `410` | session 已过期（已清理工作区）；前端应 `sessions/new` |
+
+建议：标签页 `visibilitychange` 变为 visible 且距上次活动 >30min 时可选调用（v0.1 非必须）。
 
 ## 5. 任务进度只读 `GET /v1/tasks`
 
@@ -166,6 +209,8 @@ Worker 内部 LLM: 仅 Run 内 messages，不接入 SSE 管道
 | HTTP | code | 场景 |
 |------|------|------|
 | 400 | `invalid_request` | 缺字段 |
+| 409 | `chat_in_progress` | 该 `session_id` 已有进行中的 chat Run（[§3.5](#35-chat-单飞-a1)） |
+| 410 | `session_expired` | 超过 `SESSION_IDLE_TTL`（[10 §1.4](./10-会话闸门与state.md#14-闲置过期i2)）；须 `POST /v1/sessions/new` |
 | 503 | `agent_unavailable` | Python 未启动 |
 | 504 | `run_timeout` | Run 超时 |
 

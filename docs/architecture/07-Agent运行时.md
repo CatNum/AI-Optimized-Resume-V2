@@ -2,9 +2,9 @@
 
 | 属性 | 内容 |
 |------|------|
-| 文档版本 | v0.5 |
+| 文档版本 | v0.6 |
 | 父文档 | [00-架构总览.md](./00-架构总览.md) |
-| 最后更新 | 2026-05-29 |
+| 最后更新 | 2026-05-30（B1 无跨请求 checkpoint） |
 
 ## 1. 选型结论：二者结合
 
@@ -108,7 +108,20 @@ backend/career_os/agents/
   state/worker.py            # 含 loaded_skills[], skill_index
 ```
 
-## 8. SPIKE 验收
+## 8. LangGraph checkpoint（B1）
+
+v0.1 **不使用跨 HTTP 请求的 LangGraph 持久 checkpoint**（无 SqliteSaver / MemorySaver 跨 session）。
+
+| 项 | 约定 |
+|----|------|
+| **每次 chat** | 新协调者图 Run；启动时读 `messages.json` + `state.json` + `profile` |
+| **Run 内** | `analyze → delegate → synthesize` 循环在 **内存** 中推进；单次 SSE 连接内可多轮 delegate |
+| **Run 结束** | append `messages.json`、更新 `state.json`；释放 chat 单飞锁 |
+| **进程崩溃** | **不续跑** 未完成 Run；用户重发或 `sessions/new` 后从已落盘 messages 继续 |
+
+业务状态以 JSON 文件为准，**不** 与 LangGraph checkpoint 双轨存储。
+
+## 9. SPIKE 验收
 
 1. 协调者 `delegate` 不带 `skill_name`，Worker 收到索引。
 2. Worker 子图：先 `load_skill(A)` 执行几步，再 `load_skill(B)`，审计日志有两条 `skill.load`。

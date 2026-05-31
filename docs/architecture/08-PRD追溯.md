@@ -2,16 +2,17 @@
 
 | 属性 | 内容 |
 |------|------|
-| 文档版本 | v0.3 |
+| 文档版本 | v0.4 |
 | 最后更新 | 2026-05-30 |
 
 ## 机制类
 
 | PRD | 架构模块 | 文档 |
 |-----|----------|------|
-| A01 职业档案 | `store/profile`, `store/resume`, Patch 白名单 | [02-平台服务.md](./02-平台服务.md) |
+| A01 职业档案 | `store/profile`, `store/resume`, Patch 白名单 | [02-平台服务.md](./02-平台服务.md)、[13-Profile-写入权限.md](./13-Profile-写入权限.md) |
 | A02 任务系统 | `platform/task`, Preset, ID 规则, 对话启停 | [02-平台服务.md](./02-平台服务.md) |
 | A03 技能包 | `platform/skill`, `.agent/skills` | [02-平台服务.md](./02-平台服务.md) |
+| Tool schema | Harness 工具契约 | [14-Harness-Tools-Schema.md](./14-Harness-Tools-Schema.md) |
 
 ## 流程类
 
@@ -70,6 +71,18 @@
 | 27 | 2026-05-30 | **初探 gate E1**：`context.gate_owner` 指定唯一 `gate_prompt` 产出者 |
 | 28 | 2026-05-30 | 修订 #16：Session **含** `messages.json`（会话级，不跨会话） |
 | 29 | 2026-05-30 | **Eval E-LLM**：L2/L3 真 LLM 优先；mock 仅无 Key 降级 → [12 §3.0](./12-评测与可观测.md#30-真-llm-优先e-llm) |
+| 30 | 2026-05-30 | **PRD 同步 P2**：`00`/`A02`/`B04`/`B05`/`B07` 对齐 session、messages、tasks 绑定 |
+| 31 | 2026-05-30 | **Profile 写入 V1**：可见仅 HTML；不可见白名单 → [13](./13-Profile-写入权限.md) |
+| 32 | 2026-05-30 | **`match_gate_intent` M2**：规则优先 + 轻 LLM → [10 §2.3](./10-会话闸门与state.md#23-match_gate_intent) |
+| 33 | 2026-05-30 | **Tool schema S2** 独立篇 → [14](./14-Harness-Tools-Schema.md) |
+| 34 | 2026-05-30 | **初探 Skill K2**：单 skill + `mode` + `allowed_workers` → [A03](../prd/A03.%20机制-技能包%20PRD.md) |
+| 35 | 2026-05-30 | **三档 HTML H1**：同 jd list 3×work，保守→标准→进取 |
+| 36 | 2026-05-30 | **T-04 O1**：始终 `output/YYYY-MM-DD/`；文件名 `(n)` 消歧 |
+| 37 | 2026-05-30 | **`preference-tags-default.json`**：分组全展示、V1 词表 |
+| 38 | 2026-05-30 | **Chat A1**：409 `chat_in_progress` → [05 §3.5](./05-API与流式协议.md#35-chat-单飞-a1) |
+| 39 | 2026-05-30 | **LangGraph B1**：无跨请求 checkpoint → [07 §8](./07-Agent运行时.md#8-langgraph-checkpointb1) |
+| 40 | 2026-05-30 | **存储锁 C1**：profile/tasks mutex → [02 §5.1](./02-平台服务.md#51-并发写锁c1) |
+| 41 | 2026-05-30 | **Session 闲置 I2**：24h TTL、410 `session_expired`、`/ping` → [10 §1.4](./10-会话闸门与state.md#14-闲置过期i2) |
 
 > 原 #16「不存 messages」已由 #21/#28 替代：不 **长期/跨会话** 存对话，当前 session 可落盘 `messages.json`。
 
@@ -87,14 +100,14 @@
 | P0-4 | Tool 注册表 + `profile_get/patch`、`apply_proposed_patches` | L1 pytest ≥5（无 LLM） |
 | P0-5 | `delegate_worker` + **真 LLM** Worker（先 `opportunity`、`strategy`） | 返 S2 schema；无 SSE Worker token；**无 Key 时** 暂用 stub 仅测 Harness |
 | P0-6 | 协调者 LangGraph + **C3**（真 LLM 验证 gate 停链） | trajectory case ≥3（`-m llm`） |
-| P0-7 | `POST /v1/chat` SSE（仅协调者 token）+ `match_gate_intent` | 闸门 3 个：深度探讨、不推荐继续、优化确认 |
+| P0-7 | `POST /v1/chat` SSE（仅协调者 token）+ `match_gate_intent` + **409 单飞** | 闸门 3 个：深度探讨、不推荐继续、优化确认 |
 | P0-8 | `TraceWriter` → `data/logs/traces/*.jsonl` | delegate / tool / gate 可 grep |
 
 ### P1 — 产品主路径
 
 | 步骤 | 交付 | 验收 |
 |:----:|------|------|
-| P1-1 | Skill 扫描 + `load_skill` + `allowed_workers` | [07 §8 SPIKE](./07-Agent运行时.md#8-spike-验收) |
+| P1-1 | Skill 扫描 + `load_skill` + `allowed_workers` | [07 §9 SPIKE](./07-Agent运行时.md#9-spike-验收) |
 | P1-2 | 7 Worker 图（可先 4 个：identity、capability、opportunity、strategy） | [09](./09-Worker结构化输出.md) 校验 |
 | P1-3 | Task `explore` / `jd` + `meta.session_id` + 对话 start/abandon | T6-1 |
 | P1-4 | `write_resume_html` + `register_outputs_index` + 三档 | HTML + index 可打开 |

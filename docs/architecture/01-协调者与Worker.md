@@ -240,14 +240,19 @@ sequenceDiagram
 
 ## 6. 闸门与对话确认
 
-[PRD 附录 B](../prd/00.%20职业规划%20Agent%20PRD.md#附录-b确认话术建议) 闸门：**领域 Worker** 在 `structured_output` 中产出确认问句（如 `gate_prompt`）；**协调者** `synthesize` 转述后经 SSE 对用户呈现。Harness 提供 `match_gate_intent(user_text)` 辅助判定，**不**提供独立确认 API。
+[PRD 附录 B](../prd/00.%20职业规划%20Agent%20PRD.md#附录-b确认话术建议) 闸门：**领域 Worker** 在 `structured_output` 中产出确认问句（如 `gate_prompt`）；**协调者** `synthesize` 转述后经 SSE 对用户呈现。Harness 提供 `match_gate_intent(user_text)`（**M2**：规则优先，未命中时轻量 LLM 分类），**不**提供独立确认 API。闸门临时态见 [10 §2](./10-会话闸门与state.md#2-gates-闸门)；`gate_prompt` 必填/禁止规则见 [09](./09-Worker结构化输出.md)。
 
-| 闸门 | Worker 产出 | 协调者 / Harness |
-|------|-------------|------------------|
-| 进入深度探讨 | 协调者自拟邀请 | 可选 `gate_deep_explore` 状态位 |
-| 初探完成 | identity/capability 可选 `gate_prompt` | `exploration.completed_at` 校验 |
-| 不推荐仍继续 | opportunity 结论 + 问句 | 写 `career.jd_override` |
-| 优化确认 | strategy 的 `gate_prompt` | 派 `resume` 前须确认；拒绝未确认时 `delegate_worker(resume)` |
+| `gate_name` | 产出者 | `gate_prompt` | 用户确认后（不可见域白名单 / 可见前置） |
+|-------------|--------|---------------|----------------------------------------|
+| 进入深度探讨 | 协调者自拟邀请 | — | `gates.flags.deep_explore_accepted`；可弹建档表单 |
+| 初探完成 | **E1**：`context.gate_owner` 指定 `identity` **或** `capability` | **仅 owner 必填**；另一 Worker **禁止** 出现 | patch `exploration.*` + `exploration.completed_at`（[10 §3](./10-会话闸门与state.md#3-profile-落档双路径-p3)） |
+| 不推荐仍继续 | `opportunity`（**O1**） | `not_recommended` 时 **必填** | `career.jd_override[]` + `jd_continue_despite_not_recommended` |
+| 优化确认 | `strategy`（**St1**，JD 路径） | `requires_optimize_gate` 时 **必填**；`plan` **禁止** | `optimize_confirmed` → 允许 **可见** `write_resume_html`（[V1](./10-会话闸门与state.md#1-会话工作区生命周期)） |
+| 复用确认 | `asset`（`run_kind=reuse`） | **必填** | 用户选定复用/新建/跳过后再派 `resume` |
+
+**协调者路由**：任一 Worker 返回 `gate_prompt` → **C3** 停链 synthesize，等用户下一条消息后再继续 delegate（见 [§9](#9-协调者路由策略)）。
+
+**未初探走 JD（B1）**：协调者软引导；**不** HTTP 403；不可见域仍可按白名单写入评估 snapshot（O-P1）。
 
 ## 7. 与「错误模型」的对比
 

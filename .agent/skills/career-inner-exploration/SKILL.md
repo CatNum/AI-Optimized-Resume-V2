@@ -5,11 +5,19 @@ description: >-
   confirmed entering deep exploration (PRD 5.1.0) and submitted the structured
   profile form. Use when a task list with list_type explore or plan is active, the
   milestone is career initial exploration (职业初探), the user asks for planning or
-  self-discovery before JD/resume work, exploration review (初探复盘), or the
-  identity or capability Worker is invoked for list_type explore or plan. MUST NOT use during
-  JD matching, resume optimization, or simple factual Q&A.
-  One question per turn; writes conclusions to profile.json exploration fields
-  and resume.experience_bank.
+  self-discovery before JD/resume work, exploration review (初探复盘), experience bank
+  deep-dive (capability_bank), or the identity or capability Worker is invoked for
+  list_type explore or plan. MUST NOT use during JD matching, resume optimization,
+  or simple factual Q&A. Load with mode: exploration_first | exploration_review |
+  capability_bank (K2). One question per turn; writes to profile.json exploration
+  fields and resume.experience_bank.
+modes:
+  exploration_first:
+    allowed_workers: [identity]
+  exploration_review:
+    allowed_workers: [identity]
+  capability_bank:
+    allowed_workers: [capability]
 ---
 
 # 职业内核探索
@@ -40,14 +48,15 @@ description: >-
 
 ---
 
-## 模式选择：首次初探 vs 初探复盘
+## 模式选择（K2：`load_skill` + `mode`）
 
-入口编排智能体（运行框架）须在加载本技能包时标明模式（或根据 `profile.json` 自行判断）：
+Worker Run 内 **自行** 调用 `load_skill("career-inner-exploration", mode=…)`；Harness 校验当前 `worker_id ∈ allowed_workers[mode]`。协调者 **不** 预指定 mode。
 
-| 模式 | 条件 | 走哪条清单 |
-|------|------|------------|
-| **首次初探** | 无 `exploration.completed_at`，或用户明确是第一次深度探索 | **完整清单**（五主题 + 简历深挖 + 交叉/路径/summary） |
-| **初探复盘** | 已有 `exploration.completed_at`，用户要更新/纠正既往结论 | **复盘短路径**（见下节），不从头五主题；**按需** 补 `experience_bank` |
+| `mode` | 允许 Worker | 条件 | 走哪条清单 |
+|--------|-------------|------|------------|
+| `exploration_first` | `identity` | 无 `exploration.completed_at`，或用户明确首次深度探索 | **完整清单**（五主题 + 简历深挖 + 交叉/路径/summary） |
+| `exploration_review` | `identity` | 已有 `exploration.completed_at`，用户要更新/纠正 | **复盘短路径**（见下节） |
+| `capability_bank` | `capability` | JD 后素材补齐、经历追问、补 `experience_bank` | **JD 定向短路径**（2–5 轮；见 [B06 §5.5.0](../../docs/prd/B06.%20流程-简历优化%20PRD.md#550-jd-后经历素材补齐可选深挖)） |
 
 复盘触发示例：「重新梳理职业方向」「优先级变了」「上次初探不太准」「还有段经历没写进简历」。
 
