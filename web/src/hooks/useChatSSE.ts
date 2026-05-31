@@ -1,0 +1,75 @@
+import { useCallback, useState } from "react";
+
+type ChatHandlers = {
+  onSession: (sessionId: string) => void;
+  onToken: (delta: string) => void;
+  onHistoryNotice: (payload: Record<string, unknown>) => void;
+  onDone: () => void;
+  onError: (message: string) => void;
+};
+
+export function useChatSSE() {
+  const [loading, setLoading] = useState(false);
+
+  const sendMessage = useCallback(
+    async (message: string, sessionId: string | null, handlers: ChatHandlers) => {
+      setLoading(true);
+      try {
+        const response = await fetch("/v1/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "text/event-stream",
+          },
+          body: JSON.stringify({ session_id: sessionId, message }),
+        });
+
+        if (response.status === 409) {
+          handlers.onError("chat_in_progress");
+          return;
+        }
+        if (response.status === 410) {
+          const fresh = await fetch("/v1/sessions/new", { method: "POST" });
+          const data = await fresh.json();
+          handlers.onSession(data.session_id);
+          handlers.onError("session_expired");
+          return;
+        }
+        if (!response.ok || !response.body) {
+          handlers.onError(`HTTP ${response.status}`);
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split("\n\n");
+          buffer = parts.pop() || "";
+          for (const part of parts) {
+            const lines = part.split("\n");
+            const eventLine = lines.find((l) => l.startsWith("event:"));
+            const dataLine = lines.find((l) => l.startsWith("data:"));
+            if (!eventLine || !dataLine) continue;
+            const event = eventLine.replace("event:", "").trim();
+            const data = JSON.parse(dataLine.replace("data:", "").trim());
+            if (event === "session") handlers.onSession(data.session_id);
+            if (event === "token") handlers.onToken(data.delta);
+            if (event === "history_notice") handlers.onHistoryNotice(data);
+            if (event === "done") handlers.onDone();
+            if (event === "error") handlers.onError(data.message);
+          }
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
+
+  return { sendMessage, loading };
+}
