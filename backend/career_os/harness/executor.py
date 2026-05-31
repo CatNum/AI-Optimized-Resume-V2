@@ -3,6 +3,7 @@ from typing import Any
 from career_os.harness.delegate import check_delegate_rules, delegate_worker as run_delegate_worker
 from career_os.harness.errors import HarnessError
 from career_os.harness.gate import match_gate_intent as run_match_gate_intent
+from career_os.platform.trace.writer import TraceWriter
 from career_os.platform.tool.handlers.profile import (
     apply_proposed_patches,
     profile_get,
@@ -25,8 +26,9 @@ from career_os.platform.tool.registry import (
 
 
 class Harness:
-    def __init__(self) -> None:
+    def __init__(self, trace_writer: TraceWriter | None = None) -> None:
         self.tools = ToolRegistry()
+        self.trace = trace_writer or TraceWriter()
         self._register_tools()
 
     def _register_tools(self) -> None:
@@ -66,13 +68,38 @@ class Harness:
         )
 
     def execute_tool(
-        self, actor: str, tool_name: str, args: dict[str, Any]
+        self,
+        actor: str,
+        tool_name: str,
+        args: dict[str, Any],
+        *,
+        session_id: str | None = None,
     ) -> Any | HarnessError:
         if not self._tool_visible_to_actor(actor, tool_name):
             return HarnessError("tool_not_allowed", f"{actor} cannot use {tool_name}")
         try:
+            import time
+
+            started = time.perf_counter()
             result = self.tools.execute(actor, tool_name, args)
+            status = "error" if hasattr(result, "code") else "ok"
+            self.trace.emit(
+                "tool.call",
+                session_id=session_id,
+                actor=actor,
+                tool_name=tool_name,
+                status=status,
+                latency_ms=int((time.perf_counter() - started) * 1000),
+            )
         except (KeyError, PermissionError) as exc:
+            self.trace.emit(
+                "tool.call",
+                session_id=session_id,
+                actor=actor,
+                tool_name=tool_name,
+                status="error",
+                detail={"message": str(exc)},
+            )
             return HarnessError("tool_not_allowed", str(exc))
         if hasattr(result, "code"):
             return result
@@ -96,14 +123,18 @@ class Harness:
         session_state: dict[str, Any],
         *,
         context: dict[str, Any] | None = None,
+        session_id: str | None = None,
     ) -> Any | HarnessError:
-        return run_delegate_worker(
+        result = run_delegate_worker(
             actor,
             worker_id,
             goal,
             session_state,
             context=context,
+            trace=self.trace,
+            session_id=session_id,
         )
+        return result
 
     def check_delegate_rules(
         self, worker_id: str, session_state: dict[str, Any]

@@ -1,6 +1,7 @@
 from typing import Any
 
 from career_os.harness.errors import HarnessError
+from career_os.platform.trace.writer import TraceWriter
 
 
 def check_delegate_rules(
@@ -34,6 +35,8 @@ def delegate_worker(
     session_state: dict[str, Any],
     *,
     context: dict[str, Any] | None = None,
+    trace: TraceWriter | None = None,
+    session_id: str | None = None,
 ) -> HarnessError | dict[str, Any]:
     if actor != "coordinator":
         return HarnessError(
@@ -43,7 +46,23 @@ def delegate_worker(
 
     err = check_delegate_rules(worker_id, session_state)
     if err:
+        if trace:
+            trace.emit(
+                "agent.run.end",
+                session_id=session_id or session_state.get("session_id"),
+                worker_id=worker_id,
+                status="failed",
+                detail={"code": err.code, "message": err.message},
+            )
         return err
+
+    if trace:
+        trace.emit(
+            "agent.run.start",
+            session_id=session_id or session_state.get("session_id"),
+            worker_id=worker_id,
+            status="ok",
+        )
 
     return {
         "worker_id": worker_id,
