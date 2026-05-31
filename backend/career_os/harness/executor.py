@@ -13,6 +13,7 @@ from career_os.platform.tool.handlers.profile import (
 )
 from career_os.platform.tool.handlers.resume_html import write_resume_html
 from career_os.platform.tool.handlers.resume_read import resume_read
+from career_os.platform.tool.handlers.skill import list_skills, load_skill
 from career_os.platform.tool.handlers.task import (
     apply_proposed_task_completions,
     claim_task,
@@ -76,6 +77,8 @@ class Harness:
             browser_fetch,
             actors={"market", "opportunity"},
         )
+        self.tools.register("load_skill", load_skill, actors=worker_actors)
+        self.tools.register("list_skills", list_skills, actors=worker_actors)
 
     @staticmethod
     def _match_gate_intent_handler(actor: str, args: dict[str, Any]) -> dict[str, Any]:
