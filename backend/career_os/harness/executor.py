@@ -4,11 +4,15 @@ from career_os.harness.delegate import check_delegate_rules, delegate_worker as 
 from career_os.harness.errors import HarnessError
 from career_os.harness.gate import match_gate_intent as run_match_gate_intent
 from career_os.platform.trace.writer import TraceWriter
+from career_os.platform.tool.handlers.browser_fetch import browser_fetch
+from career_os.platform.tool.handlers.outputs import delete_output, register_outputs_index
 from career_os.platform.tool.handlers.profile import (
     apply_proposed_patches,
     profile_get,
     profile_patch,
 )
+from career_os.platform.tool.handlers.resume_html import write_resume_html
+from career_os.platform.tool.handlers.resume_read import resume_read
 from career_os.platform.tool.handlers.task import (
     apply_proposed_task_completions,
     claim_task,
@@ -58,6 +62,19 @@ class Harness:
             "match_gate_intent",
             self._match_gate_intent_handler,
             actors={"coordinator"},
+        )
+        self.tools.register("write_resume_html", write_resume_html, actors={"resume"})
+        self.tools.register("resume_read", resume_read, actors={"capability", "resume"})
+        self.tools.register(
+            "register_outputs_index",
+            register_outputs_index,
+            actors={"asset"},
+        )
+        self.tools.register("delete_output", delete_output, actors={"asset"})
+        self.tools.register(
+            "browser_fetch",
+            browser_fetch,
+            actors={"market", "opportunity"},
         )
 
     @staticmethod

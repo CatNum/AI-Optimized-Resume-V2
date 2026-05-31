@@ -60,10 +60,51 @@ class OpportunityOutput(BaseModel):
     gate_prompt: GatePrompt | None = None
 
 
+class MarketOutput(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    user_visible_summary: str
+    topics: list[dict[str, Any]]
+
+
+class StrategyOutput(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    user_visible_summary: str
+    path_options: list[dict[str, Any]]
+    three_horizons: dict[str, Any]
+    gate_prompt: GatePrompt | None = None
+
+
+class ResumeOutput(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    user_visible_summary: str
+    html_deliveries: list[dict[str, Any]]
+
+
+class AssetReuseOutput(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    user_visible_summary: str
+    reuse_recommendation: dict[str, Any]
+    gate_prompt: GatePrompt
+
+
+class AssetRegisterOutput(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    user_visible_summary: str
+    registered_deliveries: list[dict[str, Any]]
+
+
 WORKER_SCHEMAS: dict[str, type[BaseModel]] = {
     "identity": IdentityOutput,
     "capability": CapabilityOutput,
     "opportunity": OpportunityOutput,
+    "market": MarketOutput,
+    "strategy": StrategyOutput,
+    "resume": ResumeOutput,
 }
 
 

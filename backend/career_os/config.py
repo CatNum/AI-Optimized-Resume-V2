@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     chat_history_max_messages: int = 40
     chat_history_max_tokens: int = 12000
     chat_history_warn_ratio: float = 0.95
+    cors_origins: str = "http://127.0.0.1:5173"
 
 
 settings = Settings()

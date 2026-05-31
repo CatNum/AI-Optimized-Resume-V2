@@ -27,3 +27,7 @@ packages = ["career_os"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "llm: requires live LLM",
+    "no_llm: deterministic L1 eval",
+]

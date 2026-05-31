@@ -25,6 +25,24 @@ def run_worker_emit(
     }
 
 
+def finalize_worker_result(worker_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    state: WorkerState = {
+        "worker_id": worker_id,
+        "goal": "",
+        "context": {},
+        "messages": [],
+        "structured_output": payload,
+        "status": "pending",
+    }
+    emitted = run_worker_emit(state, raw_output=payload)
+    return {
+        "worker_id": worker_id,
+        "status": emitted["status"],
+        "structured_output": emitted.get("structured_output"),
+        "error": emitted.get("error"),
+    }
+
+
 def build_stub_worker_runner(
     responses: dict[str, dict[str, Any]],
 ) -> Callable[[str, str, dict[str, Any], dict[str, Any]], dict[str, Any]]:
@@ -35,20 +53,6 @@ def build_stub_worker_runner(
         context: dict[str, Any],
     ) -> dict[str, Any]:
         payload = responses.get(worker_id, {"user_visible_summary": goal})
-        state: WorkerState = {
-            "worker_id": worker_id,
-            "goal": goal,
-            "context": context,
-            "messages": [],
-            "structured_output": payload,
-            "status": "pending",
-        }
-        emitted = run_worker_emit(state, raw_output=payload)
-        return {
-            "worker_id": worker_id,
-            "status": emitted["status"],
-            "structured_output": emitted.get("structured_output"),
-            "error": emitted.get("error"),
-        }
+        return finalize_worker_result(worker_id, payload)
 
     return runner
