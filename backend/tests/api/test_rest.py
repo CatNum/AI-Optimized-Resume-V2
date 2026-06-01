@@ -188,7 +188,17 @@ def test_explore_intake_submit(client):
     assert status["intake"]["resolved_fields"]["current_salary"] == "25K"
 
 
-def test_explore_intake_submit_creates_explore_task_list(client):
+def test_new_session_creates_pipeline_list(client):
+    sid = client.post("/v1/sessions/new").json()["session_id"]
+    body = client.get("/v1/tasks", params={"session_id": sid}).json()
+    assert len(body["lists"]) == 1
+    assert body["lists"][0]["list_type"] == "pipeline"
+    assert body["lists"][0]["current_phase"] == "explore"
+    assert len(body["lists"][0]["milestones"]) == 5
+    assert body["all_tasks_completed"] is False
+
+
+def test_explore_intake_submit_keeps_single_pipeline_list(client):
     sid = client.post("/v1/sessions/new").json()["session_id"]
     payload = {
         "session_id": sid,
@@ -199,16 +209,14 @@ def test_explore_intake_submit_creates_explore_task_list(client):
     assert r.status_code == 200
 
     tasks = client.get("/v1/tasks", params={"session_id": sid}).json()
-    explore = [lst for lst in tasks["lists"] if lst["list_type"] == "explore"]
-    assert len(explore) == 1
-    assert explore[0]["status"] == "active"
-    assert tasks["active_list_id"] == explore[0]["list_id"]
-    task_ids = {t["id"] for t in explore[0]["tasks"]}
-    assert task_ids == {"identity", "capability"}
+    pipeline = [lst for lst in tasks["lists"] if lst["list_type"] == "pipeline"]
+    assert len(pipeline) == 1
+    assert pipeline[0]["status"] == "active"
+    assert tasks["active_list_id"] == pipeline[0]["list_id"]
 
     client.post("/v1/profile/explore-intake", json=payload)
     tasks2 = client.get("/v1/tasks", params={"session_id": sid}).json()
-    assert len([l for l in tasks2["lists"] if l["list_type"] == "explore"]) == 1
+    assert len([l for l in tasks2["lists"] if l["list_type"] == "pipeline"]) == 1
 
 
 def test_chat_explore_intake_event(client):
@@ -264,9 +272,24 @@ def test_chat_jd_gate_chain(client):
                 "path": "exploration.completed_at",
                 "value": "2026-05-31T00:00:00Z",
                 "op": "set",
-            }
+            },
+            {
+                "path": "exploration.intake.submitted_at",
+                "value": "2026-05-31T00:00:00Z",
+                "op": "set",
+            },
         ]
     )
+    from career_os.harness.pipeline_gates import jump_to_phase, set_explore_gate_confirmed
+    from career_os.platform.store.session import SessionStore
+
+    session_store = SessionStore()
+    state = session_store.get_state(session)
+    set_explore_gate_confirmed(state, True)
+    list_id = state.get("list_id")
+    assert list_id
+    jump_to_phase(session, list_id, "resume_strategy", state)
+    session_store.update_state(session, state)
 
     def chat(message: str) -> str:
         with client.stream(
@@ -347,22 +370,14 @@ def test_chat_without_session_id_creates_and_indexes(client):
 
 def test_get_tasks_by_session_id(client):
     sid = client.post("/v1/sessions/new").json()["session_id"]
-    from career_os.platform.store.task import TaskStore
-
-    store = TaskStore()
-    list_id = store.create_task_list(sid, list_type="explore", status="active")
-    store.create_task(list_id, "milestone_1", "初探", kind="milestone")
-
     r = client.get("/v1/tasks", params={"session_id": sid})
     assert r.status_code == 200
     body = r.json()
     assert body["session_id"] == sid
-    assert body["active_list_id"] == list_id
     assert len(body["lists"]) == 1
-    assert body["lists"][0]["list_id"] == list_id
-    assert body["lists"][0]["list_type"] == "explore"
-    assert body["lists"][0]["status"] == "active"
-    assert len(body["lists"][0]["tasks"]) == 1
+    assert body["lists"][0]["list_type"] == "pipeline"
+    assert body["lists"][0]["current_phase"] == "explore"
+    assert len(body["lists"][0]["milestones"]) == 5
     assert body["all_tasks_completed"] is False
 
 
@@ -371,7 +386,11 @@ def test_get_tasks_by_session_id_all_completed(client):
     from career_os.platform.store.task import TaskStore
 
     store = TaskStore()
+    pipeline_id = store.get_active_list_id_for_session(sid)
+    assert pipeline_id
+    store.abandon_task_list(pipeline_id)
     list_id = store.create_task_list(sid, list_type="jd", status="active")
+    assert isinstance(list_id, str)
     store.create_task(list_id, "milestone_1", "Done step")
     store.complete_task(list_id, "milestone_1")
 

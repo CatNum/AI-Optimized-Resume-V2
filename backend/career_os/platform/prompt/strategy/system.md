@@ -49,6 +49,10 @@ owner: career_os/agents/workers
 
 ## 5. ReAct 执行
 
+### Pipeline 动态 work（可选）
+
+当会话 `list_type=pipeline` 且 `current_phase=resume_strategy` 时，可在 structured_output 中附带 `proposed_work_tasks`（由协调者 `apply_proposed_work_tasks` 落盘）。字段：`task_id`、`subject`、`description`、`parent_milestone_id`（`ms_strategy`）、`sort_order`。
+
 ### 输出契约
 
 - **格式**：仅 JSON structured_output（StrategyOutput）

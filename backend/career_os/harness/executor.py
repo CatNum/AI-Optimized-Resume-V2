@@ -16,11 +16,16 @@ from career_os.platform.tool.handlers.resume_read import resume_read
 from career_os.platform.tool.handlers.skill import list_skills, load_skill
 from career_os.platform.tool.handlers.task import (
     abandon_task_list,
+    advance_current_phase_tool,
     apply_proposed_task_completions,
+    apply_proposed_work_tasks_tool,
     claim_task,
     complete_task,
     create_task,
     create_task_list,
+    ensure_milestone_works_tool,
+    get_task,
+    jump_to_phase_tool,
     list_tasks,
     start_task_list,
 )
@@ -56,6 +61,24 @@ class Harness:
         self.tools.register("start_task_list", start_task_list, actors={"coordinator"})
         self.tools.register("abandon_task_list", abandon_task_list, actors={"coordinator"})
         self.tools.register("list_tasks", list_tasks, actors={"coordinator"})
+        self.tools.register("get_task", get_task, actors={"coordinator"})
+        self.tools.register("jump_to_phase", jump_to_phase_tool, actors={"coordinator"})
+        self.tools.register(
+            "advance_current_phase",
+            advance_current_phase_tool,
+            actors={"coordinator"},
+        )
+        worker_actors = set(WORKER_BUSINESS_TOOLS.keys())
+        self.tools.register(
+            "ensure_milestone_works",
+            ensure_milestone_works_tool,
+            actors={"coordinator", *worker_actors},
+        )
+        self.tools.register(
+            "apply_proposed_work_tasks",
+            apply_proposed_work_tasks_tool,
+            actors={"coordinator"},
+        )
         self.tools.register("claim_task", claim_task, actors={"coordinator"})
         self.tools.register("complete_task", complete_task, actors={"coordinator"})
         self.tools.register(

@@ -49,10 +49,31 @@ owner: career_os/agents
 | --------- | --------- | -------------------------------------------- |
 | explore   | 职业初探  | identity、capability                         |
 | jd        | JD/岗位链 | market、opportunity、strategy、resume、asset |
+| pipeline  | 五步主路径（会话默认） | 见下表 `current_phase` |
+
+### pipeline 五步（`list_type=pipeline`）
+
+会话固定一条 pipeline；**`current_phase`** 决定本轮可派 Worker（输入 JSON 会提供 `pipeline_mode`、`current_phase`、`allowed_workers`）：
+
+| current_phase     | 可派 Worker              | 说明 |
+| ----------------- | ------------------------ | ---- |
+| explore           | identity、capability     | 须先完成初探 intake；够深后可挂 `explore_complete` |
+| market            | market                   | 须 `explore_gate_confirmed` |
+| jd_analysis       | opportunity              | 同上；换 JD 由系统更新 fingerprint |
+| resume_strategy   | strategy                   | 同上；策略完成后可挂 `strategy_complete` |
+| resume_optimize   | resume、asset              | 须 `optimize_confirmed` 且已 **advance** 进入该步 |
+
+**硬约束（pipeline）**：
+
+- **禁止** 协调者或用户通过 jump 直接进入 `resume_optimize`；须先 `resume_strategy` 再 `optimize_confirm`
+- **允许** `jump_to_phase(explore)` 跳回初探（任意时刻）
+- 非 explore 阶段派工须 `explore_gate_confirmed=true`（见输入字段）
+- `can_offer_explore_complete=true` 时才可建议挂 `explore_complete` 问句
 
 **硬约束**：
 
-- explore 与 jd 链 worker **不得混用**
+- explore 与 jd 链 worker **不得混用**（legacy `list_type=explore|jd` 时）
+- pipeline 模式下按 **当前 phase** 选 Worker，**不得** 跨 phase 混派
 - `workers` 中的每一项必须出现在输入的 `worker_index` 里
 - 用户未提供 JD 且只是闲聊时，不要因 market 支持「无 JD 调研」而派 market
 
@@ -91,8 +112,13 @@ Harness 在 `delegate_worker` 层对 **market / opportunity / strategy** 硬拦�
 | jd_prerequisites_met | 是否满足 JD 评估前置条件 |
 | profile_has_basic    | 是否已建档（basic 非空） |
 | explore_completed    | 初探是否已完成并落档     |
+| pipeline_mode        | 是否为 pipeline 主路径   |
+| current_phase        | pipeline 当前阶段（若适用） |
+| allowed_workers      | pipeline 当前允许 worker 列表 |
+| explore_gate_confirmed | session 是否已确认离开初探 |
+| can_offer_explore_complete | 是否可挂 explore_complete 问句 |
 
-**任务**：根据输入决定本轮派哪些 Worker，并给出 list_type（若适用）。
+**任务**：根据输入决定本轮派哪些 Worker，并给出 list_type（若适用）。`list_type=pipeline` 时 **只派** `allowed_workers` 中的 worker。
 
 **输出契约**（analyze 专用）：
 
@@ -102,7 +128,7 @@ Harness 在 `delegate_worker` 层对 **market / opportunity / strategy** 硬拦�
 | 字段       | 类型            | 必填 | 说明                                    |
 | ---------- | --------------- | ---- | --------------------------------------- |
 | workers    | string[]        | 是   | 本轮派工列表；无派工时为 `[]`           |
-| list_type  | `"jd"` \| `"explore"` \| null | 是 | 无派工或未判定时为 `null` |
+| list_type  | `"jd"` \| `"explore"` \| `"pipeline"` \| null | 是 | pipeline 会话固定为 `"pipeline"`；无派工可为 `null` |
 
 - **禁止**：额外字段、自然语言说明、workers 含 worker_index 外的 id
 

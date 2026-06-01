@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from career_os.harness.errors import HarnessError
+from career_os.harness.pipeline_gates import is_explore_gate_confirmed
 from career_os.platform.store.profile import ProfileStore
 
 JD_CHAIN_WORKERS = frozenset({"market", "opportunity", "strategy"})
@@ -21,6 +22,8 @@ def _onboarding_complete(profile: dict[str, Any]) -> bool:
 
 
 def _explore_completed(profile: dict[str, Any], session_state: dict[str, Any]) -> bool:
+    if is_explore_gate_confirmed(session_state):
+        return True
     explore = session_state.get("explore_closure") or {}
     if explore.get("completed"):
         return True

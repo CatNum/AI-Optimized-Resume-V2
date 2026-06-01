@@ -8,6 +8,11 @@ from pathlib import Path
 from typing import Any
 
 from career_os.config import settings
+from career_os.platform.pipeline_constants import (
+    MILESTONE_ID_TO_PHASE,
+    PHASE_TO_MILESTONE_ID,
+    PIPELINE_PHASES,
+)
 
 _lock = threading.Lock()
 logger = logging.getLogger(__name__)
@@ -34,7 +39,12 @@ class TaskStore:
         return self._list_dir(list_id) / f"{task_id}.json"
 
     def create_task_list(
-        self, session_id: str, *, list_type: str, status: str = "active"
+        self,
+        session_id: str,
+        *,
+        list_type: str,
+        status: str = "active",
+        current_phase: str | None = None,
     ) -> str | TaskStoreError:
         if status == "active":
             existing = self._find_active_metas_for_session_unlocked(session_id)
@@ -56,8 +66,19 @@ class TaskStore:
                 "created_at": now,
                 "updated_at": now,
             }
+            if list_type == "pipeline":
+                meta["current_phase"] = current_phase or "explore"
+            elif current_phase is not None:
+                meta["current_phase"] = current_phase
             self._write_json(self._meta_path(list_id), meta)
         return list_id
+
+    def get_list_meta(self, list_id: str) -> dict[str, Any] | None:
+        with _lock:
+            meta_path = self._meta_path(list_id)
+            if not meta_path.exists():
+                return None
+            return self._read_json(meta_path)
 
     def create_task(
         self,
@@ -67,17 +88,55 @@ class TaskStore:
         *,
         kind: str = "work",
         worker_id: str | None = None,
-    ) -> dict[str, Any]:
-        task = {
-            "id": task_id,
-            "title": title,
-            "kind": kind,
-            "status": "pending",
-            "worker_id": worker_id,
-        }
+        parent_milestone_id: str | None = None,
+        pipeline_phase: str | None = None,
+        description: str | None = None,
+        sort_order: int | None = None,
+        blocked_by: str | None = None,
+        requires_user_confirm: bool | None = None,
+    ) -> dict[str, Any] | TaskStoreError:
         with _lock:
+            meta_path = self._meta_path(list_id)
+            if not meta_path.exists():
+                return TaskStoreError("list_not_found", f"List {list_id} not found")
+            meta = self._read_json(meta_path)
+            if parent_milestone_id:
+                parent_path = self._task_path(list_id, parent_milestone_id)
+                if not parent_path.exists():
+                    return TaskStoreError(
+                        "parent_not_found",
+                        f"Parent milestone {parent_milestone_id} not found",
+                    )
+            task: dict[str, Any] = {
+                "id": task_id,
+                "title": title,
+                "kind": kind,
+                "status": "pending",
+                "worker_id": worker_id,
+            }
+            if parent_milestone_id is not None:
+                task["parent_milestone_id"] = parent_milestone_id
+            if pipeline_phase is not None:
+                task["pipeline_phase"] = pipeline_phase
+            if description is not None:
+                task["description"] = description
+            if sort_order is not None:
+                task["sort_order"] = sort_order
+            if blocked_by is not None:
+                task["blockedBy"] = blocked_by
+            if requires_user_confirm is not None:
+                task["requires_user_confirm"] = requires_user_confirm
+            if meta.get("list_type") == "pipeline":
+                task["list_type"] = "pipeline"
             self._write_json(self._task_path(list_id, task_id), task)
         return task
+
+    def get_task(self, list_id: str, task_id: str) -> dict[str, Any] | None:
+        with _lock:
+            task_path = self._task_path(list_id, task_id)
+            if not task_path.exists():
+                return None
+            return self._read_json(task_path)
 
     def get_task_list(self, list_id: str) -> dict[str, Any] | None:
         with _lock:
@@ -124,8 +183,147 @@ class TaskStore:
             task_path = self._task_path(list_id, task_id)
             if not task_path.exists():
                 return TaskStoreError("task_not_found", f"Task {task_id} not found")
+            meta = self._read_json(self._meta_path(list_id))
+            task = self._read_json(task_path)
+            if meta.get("list_type") == "pipeline" and (
+                task.get("kind") == "milestone" or task_id.startswith("ms_")
+            ):
+                return TaskStoreError(
+                    "milestone_complete_forbidden",
+                    "Pipeline milestones cannot be completed",
+                )
             task_path.unlink()
             return None
+
+    def patch_list_meta(self, list_id: str, fields: dict[str, Any]) -> TaskStoreError | None:
+        with _lock:
+            meta_path = self._meta_path(list_id)
+            if not meta_path.exists():
+                return TaskStoreError("list_not_found", f"List {list_id} not found")
+            meta = self._read_json(meta_path)
+            meta.update(fields)
+            meta["updated_at"] = datetime.now(UTC).isoformat()
+            self._write_json(meta_path, meta)
+            return None
+
+    def set_current_phase(self, list_id: str, phase: str) -> TaskStoreError | None:
+        if phase not in PIPELINE_PHASES:
+            return TaskStoreError("invalid_phase", f"Unknown pipeline phase: {phase}")
+        with _lock:
+            meta_path = self._meta_path(list_id)
+            if not meta_path.exists():
+                return TaskStoreError("list_not_found", f"List {list_id} not found")
+            meta = self._read_json(meta_path)
+            if meta.get("list_type") != "pipeline":
+                return TaskStoreError("not_pipeline", "List is not pipeline type")
+            now = datetime.now(UTC).isoformat()
+            meta["current_phase"] = phase
+            meta["updated_at"] = now
+            self._write_json(meta_path, meta)
+            return None
+
+    def clear_works_for_phase(self, list_id: str, phase: str) -> TaskStoreError | None:
+        milestone_id = PHASE_TO_MILESTONE_ID.get(phase)
+        if not milestone_id:
+            return TaskStoreError("invalid_phase", f"Unknown pipeline phase: {phase}")
+        with _lock:
+            list_dir = self._list_dir(list_id)
+            if not list_dir.exists():
+                return TaskStoreError("list_not_found", f"List {list_id} not found")
+            for path in list(list_dir.glob("*.json")):
+                if path.name == "meta.json":
+                    continue
+                task = self._read_json(path)
+                if task.get("kind") != "work":
+                    continue
+                if task.get("parent_milestone_id") == milestone_id:
+                    path.unlink()
+            return None
+
+    def claim_first_work_for_phase(self, list_id: str, phase: str) -> dict[str, Any] | None:
+        milestone_id = PHASE_TO_MILESTONE_ID.get(phase)
+        if not milestone_id:
+            return None
+        with _lock:
+            err = self._ensure_mutable_list(list_id)
+            if err:
+                return None
+            works = [
+                t
+                for t in self._list_tasks_unlocked(list_id)
+                if t.get("kind") == "work"
+                and t.get("parent_milestone_id") == milestone_id
+                and t.get("status") == "pending"
+            ]
+            if not works:
+                return None
+            works.sort(key=lambda t: t.get("sort_order", 0))
+            first = works[0]
+            task_path = self._task_path(list_id, first["id"])
+            first["status"] = "active"
+            self._write_json(task_path, first)
+            return first
+
+    def list_tasks_tree(self, list_id: str) -> dict[str, Any] | None:
+        with _lock:
+            meta_path = self._meta_path(list_id)
+            if not meta_path.exists():
+                return None
+            meta = self._read_json(meta_path)
+            if meta.get("list_type") != "pipeline":
+                return None
+            current_phase = meta.get("current_phase") or "explore"
+            current_ms = PHASE_TO_MILESTONE_ID.get(current_phase, "ms_explore")
+            all_tasks = self._list_tasks_unlocked(list_id)
+            milestones = sorted(
+                (t for t in all_tasks if t.get("kind") == "milestone"),
+                key=lambda t: PIPELINE_PHASES.index(
+                    t.get("pipeline_phase", "explore")
+                )
+                if t.get("pipeline_phase") in PIPELINE_PHASES
+                else 99,
+            )
+            works_by_parent: dict[str, list[dict[str, Any]]] = {}
+            for task in all_tasks:
+                if task.get("kind") != "work":
+                    continue
+                parent = task.get("parent_milestone_id")
+                if not parent:
+                    continue
+                works_by_parent.setdefault(parent, []).append(task)
+            milestone_rows: list[dict[str, Any]] = []
+            for ms in milestones:
+                ms_id = ms["id"]
+                works = works_by_parent.get(ms_id, [])
+                if ms_id == current_ms:
+                    works = sorted(works, key=lambda w: w.get("sort_order", 0))
+                else:
+                    works = []
+                milestone_rows.append(
+                    {
+                        "task_id": ms_id,
+                        "pipeline_phase": ms.get("pipeline_phase"),
+                        "subject": ms.get("title"),
+                        "works": works,
+                    }
+                )
+            return {
+                "list_id": list_id,
+                "current_phase": current_phase,
+                "milestones": milestone_rows,
+            }
+
+    def list_works_for_phase(self, list_id: str, phase: str) -> list[dict[str, Any]]:
+        milestone_id = PHASE_TO_MILESTONE_ID.get(phase)
+        if not milestone_id:
+            return []
+        with _lock:
+            return [
+                t
+                for t in self._list_tasks_unlocked(list_id)
+                if t.get("kind") == "work"
+                and t.get("parent_milestone_id") == milestone_id
+            ]
 
     def start_task_list(self, list_id: str) -> TaskStoreError | None:
         with _lock:

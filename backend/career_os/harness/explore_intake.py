@@ -39,6 +39,13 @@ def worker_context_from_intake() -> dict[str, Any]:
 def is_explore_route(result: dict[str, Any]) -> bool:
     if result.get("list_type") == "explore":
         return True
+    if result.get("list_type") == "pipeline":
+        if result.get("pipeline_phase") not in (None, "explore"):
+            return False
+        workers = result.get("workers") or []
+        return not workers or any(
+            worker_id in {"identity", "capability"} for worker_id in workers
+        )
     workers = result.get("workers") or []
     return any(worker_id in {"identity", "capability"} for worker_id in workers)
 
@@ -75,7 +82,7 @@ def enforce_explore_intake(
     if not explore_intake_submitted():
         return {
             "workers": [],
-            "list_type": "explore",
+            "list_type": list_type,
             "explore_intake_blocked": True,
         }
 
@@ -83,13 +90,13 @@ def enforce_explore_intake(
         if needs_repeat_intake(session_state):
             return {
                 "workers": [],
-                "list_type": "explore",
+                "list_type": list_type,
                 "explore_intake_blocked": True,
             }
         return result
 
     return {
         "workers": [],
-        "list_type": "explore",
+        "list_type": list_type,
         "explore_repeat_blocked": True,
     }

@@ -15,7 +15,9 @@ from career_os.harness.orchestrator import ChatOrchestrator
 from career_os.harness.session_activity import build_session_activity
 from career_os.platform.store.profile import ProfileStore
 from career_os.platform.store.session import SessionStore
-from career_os.platform.store.task import TaskStore
+from career_os.harness.pipeline_gates import compute_hard_pass
+from career_os.platform.pipeline_template import instantiate_pipeline_for_session
+from career_os.platform.store.task import TaskStore, TaskStoreError
 
 router = APIRouter(prefix="/v1")
 harness = Harness()
@@ -215,6 +217,12 @@ def delete_session(session_id: str):
 def new_session():
     store = SessionStore()
     session_id = store.create_session()
+    result = instantiate_pipeline_for_session(session_id)
+    if isinstance(result, TaskStoreError):
+        raise HTTPException(
+            status_code=500,
+            detail={"code": result.code, "message": result.message},
+        )
     return {"session_id": session_id}
 
 
@@ -296,6 +304,22 @@ def get_profile():
     )
 
 
+def _format_task_list_row(store: TaskStore, row: dict[str, Any]) -> dict[str, Any]:
+    list_id = row["list_id"]
+    if row.get("list_type") == "pipeline":
+        tree = store.list_tasks_tree(list_id)
+        if tree:
+            return {
+                "list_id": list_id,
+                "list_type": "pipeline",
+                "status": row.get("status"),
+                "current_phase": tree.get("current_phase"),
+                "milestones": tree.get("milestones", []),
+                "tasks": [],
+            }
+    return row
+
+
 @router.get("/tasks")
 def get_tasks(session_id: str | None = Query(default=None)):
     if session_id is None:
@@ -306,14 +330,27 @@ def get_tasks(session_id: str | None = Query(default=None)):
         )
     _validate_session_id_for_tasks(session_id)
     store = TaskStore()
-    lists = store.list_lists_for_session(session_id)
+    session_store = SessionStore()
+    if not session_store.session_exists(session_id):
+        raise _task_error(404, "session_not_found", "Session not found")
+    raw_lists = store.list_lists_for_session(session_id)
+    lists = [_format_task_list_row(store, row) for row in raw_lists]
     active_list_id = store.get_active_list_id_for_session(session_id)
-    all_tasks_completed = all(not item["tasks"] for item in lists)
+    has_pipeline = any(item.get("list_type") == "pipeline" for item in lists)
+    if has_pipeline:
+        all_tasks_completed = False
+    else:
+        all_tasks_completed = all(not item.get("tasks") for item in lists)
+    state = session_store.get_state(session_id)
+    hard_pass, _ = compute_hard_pass(ProfileStore().get(["basic", "intent", "exploration", "resume"]))
     return {
         "session_id": session_id,
         "active_list_id": active_list_id,
         "lists": lists,
         "all_tasks_completed": all_tasks_completed,
+        "explore_gate_confirmed": bool(state.get("explore_gate_confirmed")),
+        "hard_pass": hard_pass,
+        "ui_mode": "normal" if hard_pass else "weak",
     }
 
 

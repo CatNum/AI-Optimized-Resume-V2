@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime
 from typing import Any, AsyncIterator
 
 from fastapi import APIRouter, HTTPException
@@ -12,6 +13,12 @@ from career_os.agents.lc.models import LLMRole
 from career_os.agents.lc.coordinator_llm import build_synthesis_messages
 from career_os.harness.executor import Harness
 from career_os.harness.gate import match_gate_intent
+from career_os.harness.pipeline_gates import (
+    PipelineGateError,
+    advance_current_phase,
+    set_explore_gate_confirmed,
+)
+from career_os.platform.store.task import TaskStore
 from career_os.harness.orchestrator import ChatOrchestrator
 from career_os.harness.session_activity import build_session_activity
 from career_os.platform.store.profile import ProfileStore
@@ -45,14 +52,49 @@ def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str
             flags["optimize_confirmed"] = True
             gates["flags"] = flags
             session_state["gates"] = gates
+            list_id = session_state.get("list_id")
+            session_id = session_state.get("session_id")
+            if list_id and session_id:
+                adv = advance_current_phase(session_id, list_id, "resume_optimize", session_state)
+                if isinstance(adv, PipelineGateError):
+                    gates["pending"] = pending
+                    return []
             return ["resume", "asset"]
+        if gate_name == "strategy_complete":
+            flags["strategy_complete"] = True
+            gates["flags"] = flags
+            session_state["gates"] = gates
+            gates["pending"] = {
+                "name": "optimize_confirm",
+                "prompt": "是否确认开始按策略优化简历？",
+            }
+            session_state["gates"] = gates
+            return []
         if gate_name == "explore_complete":
             explore = dict(session_state.get("explore_closure") or {})
             explore["gate_pending"] = False
             explore["completed"] = True
             session_state["explore_closure"] = explore
+            set_explore_gate_confirmed(session_state, True)
+            flags["fresh_pass"] = True
             gates["flags"] = flags
             session_state["gates"] = gates
+            profile = ProfileStore().get(["exploration", "basic", "intent", "resume"])
+            exploration = dict(profile.get("exploration") or {})
+            intake = exploration.get("intake") or {}
+            exploration["intake_baseline"] = dict(intake)
+            exploration["completed_at"] = exploration.get("completed_at") or datetime.now(
+                UTC
+            ).isoformat()
+            ProfileStore().patch(
+                [
+                    {"path": "exploration.intake_baseline", "value": dict(intake), "op": "set"},
+                    {"path": "exploration.completed_at", "value": exploration["completed_at"], "op": "set"},
+                ]
+            )
+            list_id = session_state.get("list_id")
+            if list_id:
+                TaskStore().clear_works_for_phase(list_id, "explore")
             return []
         if gate_name == "explore_repeat":
             flags["explore_repeat_accepted"] = True

@@ -25,11 +25,23 @@ def check_delegate_rules(
                 "JD-R1: opportunity requires prior_results.market",
             )
 
-    if worker_id == "resume" and not flags.get("optimize_confirmed"):
-        return HarnessError(
-            "gate_blocked",
-            "resume delegation requires optimize_confirmed",
-        )
+    if worker_id == "resume":
+        if not flags.get("optimize_confirmed"):
+            return HarnessError(
+                "gate_blocked",
+                "resume delegation requires optimize_confirmed",
+            )
+        list_id = session_state.get("list_id")
+        if list_id:
+            from career_os.platform.store.task import TaskStore
+
+            meta = TaskStore().get_list_meta(list_id)
+            if meta and meta.get("list_type") == "pipeline":
+                if meta.get("current_phase") != "resume_optimize":
+                    return HarnessError(
+                        "gate_blocked",
+                        "resume delegation requires current_phase=resume_optimize",
+                    )
 
     return None
 

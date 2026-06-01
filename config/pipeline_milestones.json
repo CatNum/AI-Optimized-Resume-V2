@@ -1,0 +1,27 @@
+[
+  {
+    "task_id": "ms_explore",
+    "pipeline_phase": "explore",
+    "subject": "职业初探"
+  },
+  {
+    "task_id": "ms_market",
+    "pipeline_phase": "market",
+    "subject": "市场分析"
+  },
+  {
+    "task_id": "ms_jd",
+    "pipeline_phase": "jd_analysis",
+    "subject": "JD 分析"
+  },
+  {
+    "task_id": "ms_strategy",
+    "pipeline_phase": "resume_strategy",
+    "subject": "简历优化策略"
+  },
+  {
+    "task_id": "ms_resume",
+    "pipeline_phase": "resume_optimize",
+    "subject": "简历优化"
+  }
+]

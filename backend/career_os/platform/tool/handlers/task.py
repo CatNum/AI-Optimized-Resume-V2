@@ -1,6 +1,13 @@
 from dataclasses import dataclass
 from typing import Any
 
+from career_os.harness.pipeline_gates import (
+    PipelineGateError,
+    advance_current_phase,
+    apply_proposed_work_tasks,
+    ensure_milestone_works,
+    jump_to_phase,
+)
 from career_os.platform.store.session import SessionStore
 from career_os.platform.store.task import TaskStore, TaskStoreError
 
@@ -12,6 +19,10 @@ class TaskToolError:
 
 
 def _store_error(err: TaskStoreError) -> TaskToolError:
+    return TaskToolError(code=err.code, message=err.message)
+
+
+def _gate_error(err: PipelineGateError) -> TaskToolError:
     return TaskToolError(code=err.code, message=err.message)
 
 
@@ -38,14 +49,120 @@ def create_task(actor: str, args: dict[str, Any]) -> TaskToolError | dict[str, A
     if actor != "coordinator":
         return TaskToolError("tool_not_allowed", "create_task is coordinator-only")
     store = TaskStore()
-    task = store.create_task(
+    result = store.create_task(
         args["list_id"],
         args["task_id"],
         args.get("subject") or args.get("title", ""),
         kind=args.get("kind", "work"),
         worker_id=args.get("worker_id"),
+        parent_milestone_id=args.get("parent_milestone_id"),
+        pipeline_phase=args.get("pipeline_phase"),
+        description=args.get("description"),
+        sort_order=args.get("sort_order"),
+        blocked_by=args.get("blocked_by"),
+        requires_user_confirm=args.get("requires_user_confirm"),
     )
+    if isinstance(result, TaskStoreError):
+        return _store_error(result)
+    return {"task": result}
+
+
+def get_task(actor: str, args: dict[str, Any]) -> TaskToolError | dict[str, Any]:
+    if actor != "coordinator":
+        return TaskToolError("tool_not_allowed", "get_task is coordinator-only")
+    store = TaskStore()
+    task = store.get_task(args["list_id"], args["task_id"])
+    if task is None:
+        return TaskToolError("task_not_found", f"Task {args['task_id']} not found")
     return {"task": task}
+
+
+def jump_to_phase_tool(actor: str, args: dict[str, Any]) -> TaskToolError | dict[str, Any]:
+    if actor != "coordinator":
+        return TaskToolError("tool_not_allowed", "jump_to_phase is coordinator-only")
+    session_id = args.get("session_id")
+    if not session_id:
+        return TaskToolError("session_required", "session_id required")
+    session_store = SessionStore()
+    state = session_store.get_state(session_id)
+    list_id = args.get("list_id") or state.get("list_id")
+    if not list_id:
+        return TaskToolError("list_not_found", "No pipeline list for session")
+    result = jump_to_phase(session_id, list_id, args["target_phase"], state)
+    if isinstance(result, PipelineGateError):
+        return _gate_error(result)
+    session_store.update_state(session_id, state)
+    return result
+
+
+def advance_current_phase_tool(
+    actor: str, args: dict[str, Any]
+) -> TaskToolError | dict[str, Any]:
+    if actor != "coordinator":
+        return TaskToolError(
+            "tool_not_allowed", "advance_current_phase is coordinator-only"
+        )
+    session_id = args.get("session_id")
+    if not session_id:
+        return TaskToolError("session_required", "session_id required")
+    session_store = SessionStore()
+    state = session_store.get_state(session_id)
+    list_id = args.get("list_id") or state.get("list_id")
+    if not list_id:
+        return TaskToolError("list_not_found", "No pipeline list for session")
+    target = args.get("target_phase", "resume_optimize")
+    result = advance_current_phase(session_id, list_id, target, state)
+    if isinstance(result, PipelineGateError):
+        return _gate_error(result)
+    return result
+
+
+def ensure_milestone_works_tool(
+    actor: str, args: dict[str, Any]
+) -> TaskToolError | dict[str, Any]:
+    allowed = {"coordinator", "identity", "capability", "market", "opportunity", "strategy", "resume", "asset"}
+    if actor not in allowed:
+        return TaskToolError("tool_not_allowed", "ensure_milestone_works not allowed")
+    session_store = SessionStore()
+    state: dict[str, Any] = {}
+    session_id = args.get("session_id")
+    if session_id:
+        state = session_store.get_state(session_id)
+    list_id = args.get("list_id") or state.get("list_id")
+    if not list_id:
+        return TaskToolError("list_not_found", "list_id required")
+    phase = args.get("phase")
+    if not phase:
+        meta = TaskStore().get_list_meta(list_id)
+        phase = (meta or {}).get("current_phase")
+    if not phase:
+        return TaskToolError("invalid_phase", "phase required")
+    result = ensure_milestone_works(list_id, phase, session_state=state)
+    if isinstance(result, PipelineGateError):
+        return _gate_error(result)
+    return result
+
+
+def apply_proposed_work_tasks_tool(
+    actor: str, args: dict[str, Any]
+) -> TaskToolError | dict[str, Any]:
+    if actor not in {"coordinator"}:
+        return TaskToolError(
+            "tool_not_allowed",
+            "apply_proposed_work_tasks is coordinator-only",
+        )
+    session_id = args.get("session_id")
+    if not session_id:
+        return TaskToolError("session_required", "session_id required")
+    state = SessionStore().get_state(session_id)
+    list_id = args.get("list_id") or state.get("list_id")
+    if not list_id:
+        return TaskToolError("list_not_found", "No pipeline list for session")
+    proposals = args.get("proposals") or args.get("proposed_work_tasks") or []
+    result = apply_proposed_work_tasks(list_id, proposals, state)
+    if isinstance(result, PipelineGateError):
+        return _gate_error(result)
+    return result
 
 
 def list_tasks(actor: str, args: dict[str, Any]) -> TaskToolError | dict[str, Any]:

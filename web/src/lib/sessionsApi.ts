@@ -95,6 +95,22 @@ export async function createSession(): Promise<{ session_id: string }> {
   return parseJson(response);
 }
 
+export type WorkRow = {
+  id: string;
+  title: string;
+  status: string;
+  kind?: string;
+  description?: string;
+  sort_order?: number;
+};
+
+export type MilestoneRow = {
+  task_id: string;
+  pipeline_phase: string;
+  subject: string;
+  works: WorkRow[];
+};
+
 export type TaskRow = {
   id: string;
   title: string;
@@ -106,6 +122,8 @@ export type TaskListRow = {
   list_id: string;
   list_type?: string | null;
   status: string;
+  current_phase?: string;
+  milestones?: MilestoneRow[];
   tasks: TaskRow[];
 };
 
@@ -114,6 +132,9 @@ export type SessionTasksResponse = {
   active_list_id: string | null;
   lists: TaskListRow[];
   all_tasks_completed: boolean;
+  explore_gate_confirmed?: boolean;
+  hard_pass?: boolean;
+  ui_mode?: "weak" | "normal";
 };
 
 export async function getTasks(sessionId: string): Promise<SessionTasksResponse> {

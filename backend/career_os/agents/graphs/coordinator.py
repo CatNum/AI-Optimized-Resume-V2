@@ -92,6 +92,13 @@ def build_coordinator_graph(
             return state
         pending = list(state.get("pending_workers") or [])
         session_state = dict(state.get("session_state") or {})
+        from career_os.harness.pipeline_routing import maybe_apply_jd_fingerprint_from_message
+
+        session_state = maybe_apply_jd_fingerprint_from_message(
+            state.get("session_id"),
+            session_state,
+            state.get("user_message", ""),
+        )
         session_state.pop("jd_prerequisite_blocked", None)
         session_state.pop("jd_block_reason", None)
         if not needs_repeat_intake(session_state):
@@ -303,7 +310,31 @@ def build_coordinator_graph(
         last = state.get("last_worker_result") or {}
         structured = last.get("structured_output") or {}
 
-        if can_set_explore_gate_pending(session_state.get("explore_closure")):
+        from career_os.harness.explore_depth import can_offer_explore_complete
+        from career_os.platform.store.profile import ProfileStore
+
+        profile = ProfileStore().get(
+            ["basic", "intent", "exploration", "resume", "capability"]
+        )
+        list_type = session_state.get("list_type")
+        offer_explore, _diag = can_offer_explore_complete(profile, session_state)
+        text: str | None = None
+        if (
+            list_type == "pipeline"
+            and offer_explore
+            and can_set_explore_gate_pending(session_state.get("explore_closure"))
+        ):
+            text = "初探两线已完成，请确认是否完成初探？"
+            gates = dict(session_state.get("gates") or {})
+            gates["pending"] = {
+                "name": "explore_complete",
+                "prompt": text,
+            }
+            session_state["gates"] = gates
+            explore = dict(session_state.get("explore_closure") or {})
+            explore["gate_pending"] = True
+            session_state["explore_closure"] = explore
+        elif can_set_explore_gate_pending(session_state.get("explore_closure")):
             text = "初探两线已完成，请确认是否完成初探？"
             gates = dict(session_state.get("gates") or {})
             gates["pending"] = {
@@ -351,6 +382,9 @@ def build_coordinator_graph(
                     text = structured.get("user_visible_summary") or "已完成本轮处理。"
             else:
                 text = structured.get("user_visible_summary") or "已完成本轮处理。"
+
+        if text is None:
+            text = chat_only_synthesis_draft()
 
         return {
             **state,

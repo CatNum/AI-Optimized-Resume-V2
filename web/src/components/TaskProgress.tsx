@@ -1,49 +1,39 @@
 import { useEffect, useState } from "react";
 import {
-  activityStatusLabel,
-  type SessionActivity,
-  type SessionActivityItem,
-} from "../lib/sessionActivity";
-import { getTasks, type TaskListRow, type TaskRow } from "../lib/sessionsApi";
+  getTasks,
+  type MilestoneRow,
+  type SessionTasksResponse,
+  type TaskListRow,
+} from "../lib/sessionsApi";
 
-const LIST_TYPE_HEADLINES: Record<string, string> = {
+const PHASE_LABELS: Record<string, string> = {
   explore: "职业初探",
-  jd: "JD 评估",
-  plan: "职业规划",
+  market: "市场分析",
+  jd_analysis: "JD 分析",
+  resume_strategy: "简历优化策略",
+  resume_optimize: "简历优化",
 };
 
-function mapTaskStatus(status: string): SessionActivityItem["status"] {
-  if (status === "active") return "in_progress";
-  if (status === "completed") return "completed";
-  return "pending";
-}
-
-export function pickTaskListForDisplay(lists: TaskListRow[]): TaskListRow | null {
-  const active = lists.find((l) => l.status === "active");
-  if (active?.tasks?.length) return active;
-
-  const readyLists = lists.filter((l) => l.status === "ready");
-  if (active && readyLists.length > 0) return readyLists[0];
-
-  if (readyLists[0]?.tasks?.length) return readyLists[0];
-
+function pickPipelineList(body: SessionTasksResponse): TaskListRow | null {
+  const active = body.lists.find(
+    (l) => l.status === "active" && l.list_type === "pipeline",
+  );
   if (active) return active;
-
-  return null;
+  return body.lists.find((l) => l.list_type === "pipeline") ?? null;
 }
 
-function tasksToActivity(list: TaskListRow): SessionActivity {
-  const headline =
-    (list.list_type && LIST_TYPE_HEADLINES[list.list_type]) || null;
-  return {
-    list_type: list.list_type,
-    headline,
-    items: list.tasks.map((t: TaskRow) => ({
-      id: t.id,
-      title: t.title,
-      status: mapTaskStatus(t.status),
-    })),
-  };
+function milestoneDisabled(
+  ms: MilestoneRow,
+  list: TaskListRow,
+  body: SessionTasksResponse,
+): boolean {
+  const phase = ms.pipeline_phase;
+  if (phase === "explore") return false;
+  if (!body.explore_gate_confirmed) return true;
+  if (phase === "resume_optimize" && list.current_phase !== "resume_optimize") {
+    return true;
+  }
+  return false;
 }
 
 export function TaskProgress({
@@ -53,59 +43,75 @@ export function TaskProgress({
   sessionId: string | null;
   refreshTrigger?: number;
 }) {
-  const [display, setDisplay] = useState<SessionActivity | null>(null);
+  const [payload, setPayload] = useState<SessionTasksResponse | null>(null);
 
   useEffect(() => {
     if (!sessionId) {
-      setDisplay(null);
+      setPayload(null);
       return;
     }
     let cancelled = false;
     void getTasks(sessionId)
       .then((body) => {
-        if (cancelled) return;
-        const list = pickTaskListForDisplay(body.lists);
-        setDisplay(list ? tasksToActivity(list) : null);
+        if (!cancelled) setPayload(body);
       })
       .catch(() => {
-        if (!cancelled) setDisplay(null);
+        if (!cancelled) setPayload(null);
       });
     return () => {
       cancelled = true;
     };
   }, [sessionId, refreshTrigger]);
 
-  if (!display) return null;
+  if (!payload) return null;
+
+  const list = pickPipelineList(payload);
+  if (!list?.milestones?.length) return null;
+
+  const current = list.current_phase ?? "explore";
+  const weak = payload.ui_mode === "weak";
 
   return (
-    <div className="rounded-lg border border-slate-700 bg-slate-900/60 p-3 text-sm">
-      {display.headline ? (
-        <div className="mb-2 text-emerald-300/90">{display.headline}</div>
-      ) : (
-        <div className="mb-2 font-medium text-slate-300">任务进度</div>
-      )}
-      <ul className="space-y-1">
-        {display.items.length === 0 ? (
-          <li className="text-slate-500">暂无任务条目</li>
-        ) : (
-          display.items.map((item) => (
-            <li key={item.id} className="flex justify-between gap-3 text-slate-400">
-              <span>{item.title || item.id}</span>
-              <span
-                className={
-                  item.status === "in_progress"
-                    ? "text-emerald-400"
-                    : item.status === "completed"
-                      ? "text-slate-500"
-                      : ""
-                }
-              >
-                {activityStatusLabel(item.status)}
-              </span>
+    <section
+      className={`task-progress ${weak ? "task-progress--weak" : ""}`}
+      aria-label="任务进度"
+    >
+      {weak ? (
+        <p className="task-progress__hint">请先完成建档 / 初探表单后再推进后续步骤</p>
+      ) : null}
+      <ol className="task-progress__milestones">
+        {list.milestones.map((ms) => {
+          const isCurrent = ms.pipeline_phase === current;
+          const disabled = milestoneDisabled(ms, list, payload);
+          const hasWorks = isCurrent && ms.works.length > 0;
+          return (
+            <li
+              key={ms.task_id}
+              className={[
+                "task-progress__milestone",
+                isCurrent ? "task-progress__milestone--current" : "",
+                disabled ? "task-progress__milestone--disabled" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              <div className="task-progress__milestone-title">
+                {PHASE_LABELS[ms.pipeline_phase] ?? ms.subject}
+              </div>
+              {hasWorks ? (
+                <ul className="task-progress__works">
+                  {ms.works.map((w) => (
+                    <li key={w.id} className="task-progress__work">
+                      <span className="task-progress__work-title">{w.title}</span>
+                      <span className="task-progress__work-status">{w.status}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </li>
-          ))
-        )}
-      </ul>
-    </div>
+          );
+        })}
+      </ol>
+    </section>
   );
 }

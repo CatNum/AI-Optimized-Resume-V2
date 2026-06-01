@@ -17,11 +17,18 @@ LIST_TYPE_LABELS = {
     "explore": "职业初探",
     "jd": "JD 评估",
     "plan": "职业规划",
+    "pipeline": "职业路径",
 }
 
 
 def explore_flow_active(session_state: dict[str, Any]) -> bool:
-    if session_state.get("list_type") != "explore":
+    list_type = session_state.get("list_type")
+    if list_type == "pipeline":
+        from career_os.harness.pipeline_routing import get_current_phase
+
+        if get_current_phase(session_state) != "explore":
+            return False
+    elif list_type != "explore":
         return False
     if session_state.get("explore_intake_blocked"):
         return False

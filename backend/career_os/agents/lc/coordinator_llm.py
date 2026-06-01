@@ -13,6 +13,13 @@ from career_os.harness.explore_closure import (
     explore_continuation_analyze,
     plan_explore_worker_dispatch,
 )
+from career_os.harness.explore_depth import can_offer_explore_complete
+from career_os.harness.pipeline_routing import (
+    enforce_pipeline_phase_rules,
+    pipeline_analyze_payload,
+    pipeline_fallback_workers,
+)
+from career_os.platform.store.profile import ProfileStore
 from career_os.harness.explore_guidance import (
     sanitize_prior_results_for_synthesis,
     sanitize_structured_for_synthesis,
@@ -92,10 +99,12 @@ def normalize_analyze_result(
         if isinstance(w, str) and w in allowed_workers
     ]
     list_type = result.get("list_type")
-    if list_type not in {"jd", "explore"}:
+    if list_type not in {"jd", "explore", "pipeline"}:
         list_type = None
 
-    if list_type == "explore":
+    if list_type == "pipeline":
+        workers = raw_workers
+    elif list_type == "explore":
         workers = [w for w in raw_workers if w in EXPLORE_WORKERS]
     elif list_type == "jd":
         workers = [w for w in raw_workers if w in JD_WORKERS]
@@ -119,6 +128,8 @@ def normalize_analyze_result(
     out: dict[str, Any] = {"workers": workers}
     if list_type and workers:
         out["list_type"] = list_type
+    if result.get("pipeline_phase"):
+        out["pipeline_phase"] = result["pipeline_phase"]
     return out
 
 
@@ -126,6 +137,8 @@ def _is_jd_route(result: dict[str, Any]) -> bool:
     workers = result.get("workers") or []
     if result.get("list_type") == "jd":
         return True
+    if result.get("list_type") == "pipeline":
+        return any(w in JD_WORKERS for w in workers)
     return any(w in JD_WORKERS for w in workers)
 
 
@@ -187,6 +200,10 @@ def fallback_analyze_workers(
 ) -> dict[str, Any] | None:
     if is_small_talk(user_message):
         return {"workers": []}
+
+    pipeline_fb = pipeline_fallback_workers(user_message, session_state)
+    if pipeline_fb is not None:
+        return enforce_explore_intake(pipeline_fb, session_state)
 
     continued = explore_continuation_analyze(session_state)
     if continued:
@@ -257,19 +274,25 @@ def analyze_workers(
     if not llm_enabled():
         return None
 
-    user = json.dumps(
-        {
-            "node": "analyze",
-            "message": user_message,
-            "list_type": session_state.get("list_type"),
-            "gates": session_state.get("gates"),
-            "prior_workers": list((session_state.get("prior_results") or {}).keys()),
-            "worker_index": worker_summary,
-            **jd_prerequisites_payload(session_state),
-            **explore_intake_payload(),
-        },
-        ensure_ascii=False,
+    profile = ProfileStore().get(
+        ["basic", "intent", "exploration", "resume", "capability"]
     )
+    offer_explore, explore_diag = can_offer_explore_complete(profile, session_state)
+    analyze_payload: dict[str, Any] = {
+        "node": "analyze",
+        "message": user_message,
+        "list_type": session_state.get("list_type"),
+        "gates": session_state.get("gates"),
+        "prior_workers": list((session_state.get("prior_results") or {}).keys()),
+        "worker_index": worker_summary,
+        "can_offer_explore_complete": offer_explore,
+        "explore_depth_diag": explore_diag,
+        **jd_prerequisites_payload(session_state),
+        **explore_intake_payload(),
+    }
+    if session_state.get("list_type") == "pipeline":
+        analyze_payload.update(pipeline_analyze_payload(session_state))
+    user = json.dumps(analyze_payload, ensure_ascii=False)
     try:
         data = invoke_json(_coordinator_system(), user, role=LLMRole.COORDINATOR)
         if not data:
@@ -277,10 +300,19 @@ def analyze_workers(
 
         result: dict[str, Any] = {"workers": data.get("workers") or []}
         list_type = data.get("list_type")
-        if isinstance(list_type, str) and list_type in {"jd", "explore"}:
+        if session_state.get("list_type") == "pipeline":
+            result["list_type"] = "pipeline"
+        elif isinstance(list_type, str) and list_type in {"jd", "explore"}:
             result["list_type"] = list_type
         normalized = normalize_analyze_result(result, allowed_workers)
-        normalized = enforce_jd_prerequisites(normalized, session_state, user_message)
+        if session_state.get("list_type") == "pipeline":
+            normalized = enforce_pipeline_phase_rules(
+                normalized, session_state, user_message
+            )
+        else:
+            normalized = enforce_jd_prerequisites(
+                normalized, session_state, user_message
+            )
         normalized = enforce_explore_intake(normalized, session_state)
         return _apply_explore_dispatch_plan(normalized, session_state)
     except Exception:

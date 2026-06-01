@@ -45,6 +45,12 @@ GATE_PATTERNS: list[tuple[str, str, list[str], list[str]]] = [
         [r"先不优化", r"暂不优化", r"不要优化"],
     ),
     (
+        "strategy_complete",
+        "confirm",
+        [r"确认策略完成", r"策略阶段完成", r"策略可以了", r"策略没问题"],
+        [r"还要改策略", r"策略再想想"],
+    ),
+    (
         "deep_explore",
         "confirm",
         [r"确认进入深度探讨", r"进入深度探讨"],
