@@ -4,6 +4,7 @@ import {
   deleteSession,
   listSessions,
   patchSession,
+  SessionApiError,
   type SessionRow,
 } from "../lib/sessionsApi";
 
@@ -30,6 +31,7 @@ type Props = {
   onNewSession: (sessionId: string) => void;
   onSessionCleared?: () => void;
   openTrigger?: number;
+  refreshTrigger?: number;
 };
 
 export function SessionSwitcher({
@@ -39,6 +41,7 @@ export function SessionSwitcher({
   onNewSession,
   onSessionCleared,
   openTrigger = 0,
+  refreshTrigger = 0,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<DrawerTab>(readStoredTab);
@@ -73,6 +76,11 @@ export function SessionSwitcher({
     if (!open) return;
     void loadList();
   }, [open, loadList]);
+
+  useEffect(() => {
+    if (!open) return;
+    void loadList();
+  }, [refreshTrigger, open, loadList]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -151,6 +159,10 @@ export function SessionSwitcher({
         }
       }
     } catch (e) {
+      if (e instanceof SessionApiError && e.status === 409 && e.message === "chat_in_progress") {
+        window.alert("会话仍在处理中，暂时无法删除。");
+        return;
+      }
       window.alert(e instanceof Error ? e.message : "删除失败");
     }
   }

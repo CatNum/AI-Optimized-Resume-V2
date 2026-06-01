@@ -52,6 +52,7 @@ export function ChatPage() {
   const [sessionActivity, setSessionActivity] = useState<SessionActivity | null>(null);
   const [initDone, setInitDone] = useState(false);
   const [drawerOpenTrigger, setDrawerOpenTrigger] = useState(0);
+  const [sessionRefreshTrigger, setSessionRefreshTrigger] = useState(0);
   const { sendMessage, loading } = useChatSSE();
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
@@ -241,6 +242,16 @@ export function ChatPage() {
         if (shouldApplyStreamUpdate(streamSessionId) && payload.context_usage) {
           applyContextUsage(payload.context_usage);
         }
+        if (streamSessionId && shouldApplyStreamUpdate(streamSessionId)) {
+          try {
+            const row = await getSession(streamSessionId);
+            setSessionTitle(row.title);
+            setSessionExpired(Boolean(row.expired));
+          } catch {
+            // Ignore secondary metadata refresh errors.
+          }
+          setSessionRefreshTrigger((n) => n + 1);
+        }
       },
       onError: (message) => {
         if (message === "session_expired") {
@@ -298,6 +309,7 @@ export function ChatPage() {
             currentSessionId={sessionId}
             currentTitle={sessionTitle}
             openTrigger={drawerOpenTrigger}
+            refreshTrigger={sessionRefreshTrigger}
             onSelectSession={(id) => void activateSession(id)}
             onNewSession={(id) => void handleNewSession(id)}
             onSessionCleared={handleSessionCleared}

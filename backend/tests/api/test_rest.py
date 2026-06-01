@@ -137,6 +137,20 @@ def test_delete_session_404_after(client):
     assert client.get(f"/v1/sessions/{sid}").status_code == 404
 
 
+def test_delete_session_409_when_chat_in_progress(client):
+    sid = client.post("/v1/sessions/new").json()["session_id"]
+    import career_os.harness.orchestrator as orch_mod
+
+    orch_mod._active_runs[sid] = True
+    try:
+        r = client.delete(f"/v1/sessions/{sid}")
+        assert r.status_code == 409
+        assert r.json()["detail"] == "chat_in_progress"
+        assert client.get(f"/v1/sessions/{sid}").status_code == 200
+    finally:
+        orch_mod._active_runs.pop(sid, None)
+
+
 def test_invalid_session_id_format_400(client):
     r = client.get("/v1/sessions/not-a-valid-id/messages")
     assert r.status_code == 400

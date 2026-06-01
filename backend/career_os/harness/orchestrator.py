@@ -46,6 +46,10 @@ class ChatOrchestrator:
         with _chat_lock:
             _active_runs.pop(session_id, None)
 
+    def is_chat_in_progress(self, session_id: str) -> bool:
+        with _chat_lock:
+            return bool(_active_runs.get(session_id))
+
     def touch_session(self, session_state: dict[str, Any]) -> dict[str, Any]:
         state = dict(session_state)
         state["last_activity_at"] = datetime.now(UTC).isoformat()

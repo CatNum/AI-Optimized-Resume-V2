@@ -196,6 +196,8 @@ def delete_session(session_id: str):
     store = SessionStore()
     if not store.session_exists(session_id):
         raise _session_not_found()
+    if orchestrator.is_chat_in_progress(session_id):
+        raise HTTPException(status_code=409, detail="chat_in_progress")
     store.delete_session(session_id)
     return {"ok": True}
 

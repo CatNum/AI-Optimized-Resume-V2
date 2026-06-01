@@ -22,7 +22,7 @@ export type ListSessionsOpts = {
 async function parseJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-    throw new Error(body?.detail ?? `HTTP ${response.status}`);
+    throw new SessionApiError(response.status, body?.detail ?? `HTTP ${response.status}`);
   }
   return response.json() as Promise<T>;
 }
@@ -77,7 +77,8 @@ export async function patchSession(
 export async function deleteSession(sessionId: string): Promise<void> {
   const response = await fetch(`/v1/sessions/${sessionId}`, { method: "DELETE" });
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
+    const body = (await response.json().catch(() => null)) as { detail?: string } | null;
+    throw new SessionApiError(response.status, body?.detail ?? `HTTP ${response.status}`);
   }
 }
 
