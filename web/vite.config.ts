@@ -9,6 +9,7 @@ export default defineConfig({
     proxy: {
       "/v1": "http://127.0.0.1:18080",
       "/healthz": "http://127.0.0.1:18080",
+      "/output": "http://127.0.0.1:18080",
     },
   },
 });

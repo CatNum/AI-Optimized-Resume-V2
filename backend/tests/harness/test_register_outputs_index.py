@@ -15,10 +15,12 @@ def harness(tmp_path, monkeypatch):
     import career_os.config as config_mod
     import career_os.platform.store.output as output_mod
     import career_os.platform.store.profile as profile_mod
+    import career_os.platform.tool.handlers.outputs as outputs_mod
 
     importlib.reload(config_mod)
     importlib.reload(output_mod)
     importlib.reload(profile_mod)
+    importlib.reload(outputs_mod)
     return Harness()
 
 

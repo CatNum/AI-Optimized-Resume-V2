@@ -24,6 +24,7 @@ owner: career_os/agents/workers
 ## 2. 目标
 
 - **档位对齐**：每档一次 `write_resume_html`，delivery 与所选档位一致
+- **文件名**：`filename` 须以 `.html` 结尾（如 `resume_进取.html`），便于浏览器打开
 - **可交付**：html_deliveries 含 path 等元数据，供 asset 登记
 - **Opt-1 对话选档**：若用户未选档，仅返回说明性 user_visible_summary
 

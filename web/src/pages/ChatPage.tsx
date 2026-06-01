@@ -1,6 +1,6 @@
 import { FormEvent, KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { ContextUsageIndicator } from "../components/ContextUsageIndicator";
+import { OutputsPanel } from "../components/OutputsPanel";
 import { ExpiredSessionBanner } from "../components/ExpiredSessionBanner";
 import { SessionSwitcher } from "../components/SessionSwitcher";
 import { TaskProgress } from "../components/TaskProgress";
@@ -40,7 +40,6 @@ function pickInitialSessionId(
 
 export function ChatPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [sessionTitle, setSessionTitle] = useState<string | undefined>();
   const [sessionExpired, setSessionExpired] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -49,7 +48,6 @@ export function ChatPage() {
   const [showForm, setShowForm] = useState(false);
   const [showExploreIntake, setShowExploreIntake] = useState(false);
   const [initDone, setInitDone] = useState(false);
-  const [drawerOpenTrigger, setDrawerOpenTrigger] = useState(0);
   const [sessionRefreshTrigger, setSessionRefreshTrigger] = useState(0);
   const [taskRefreshTrigger, setTaskRefreshTrigger] = useState(0);
   const { sendMessage, loading } = useChatSSE();
@@ -86,7 +84,6 @@ export function ChatPage() {
     async (id: string) => {
       const [msgRes, sessionRow] = await Promise.all([getMessages(id), getSession(id)]);
       setMessages(msgRes.messages);
-      setSessionTitle(sessionRow.title);
       setSessionExpired(Boolean(sessionRow.expired ?? msgRes.expired));
       const usage = await fetchSessionContext(id);
       if (usage) applyContextUsage(usage);
@@ -96,14 +93,13 @@ export function ChatPage() {
   );
 
   const resolveInitialSession = useCallback(async () => {
-    const { sessions } = await listSessions();
+    const { sessions } = await listSessions({ archived: "all" });
     const stored = localStorage.getItem("session_id");
     const selected = pickInitialSessionId(stored, sessions);
     setSessionId(selected);
     if (!selected) {
       setSessionExpired(false);
       setMessages([]);
-      setSessionTitle(undefined);
       setInitDone(true);
       return;
     }
@@ -165,10 +161,8 @@ export function ChatPage() {
     setSessionId(id);
     localStorage.setItem("session_id", id);
     clearSessionWorkspace();
-    setSessionTitle("未命名会话");
     try {
       const row = await getSession(id);
-      setSessionTitle(row.title);
       setSessionExpired(Boolean(row.expired));
     } catch {
       /* ignore */
@@ -179,7 +173,6 @@ export function ChatPage() {
     localStorage.removeItem("session_id");
     setSessionId(null);
     clearSessionWorkspace();
-    setSessionTitle(undefined);
   }
 
   function shouldApplyStreamUpdate(streamSessionId: string | null): boolean {
@@ -237,7 +230,6 @@ export function ChatPage() {
         if (streamSessionId && shouldApplyStreamUpdate(streamSessionId)) {
           try {
             const row = await getSession(streamSessionId);
-            setSessionTitle(row.title);
             setSessionExpired(Boolean(row.expired));
           } catch {
             // Ignore secondary metadata refresh errors.
@@ -295,46 +287,34 @@ export function ChatPage() {
   const inputDisabled = chatBusyOnDisplayed || sessionExpired || !initDone;
 
   return (
-    <div className="mx-auto flex h-screen max-w-3xl flex-col p-4">
-      <header className="mb-4 shrink-0 flex items-center justify-between gap-3 overflow-visible">
-        <h1 className="text-xl font-semibold shrink-0">Career OS</h1>
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-2 overflow-visible text-sm">
-          <SessionSwitcher
-            currentSessionId={sessionId}
-            currentTitle={sessionTitle}
-            openTrigger={drawerOpenTrigger}
-            refreshTrigger={sessionRefreshTrigger}
-            onSelectSession={(id) => void activateSession(id)}
-            onNewSession={(id) => void handleNewSession(id)}
-            onSessionCleared={handleSessionCleared}
-          />
-          <ContextUsageIndicator usage={contextUsage} />
-          <button className="shrink-0 text-slate-400" onClick={() => setShowForm(true)}>
-            建档
-          </button>
-          <button
-            className="shrink-0 text-slate-400"
-            onClick={() =>
-              void createSession().then(({ session_id }) => handleNewSession(session_id))
-            }
-          >
-            新会话
-          </button>
-          <Link className="shrink-0 text-emerald-400" to="/outputs">
-            产物
-          </Link>
-        </div>
-      </header>
+    <div className="flex h-screen bg-slate-950">
+      <SessionSwitcher
+        currentSessionId={sessionId}
+        refreshTrigger={sessionRefreshTrigger}
+        onSelectSession={(id) => void activateSession(id)}
+        onNewSession={(id) => void handleNewSession(id)}
+        onSessionCleared={handleSessionCleared}
+      />
 
-      {sessionExpired ? (
-        <ExpiredSessionBanner
-          onSwitchSession={() => setDrawerOpenTrigger((n) => n + 1)}
-          onNewSession={async () => {
-            const { session_id } = await createSession();
-            await handleNewSession(session_id);
-          }}
-        />
-      ) : null}
+      <div className="flex min-w-0 flex-1 flex-col p-4">
+        <header className="mb-4 flex shrink-0 items-center justify-between gap-3">
+          <h1 className="shrink-0 text-xl font-semibold">Career OS</h1>
+          <div className="flex items-center gap-3 text-sm">
+            <ContextUsageIndicator usage={contextUsage} />
+            <button className="text-slate-400 hover:text-slate-200" onClick={() => setShowForm(true)}>
+              建档
+            </button>
+          </div>
+        </header>
+
+        {sessionExpired ? (
+          <ExpiredSessionBanner
+            onNewSession={async () => {
+              const { session_id } = await createSession();
+              await handleNewSession(session_id);
+            }}
+          />
+        ) : null}
 
       {notice && !sessionExpired ? (
         <div className="mb-3 shrink-0 rounded border border-amber-700/50 bg-amber-950/40 px-3 py-2 text-sm text-amber-200">
@@ -406,6 +386,9 @@ export function ChatPage() {
           onSubmitted={() => void handleExploreIntakeSubmitted()}
         />
       ) : null}
+      </div>
+
+      <OutputsPanel refreshTrigger={taskRefreshTrigger} />
     </div>
   );
 }

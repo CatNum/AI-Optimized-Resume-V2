@@ -30,6 +30,17 @@ class OutputStore:
                 return []
             return sorted(p for p in target_dir.iterdir() if p.is_file())
 
+    def list_all_files(self) -> list[Path]:
+        with _lock:
+            if not self._output_dir.exists():
+                return []
+            files: list[Path] = []
+            for day_dir in self._output_dir.iterdir():
+                if not day_dir.is_dir():
+                    continue
+                files.extend(p for p in day_dir.iterdir() if p.is_file())
+            return sorted(files, key=lambda p: p.stat().st_mtime, reverse=True)
+
     def delete(self, path: Path) -> bool:
         with _lock:
             resolved = path.resolve()

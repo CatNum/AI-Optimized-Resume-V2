@@ -5,6 +5,7 @@ from typing import Any
 from career_os.config import settings
 from career_os.platform.store.output import OutputStore
 from career_os.platform.store.profile import ProfileStore
+_LEVEL_ORDER = ["保守", "标准", "进取"]
 
 
 @dataclass
@@ -17,23 +18,79 @@ def _output_root() -> Path:
     return Path(settings.output_dir).resolve()
 
 
-def normalize_output_path(path: str | Path) -> str:
-    raw = Path(path)
-    output_dir = Path(settings.output_dir)
+def canonical_output_prefix() -> str:
+    """Logical URL/index prefix (e.g. output/demo), not an absolute filesystem path."""
+    configured = Path(settings.output_dir)
+    if not configured.is_absolute():
+        return configured.as_posix().removeprefix("./")
+    parts = configured.resolve().parts
+    for idx, part in enumerate(parts):
+        if part == "output":
+            return "/".join(parts[idx:])
+    return configured.name or "output"
+
+
+def strip_canonical_prefix(path: str | Path) -> str:
+    posix = Path(path).as_posix().lstrip("/")
+    canonical = canonical_output_prefix()
+    while posix.startswith(f"{canonical}/"):
+        posix = posix[len(canonical) + 1 :]
+    if posix == canonical:
+        return ""
+    return posix
+
+
+def relative_output_path(path: str | Path) -> Path | None:
     output_root = _output_root()
+    raw = Path(path)
 
     if raw.is_absolute():
-        resolved = raw.resolve()
-    elif raw.parts and raw.parts[0] == output_dir.name:
-        resolved = output_root.joinpath(*raw.parts[1:]).resolve()
-    else:
-        resolved = (output_root / raw).resolve()
+        try:
+            return raw.resolve().relative_to(output_root)
+        except ValueError:
+            pass
 
-    try:
-        rel = resolved.relative_to(output_root)
-        return (output_dir / rel).as_posix()
-    except ValueError:
-        return raw.as_posix()
+    stripped = strip_canonical_prefix(raw)
+    if stripped:
+        return Path(stripped)
+
+    posix = raw.as_posix()
+    if posix.startswith("output/"):
+        without_output = Path(*Path(posix).parts[1:])
+        for candidate in (
+            output_root / without_output,
+            output_root / Path(*without_output.parts[1:])
+            if without_output.parts
+            and without_output.parts[0] == Path(settings.output_dir).name
+            else None,
+        ):
+            if candidate is not None and candidate.exists():
+                try:
+                    return candidate.resolve().relative_to(output_root)
+                except ValueError:
+                    continue
+        if without_output.parts and without_output.parts[0] == Path(settings.output_dir).name:
+            return Path(*without_output.parts[1:])
+        return without_output
+
+    env_name = Path(settings.output_dir).name
+    if raw.parts and raw.parts[0] == env_name:
+        return Path(*raw.parts[1:])
+
+    return raw if raw.parts else None
+
+
+def normalize_output_path(path: str | Path) -> str:
+    canonical = canonical_output_prefix()
+    resolved_file = resolve_output_file(path)
+    if resolved_file is not None:
+        rel = resolved_file.relative_to(_output_root())
+        return f"{canonical}/{rel.as_posix()}"
+
+    rel = relative_output_path(path)
+    if rel is None or str(rel) in ("", "."):
+        return strip_canonical_prefix(path) or Path(path).as_posix()
+    return f"{canonical}/{rel.as_posix()}"
 
 
 def dedupe_outputs_index(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -52,20 +109,84 @@ def dedupe_outputs_index(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def resolve_output_file(path: str | Path) -> Path | None:
-    raw = Path(path)
-    output_dir = Path(settings.output_dir)
     output_root = _output_root()
+    raw = Path(path)
     candidates: list[Path] = []
+
     if raw.is_absolute():
-        candidates.append(raw)
-    else:
-        if raw.parts and raw.parts[0] == output_dir.name:
-            candidates.append(output_root.joinpath(*raw.parts[1:]))
-        candidates.extend([output_root / raw, raw])
+        candidates.append(raw.resolve())
+
+    rel = relative_output_path(raw)
+    if rel is not None:
+        candidates.append(output_root / rel)
+
+    stripped = strip_canonical_prefix(raw)
+    if stripped:
+        candidates.append(output_root / stripped)
+
+    candidates.append(output_root / raw)
+
+    seen: set[str] = set()
+    unique_candidates: list[Path] = []
     for candidate in candidates:
+        key = str(candidate)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_candidates.append(candidate)
+
+    html_candidates: list[Path] = []
+    for candidate in unique_candidates:
+        if candidate.suffix.lower() != ".html":
+            html_candidates.append(candidate.with_suffix(".html"))
+            html_candidates.append(Path(f"{candidate}.html"))
+    unique_candidates.extend(html_candidates)
+
+    for candidate in unique_candidates:
         if candidate.is_file():
             return candidate.resolve()
     return None
+
+
+def infer_optimization_level(filename: str) -> str | None:
+    for level in _LEVEL_ORDER:
+        if level in filename:
+            return level
+    return None
+
+
+def scan_disk_outputs() -> list[dict[str, Any]]:
+    store = OutputStore()
+    entries: list[dict[str, Any]] = []
+    for file_path in store.list_all_files():
+        path_str = normalize_output_path(file_path)
+        entries.append(
+            {
+                "path": path_str,
+                "optimization_level": infer_optimization_level(file_path.name),
+            }
+        )
+    return entries
+
+
+def merge_outputs_index(indexed: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    indexed_by_path = {
+        normalize_output_path(entry["path"]): entry
+        for entry in dedupe_outputs_index(indexed)
+        if entry.get("path")
+    }
+    merged: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for disk_entry in scan_disk_outputs():
+        path = disk_entry["path"]
+        if path in seen:
+            continue
+        seen.add(path)
+        if path in indexed_by_path:
+            merged.append({**disk_entry, **indexed_by_path[path], "path": path})
+        else:
+            merged.append(disk_entry)
+    return merged
 
 
 def register_outputs_index(

@@ -8,6 +8,13 @@ from career_os.platform.tool.handlers.outputs import normalize_output_path
 LEVEL_ORDER = ["保守", "标准", "进取"]
 
 
+def ensure_html_filename(filename: str) -> str:
+    name = (filename or "resume").strip() or "resume"
+    if not name.lower().endswith(".html"):
+        name = f"{name}.html"
+    return name
+
+
 @dataclass
 class ResumeHtmlError:
     code: str
@@ -18,7 +25,7 @@ def write_resume_html(actor: str, args: dict[str, Any]) -> ResumeHtmlError | dic
     if actor != "resume":
         return ResumeHtmlError("tool_not_allowed", "write_resume_html is resume-only")
     content = args.get("html") or args.get("content") or ""
-    filename = args.get("filename") or "resume.html"
+    filename = ensure_html_filename(args.get("filename") or "resume.html")
     level = args.get("optimization_level") or "标准"
     store = OutputStore()
     path = store.write(filename, content, day=date.today())

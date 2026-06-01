@@ -10,7 +10,7 @@ from career_os.api.explore_intake import (
     submit_explore_intake,
 )
 from career_os.harness.executor import Harness
-from career_os.platform.tool.handlers.outputs import dedupe_outputs_index
+from career_os.platform.tool.handlers.outputs import dedupe_outputs_index, merge_outputs_index
 from career_os.harness.orchestrator import ChatOrchestrator
 from career_os.harness.session_activity import build_session_activity
 from career_os.platform.store.profile import ProfileStore
@@ -322,9 +322,12 @@ def list_outputs():
     profile = ProfileStore()
     raw = profile.get(["outputs_index"]).get("outputs_index", [])
     deduped = dedupe_outputs_index(raw)
-    if len(deduped) != len(raw):
+    merged = merge_outputs_index(deduped)
+    if merged != deduped:
+        profile.patch([{"path": "outputs_index", "value": merged, "op": "set"}])
+    elif len(deduped) != len(raw):
         profile.patch([{"path": "outputs_index", "value": deduped, "op": "set"}])
-    return {"outputs_index": deduped}
+    return {"outputs_index": merged}
 
 
 @router.delete("/outputs/{encoded_path:path}")
