@@ -15,12 +15,14 @@ from career_os.platform.tool.handlers.resume_html import write_resume_html
 from career_os.platform.tool.handlers.resume_read import resume_read
 from career_os.platform.tool.handlers.skill import list_skills, load_skill
 from career_os.platform.tool.handlers.task import (
+    abandon_task_list,
     apply_proposed_task_completions,
     claim_task,
     complete_task,
     create_task,
     create_task_list,
     list_tasks,
+    start_task_list,
 )
 from career_os.platform.tool.registry import (
     COORDINATOR_TOOLS,
@@ -51,6 +53,8 @@ class Harness:
         )
         self.tools.register("create_task_list", create_task_list, actors={"coordinator"})
         self.tools.register("create_task", create_task, actors={"coordinator"})
+        self.tools.register("start_task_list", start_task_list, actors={"coordinator"})
+        self.tools.register("abandon_task_list", abandon_task_list, actors={"coordinator"})
         self.tools.register("list_tasks", list_tasks, actors={"coordinator"})
         self.tools.register("claim_task", claim_task, actors={"coordinator"})
         self.tools.register("complete_task", complete_task, actors={"coordinator"})
@@ -101,7 +105,10 @@ class Harness:
             import time
 
             started = time.perf_counter()
-            result = self.tools.execute(actor, tool_name, args)
+            call_args = dict(args)
+            if session_id is not None:
+                call_args.setdefault("session_id", session_id)
+            result = self.tools.execute(actor, tool_name, call_args)
             status = "error" if hasattr(result, "code") else "ok"
             self.trace.emit(
                 "tool.call",

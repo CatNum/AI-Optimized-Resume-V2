@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   activityStatusLabel,
   type SessionActivity,
@@ -18,13 +18,16 @@ function mapTaskStatus(status: string): SessionActivityItem["status"] {
   return "pending";
 }
 
-/** D3: active list with tasks → latest ready with tasks → null */
 export function pickTaskListForDisplay(lists: TaskListRow[]): TaskListRow | null {
   const active = lists.find((l) => l.status === "active");
   if (active?.tasks?.length) return active;
 
-  const ready = lists.filter((l) => l.status === "ready");
-  if (ready[0]?.tasks?.length) return ready[0];
+  const readyLists = lists.filter((l) => l.status === "ready");
+  if (active && readyLists.length > 0) return readyLists[0];
+
+  if (readyLists[0]?.tasks?.length) return readyLists[0];
+
+  if (active) return active;
 
   return null;
 }
@@ -45,16 +48,16 @@ function tasksToActivity(list: TaskListRow): SessionActivity {
 
 export function TaskProgress({
   sessionId,
-  activity,
+  refreshTrigger = 0,
 }: {
   sessionId: string | null;
-  activity: SessionActivity | null;
+  refreshTrigger?: number;
 }) {
-  const [fetchedActivity, setFetchedActivity] = useState<SessionActivity | null>(null);
+  const [display, setDisplay] = useState<SessionActivity | null>(null);
 
   useEffect(() => {
     if (!sessionId) {
-      setFetchedActivity(null);
+      setDisplay(null);
       return;
     }
     let cancelled = false;
@@ -62,28 +65,17 @@ export function TaskProgress({
       .then((body) => {
         if (cancelled) return;
         const list = pickTaskListForDisplay(body.lists);
-        setFetchedActivity(list ? tasksToActivity(list) : null);
+        setDisplay(list ? tasksToActivity(list) : null);
       })
       .catch(() => {
-        if (!cancelled) setFetchedActivity(null);
+        if (!cancelled) setDisplay(null);
       });
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
+  }, [sessionId, refreshTrigger]);
 
-  const display = useMemo(() => {
-    if (fetchedActivity?.items?.length) {
-      return {
-        ...fetchedActivity,
-        headline: fetchedActivity.headline ?? activity?.headline ?? null,
-      };
-    }
-    if (activity?.items?.length) return activity;
-    return null;
-  }, [fetchedActivity, activity]);
-
-  if (!display?.items?.length) return null;
+  if (!display) return null;
 
   return (
     <div className="rounded-lg border border-slate-700 bg-slate-900/60 p-3 text-sm">
@@ -93,22 +85,26 @@ export function TaskProgress({
         <div className="mb-2 font-medium text-slate-300">任务进度</div>
       )}
       <ul className="space-y-1">
-        {display.items.map((item) => (
-          <li key={item.id} className="flex justify-between gap-3 text-slate-400">
-            <span>{item.title || item.id}</span>
-            <span
-              className={
-                item.status === "in_progress"
-                  ? "text-emerald-400"
-                  : item.status === "completed"
-                    ? "text-slate-500"
-                    : ""
-              }
-            >
-              {activityStatusLabel(item.status)}
-            </span>
-          </li>
-        ))}
+        {display.items.length === 0 ? (
+          <li className="text-slate-500">暂无任务条目</li>
+        ) : (
+          display.items.map((item) => (
+            <li key={item.id} className="flex justify-between gap-3 text-slate-400">
+              <span>{item.title || item.id}</span>
+              <span
+                className={
+                  item.status === "in_progress"
+                    ? "text-emerald-400"
+                    : item.status === "completed"
+                      ? "text-slate-500"
+                      : ""
+                }
+              >
+                {activityStatusLabel(item.status)}
+              </span>
+            </li>
+          ))
+        )}
       </ul>
     </div>
   );

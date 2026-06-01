@@ -1,4 +1,5 @@
 export type ExploreIntakePayload = {
+  session_id: string;
   resume_text: string;
   years_of_experience: string;
   current_salary: string;
@@ -6,7 +7,8 @@ export type ExploreIntakePayload = {
   target_role: string;
 };
 
-export const emptyExploreIntake = (): ExploreIntakePayload => ({
+export const emptyExploreIntake = (sessionId: string): ExploreIntakePayload => ({
+  session_id: sessionId,
   resume_text: "",
   years_of_experience: "",
   current_salary: "",

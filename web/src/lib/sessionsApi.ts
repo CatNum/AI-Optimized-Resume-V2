@@ -19,10 +19,18 @@ export type ListSessionsOpts = {
   archived?: "false" | "true" | "all";
 };
 
+function formatApiDetail(detail: unknown): string {
+  if (typeof detail === "string") return detail;
+  if (detail && typeof detail === "object" && "message" in detail) {
+    return String((detail as { message: string }).message);
+  }
+  return "Request failed";
+}
+
 async function parseJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-    throw new SessionApiError(response.status, body?.detail ?? `HTTP ${response.status}`);
+    const body = (await response.json().catch(() => null)) as { detail?: unknown } | null;
+    throw new SessionApiError(response.status, formatApiDetail(body?.detail));
   }
   return response.json() as Promise<T>;
 }

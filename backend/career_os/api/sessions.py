@@ -29,6 +29,15 @@ def _validate_session_id(session_id: str) -> None:
         raise HTTPException(status_code=400, detail="invalid_session_id")
 
 
+def _task_error(status: int, code: str, message: str) -> HTTPException:
+    return HTTPException(status_code=status, detail={"code": code, "message": message})
+
+
+def _validate_session_id_for_tasks(session_id: str) -> None:
+    if not session_id.startswith("sess_") or not _SESSION_ID_RE.match(session_id):
+        raise _task_error(400, "invalid_session_id", "Invalid session_id")
+
+
 def _session_not_found() -> HTTPException:
     return HTTPException(status_code=404, detail="session_not_found")
 
@@ -246,7 +255,18 @@ def explore_intake_status():
 
 @router.post("/profile/explore-intake")
 def explore_intake(body: ExploreIntakeRequest):
-    return submit_explore_intake(body)
+    try:
+        return submit_explore_intake(body)
+    except ValueError as exc:
+        code = str(exc)
+        if code == "session_not_found":
+            raise HTTPException(status_code=404, detail="session_not_found") from exc
+        if code == "invalid_session_id":
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "invalid_session_id", "message": "Invalid session_id"},
+            ) from exc
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/profile/onboarding")
@@ -278,22 +298,16 @@ def get_profile():
 
 @router.get("/tasks")
 def get_tasks(session_id: str | None = Query(default=None)):
-    store = TaskStore()
     if session_id is None:
-        active = store.get_active()
-        list_id = active.get("list_id")
-        if not list_id:
-            return {"tasks": []}
-        return {"list_id": list_id, "tasks": store.list_tasks(list_id)}
-
-    _validate_session_id(session_id)
+        raise _task_error(
+            400,
+            "session_id_required",
+            "session_id query parameter is required",
+        )
+    _validate_session_id_for_tasks(session_id)
+    store = TaskStore()
     lists = store.list_lists_for_session(session_id)
-    active = store.get_active()
-    active_list_id = (
-        active.get("list_id")
-        if active.get("session_id") == session_id
-        else None
-    )
+    active_list_id = store.get_active_list_id_for_session(session_id)
     all_tasks_completed = all(not item["tasks"] for item in lists)
     return {
         "session_id": session_id,

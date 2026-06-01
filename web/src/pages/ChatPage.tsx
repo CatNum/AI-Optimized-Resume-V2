@@ -15,7 +15,6 @@ import {
   SessionApiError,
   type SessionRow,
 } from "../lib/sessionsApi";
-import type { SessionActivity } from "../lib/sessionActivity";
 import { ExploreIntakeForm } from "./ExploreIntakeForm";
 import { OnboardingForm } from "./OnboardingForm";
 
@@ -49,10 +48,10 @@ export function ChatPage() {
   const [contextUsage, setContextUsage] = useState<ContextUsage | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showExploreIntake, setShowExploreIntake] = useState(false);
-  const [sessionActivity, setSessionActivity] = useState<SessionActivity | null>(null);
   const [initDone, setInitDone] = useState(false);
   const [drawerOpenTrigger, setDrawerOpenTrigger] = useState(0);
   const [sessionRefreshTrigger, setSessionRefreshTrigger] = useState(0);
+  const [taskRefreshTrigger, setTaskRefreshTrigger] = useState(0);
   const { sendMessage, loading } = useChatSSE();
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
@@ -76,9 +75,6 @@ export function ChatPage() {
 
   const applyContextUsage = useCallback((usage: ContextUsage) => {
     setContextUsage(usage);
-    if (usage.session_activity?.items?.length) {
-      setSessionActivity(usage.session_activity);
-    }
     if (usage.recommend_new_session) {
       setNotice("对话较长，建议新开对话；档案与 HTML 仍保留。");
     } else if (usage.trimmed) {
@@ -94,10 +90,7 @@ export function ChatPage() {
       setSessionExpired(Boolean(sessionRow.expired ?? msgRes.expired));
       const usage = await fetchSessionContext(id);
       if (usage) applyContextUsage(usage);
-      else {
-        setContextUsage(null);
-        setSessionActivity(null);
-      }
+      else setContextUsage(null);
     },
     [applyContextUsage],
   );
@@ -155,7 +148,6 @@ export function ChatPage() {
 
   function clearSessionWorkspace() {
     setMessages([]);
-    setSessionActivity(null);
     setContextUsage(null);
     setNotice(null);
     setSessionExpired(false);
@@ -251,6 +243,7 @@ export function ChatPage() {
             // Ignore secondary metadata refresh errors.
           }
           setSessionRefreshTrigger((n) => n + 1);
+          setTaskRefreshTrigger((n) => n + 1);
         }
       },
       onError: (message) => {
@@ -277,6 +270,7 @@ export function ChatPage() {
   }
 
   async function handleExploreIntakeSubmitted() {
+    setTaskRefreshTrigger((n) => n + 1);
     const pending = pendingExploreMessageRef.current;
     pendingExploreMessageRef.current = null;
     setMessages((prev) => [
@@ -349,7 +343,7 @@ export function ChatPage() {
       ) : null}
 
       <div className="shrink-0">
-        <TaskProgress sessionId={sessionId} activity={sessionActivity} />
+        <TaskProgress sessionId={sessionId} refreshTrigger={taskRefreshTrigger} />
       </div>
 
       <div
@@ -405,12 +399,13 @@ export function ChatPage() {
       </form>
 
       {showForm && <OnboardingForm onClose={() => setShowForm(false)} />}
-      {showExploreIntake && (
+      {showExploreIntake && sessionId ? (
         <ExploreIntakeForm
+          sessionId={sessionId}
           onClose={() => setShowExploreIntake(false)}
           onSubmitted={() => void handleExploreIntakeSubmitted()}
         />
-      )}
+      ) : null}
     </div>
   );
 }

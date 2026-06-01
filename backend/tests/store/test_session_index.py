@@ -147,7 +147,7 @@ def test_delete_session_removes_dir_index_and_tasks(tmp_path, monkeypatch):
     t = task_mod.TaskStore()
     sid = s.create_session()
     s.append_message(sid, "user", "hello")
-    list_id = t.create_task_list(sid)
+    list_id = t.create_task_list(sid, list_type="jd")
     t.create_task(list_id, "milestone_1", "Step")
 
     s.delete_session(sid)
@@ -157,8 +157,4 @@ def test_delete_session_removes_dir_index_and_tasks(tmp_path, monkeypatch):
     rows = {r["session_id"]: r for r in index["sessions"]}
     assert sid not in rows
     assert not (tmp_path / "tasks" / list_id).exists()
-    active_path = tmp_path / "tasks" / "_active.json"
-    assert active_path.exists()
-    import json
-
-    assert json.loads(active_path.read_text(encoding="utf-8")) == {}
+    assert not (tmp_path / "tasks" / "_active.json").exists()

@@ -168,7 +168,9 @@ def test_profile_onboarding(client):
 
 
 def test_explore_intake_submit(client):
+    sid = client.post("/v1/sessions/new").json()["session_id"]
     payload = {
+        "session_id": sid,
         "resume_text": (
             "李四\n3年工作经验\n当前薪资：25k\n期望岗位：Java开发\n期望薪资：30k\n"
             "项目：订单系统重构"
@@ -184,6 +186,29 @@ def test_explore_intake_submit(client):
     assert status["intake"]["resolved_fields"]["years_of_experience"] == "6年"
     assert status["intake"]["resolved_fields"]["target_role"] == "Java开发"
     assert status["intake"]["resolved_fields"]["current_salary"] == "25K"
+
+
+def test_explore_intake_submit_creates_explore_task_list(client):
+    sid = client.post("/v1/sessions/new").json()["session_id"]
+    payload = {
+        "session_id": sid,
+        "resume_text": "张三\n3年经验\n期望岗位：后端开发\n项目：订单系统",
+        "years_of_experience": "3年",
+    }
+    r = client.post("/v1/profile/explore-intake", json=payload)
+    assert r.status_code == 200
+
+    tasks = client.get("/v1/tasks", params={"session_id": sid}).json()
+    explore = [lst for lst in tasks["lists"] if lst["list_type"] == "explore"]
+    assert len(explore) == 1
+    assert explore[0]["status"] == "active"
+    assert tasks["active_list_id"] == explore[0]["list_id"]
+    task_ids = {t["id"] for t in explore[0]["tasks"]}
+    assert task_ids == {"identity", "capability"}
+
+    client.post("/v1/profile/explore-intake", json=payload)
+    tasks2 = client.get("/v1/tasks", params={"session_id": sid}).json()
+    assert len([l for l in tasks2["lists"] if l["list_type"] == "explore"]) == 1
 
 
 def test_chat_explore_intake_event(client):
@@ -202,7 +227,9 @@ def test_chat_explore_intake_event(client):
 
 
 def test_explore_repeat_gate_when_intake_already_submitted(client):
+    sid = client.post("/v1/sessions/new").json()["session_id"]
     payload = {
+        "session_id": sid,
         "resume_text": (
             "李四\n3年工作经验\n当前薪资：25k\n期望岗位：Java开发\n期望薪资：30k\n"
             "项目：订单系统重构"
@@ -210,7 +237,6 @@ def test_explore_repeat_gate_when_intake_already_submitted(client):
         "years_of_experience": "6年",
     }
     client.post("/v1/profile/explore-intake", json=payload)
-    sid = client.post("/v1/sessions/new").json()["session_id"]
 
     with client.stream(
         "POST",
@@ -345,7 +371,7 @@ def test_get_tasks_by_session_id_all_completed(client):
     from career_os.platform.store.task import TaskStore
 
     store = TaskStore()
-    list_id = store.create_task_list(sid, status="active")
+    list_id = store.create_task_list(sid, list_type="jd", status="active")
     store.create_task(list_id, "milestone_1", "Done step")
     store.complete_task(list_id, "milestone_1")
 
@@ -356,24 +382,16 @@ def test_get_tasks_by_session_id_all_completed(client):
     assert body["active_list_id"] == list_id
 
 
-def test_get_tasks_without_session_id_v01_compat(client):
-    from career_os.platform.store.task import TaskStore
-
-    store = TaskStore()
-    list_id = store.create_task_list("sess_legacy", status="active")
-    store.create_task(list_id, "milestone_1", "Legacy task")
-
+def test_get_tasks_without_session_id_returns_400_object(client):
     r = client.get("/v1/tasks")
-    assert r.status_code == 200
-    body = r.json()
-    assert body["list_id"] == list_id
-    assert len(body["tasks"]) == 1
+    assert r.status_code == 400
+    assert r.json()["detail"]["code"] == "session_id_required"
 
 
-def test_get_tasks_invalid_session_id_400(client):
+def test_get_tasks_invalid_session_id_400_object(client):
     r = client.get("/v1/tasks", params={"session_id": "bad-id"})
     assert r.status_code == 400
-    assert r.json()["detail"] == "invalid_session_id"
+    assert r.json()["detail"]["code"] == "invalid_session_id"
 
 
 def test_chat_sse_llm_stream_multiple_tokens(client, monkeypatch):

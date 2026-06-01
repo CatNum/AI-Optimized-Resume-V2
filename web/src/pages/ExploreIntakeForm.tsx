@@ -6,6 +6,7 @@ import {
 } from "../lib/exploreIntake";
 
 type Props = {
+  sessionId: string;
   onClose: () => void;
   onSubmitted: () => void;
 };
@@ -14,8 +15,8 @@ const inputClass =
   "w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm";
 const labelClass = "mb-1 block text-xs text-slate-400";
 
-export function ExploreIntakeForm({ onClose, onSubmitted }: Props) {
-  const [form, setForm] = useState<ExploreIntakePayload>(emptyExploreIntake);
+export function ExploreIntakeForm({ sessionId, onClose, onSubmitted }: Props) {
+  const [form, setForm] = useState<ExploreIntakePayload>(() => emptyExploreIntake(sessionId));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

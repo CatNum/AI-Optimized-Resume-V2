@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from typing import Any
 
@@ -11,9 +12,19 @@ from career_os.harness.explore_intake_fields import (
     profile_patches_from_resolved,
 )
 from career_os.platform.store.profile import ProfileStore
+from career_os.platform.store.session import SessionStore
+from career_os.platform.store.task import TaskStore, TaskStoreError
+
+_SESSION_ID_RE = re.compile(r"^sess_[0-9a-f]{32}$")
+
+EXPLORE_MILESTONES: tuple[tuple[str, str], ...] = (
+    ("identity", "内心探索"),
+    ("capability", "能力素材补充"),
+)
 
 
 class ExploreIntakeRequest(BaseModel):
+    session_id: str
     resume_text: str
     years_of_experience: str = ""
     current_salary: str = ""
@@ -25,6 +36,13 @@ class ExploreIntakeRequest(BaseModel):
     def resume_not_blank(cls, value: str) -> str:
         if not value.strip():
             raise ValueError("resume_text is required")
+        return value
+
+    @field_validator("session_id")
+    @classmethod
+    def session_id_format(cls, value: str) -> str:
+        if not value.startswith("sess_") or not _SESSION_ID_RE.match(value):
+            raise ValueError("invalid_session_id")
         return value
 
 
@@ -56,14 +74,36 @@ def build_explore_intake_patches(body: ExploreIntakeRequest) -> list[dict[str, A
     return patches
 
 
+def ensure_explore_task_list(session_id: str) -> str | None:
+    store = TaskStore()
+    for row in store.list_lists_for_session(session_id):
+        if row.get("list_type") == "explore":
+            return row["list_id"]
+    result = store.create_task_list(session_id, list_type="explore", status="active")
+    if isinstance(result, TaskStoreError):
+        raise RuntimeError(result.message)
+    list_id = result
+    for task_id, title in EXPLORE_MILESTONES:
+        store.create_task(list_id, task_id, title, kind="milestone")
+    SessionStore().update_state(
+        session_id, {"list_id": list_id, "list_type": "explore"}
+    )
+    return list_id
+
+
 def submit_explore_intake(body: ExploreIntakeRequest) -> dict[str, Any]:
-    store = ProfileStore()
-    store.patch(build_explore_intake_patches(body))
-    intake = store.get(["exploration"]).get("exploration", {}).get("intake", {})
+    session_store = SessionStore()
+    if not session_store.session_exists(body.session_id):
+        raise ValueError("session_not_found")
+    profile_store = ProfileStore()
+    profile_store.patch(build_explore_intake_patches(body))
+    list_id = ensure_explore_task_list(body.session_id)
+    intake = profile_store.get(["exploration"]).get("exploration", {}).get("intake", {})
     return {
         "ok": True,
         "submitted": True,
         "pending_fields": intake.get("pending_fields") or [],
+        "explore_list_id": list_id,
     }
 
 
