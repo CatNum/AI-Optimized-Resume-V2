@@ -8,6 +8,8 @@ EVENT_ZH: dict[str, str] = {
     "tool.call": "工具调用",
     "skill.load": "Skill 加载",
     "coordinator.analyze": "入口路由选型",
+    "gate.rule_hit": "闸门硬规则命中",
+    "gate.llm_classify": "闸门 LLM 分类",
 }
 
 WORKER_ZH: dict[str, str] = {

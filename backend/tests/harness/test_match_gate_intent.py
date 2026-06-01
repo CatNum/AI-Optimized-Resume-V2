@@ -28,9 +28,21 @@ def test_optimize_confirm_reject():
     assert result["intent"] == "reject"
 
 
-def test_unknown_when_no_match():
+def test_unknown_when_no_match(monkeypatch):
+    monkeypatch.setattr("career_os.harness.gate_llm.llm_enabled", lambda: False)
     result = match_gate_intent(
         "随便聊聊",
         pending_gate={"name": "optimize_confirm"},
     )
     assert result["intent"] == "unknown"
+    assert result.get("source") == "none"
+
+
+def test_explore_complete_with_next_step_pending(monkeypatch):
+    monkeypatch.setattr("career_os.harness.gate_llm.llm_enabled", lambda: False)
+    result = match_gate_intent(
+        "已经完成初探 下一步",
+        pending_gate={"name": "explore_complete", "prompt": "请确认完成初探"},
+    )
+    assert result["matched"] is True
+    assert result["intent"] == "confirm"

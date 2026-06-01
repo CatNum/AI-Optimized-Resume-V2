@@ -77,9 +77,13 @@ Worker **仅可见** 其 `tool_index` 内工具；执行统一走 `Harness.execu
   "matched": true,
   "gate_name": "optimize_confirm",
   "intent": "confirm",
-  "confidence": 0.95
+  "confidence": 0.95,
+  "source": "rule",
+  "reason": null
 }
 ```
+
+`source`：`rule`（硬规则命中）| `llm`（含低于阈值降级）| `none`（无 LLM）。`reason` 仅 LLM/trace，不展示给用户。
 
 `intent`: `confirm` | `reject` | `unknown`。
 

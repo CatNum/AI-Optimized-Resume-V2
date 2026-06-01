@@ -163,13 +163,15 @@ stateDiagram-v2
 
 ### 2.3 `match_gate_intent`（M2）
 
+> **已实现**（2026-06-01）：细则见 [gate-intent-llm-fallback-design](../superpowers/specs/2026-06-01-gate-intent-llm-fallback-design.md)。
+
 | 项 | 约定 |
 |----|------|
-| 输入 | `user_message` + `gates.pending` + PRD 附录 B 话术 |
-| 输出 | `{ matched, gate_name, intent: confirm \| reject \| unknown, confidence? }` |
-| **规则层** | 附录 B 关键词/正则 + 同义词（优先） |
-| **LLM 层** | 规则未命中或 confidence 低时 **轻量分类**；不送整段 JD/简历 |
-| `unknown` | 协调者继续澄清，不改 flag |
+| 输入 | `user_message` + `gates.pending`；聊天路径另传 `session_id`（最近 2 轮对话）、`session_hints`（`list_type` / `current_phase`） |
+| 输出 | `{ matched, gate_name, intent, confidence?, source: rule \| llm \| none, reason? }` |
+| **规则层** | 硬规则优先（`gate_rules`）；`explore_repeat` 已收紧短词误命中 |
+| **LLM 层** | 规则未明确命中时轻量分类；`GATE_LLM_ACCEPT_THRESHOLD`（默认 0.75）；不送整段 JD/简历 |
+| `unknown` | 保持 `pending`；`gate_clarify_pending` + 复述问句 + 末尾 `GATE_REPLY_HINTS` |
 | confirm | 更新 `flags` / patch profile / `apply_proposed_patches`；协调者 **`complete_task`**（explore milestone 等，B3）；清 `pending` / `explore_closure` |
 
 #### 2.3.1 附录 B → `gate_name` 映射

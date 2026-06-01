@@ -93,3 +93,9 @@ def load_coordinator_prompt() -> CoordinatorPrompt:
         jd_prerequisite_draft_onboarding=onboarding,
         jd_prerequisite_draft_explore=explore,
     )
+
+
+@lru_cache(maxsize=1)
+def load_gate_intent_prompt() -> str:
+    path = _PROMPT_DIR / "gate_intent" / "system.md"
+    return _read_system_document(path)

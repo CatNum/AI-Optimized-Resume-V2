@@ -1,143 +1,121 @@
-import re
+"""Gate intent matching: hard rules first, then LLM fallback."""
+
+from __future__ import annotations
+
 from typing import Any
 
-_EXPLORE_COMPLETE_AFFIRMATIVE = [
-    r"确认完成初探",
-    r"确认.*初探.*完成",
-    r"初探完成",
-    r"完成初探",
-    r"^确认完成$",
-    r"确认.*完成",
-    r"足够.*梳理",
-    r"已经到位",
-    r"初探.*到位",
-    r"^到位了?$",
-    r"梳理.*到位",
-    r"聊得差不多",
-    r"可以进入下一",
-    r"没问题了",
-    r"够了",
-]
+from career_os.harness.gate_llm import classify_gate_intent_llm
+from career_os.harness.gate_patterns import (
+    EXPLORE_COMPLETE_AFFIRMATIVE,
+    GATE_PATTERNS,
+    matches_explore_complete_affirmative,
+)
+from career_os.harness.gate_rules import is_rule_clear_hit, match_gate_intent_rules
+from career_os.platform.trace.writer import TraceWriter
 
-GATE_PATTERNS: list[tuple[str, str, list[str], list[str]]] = [
-    (
-        "explore_complete",
-        "confirm",
-        [
-            r"确认完成初探",
-            r"初探完成",
-            r"完成初探",
-            r"^确认完成$",
-            r"确认.*完成",
-        ],
-        [r"还要改", r"再改改", r"还没好", r"再聊聊", r"继续聊"],
-    ),
-    (
-        "explore_review_complete",
-        "confirm",
-        [r"确认复盘完成", r"复盘完成"],
-        [r"再想想", r"还要改"],
-    ),
-    (
-        "optimize_confirm",
-        "confirm",
-        [r"确认按该\s*JD\s*优化简历", r"确认优化", r"开始优化简历"],
-        [r"先不优化", r"暂不优化", r"不要优化"],
-    ),
-    (
-        "strategy_complete",
-        "confirm",
-        [r"确认策略完成", r"策略阶段完成", r"策略可以了", r"策略没问题"],
-        [r"还要改策略", r"策略再想想"],
-    ),
-    (
-        "deep_explore",
-        "confirm",
-        [r"确认进入深度探讨", r"进入深度探讨"],
-        [r"暂不", r"先聊聊", r"不用"],
-    ),
-    (
-        "jd_continue_despite_not_recommended",
-        "confirm",
-        [r"确认继续", r"仍要继续", r"继续评估"],
-        [r"算了", r"换\s*JD", r"不做了"],
-    ),
-    (
-        "jd_bank_deep_dive",
-        "confirm",
-        [r"继续深挖经历", r"深挖经历"],
-        [r"信息已够", r"直接优化"],
-    ),
-    (
-        "task_start",
-        "confirm",
-        [r"开始执行", r"现在开始", r"开始吧"],
-        [],
-    ),
-    (
-        "task_abandon",
-        "confirm",
-        [r"放弃", r"换\s*JD\s*不做了", r"不做了"],
-        [],
-    ),
-    (
-        "explore_repeat",
-        "confirm",
-        [r"再次", r"需要", r"^是$", r"是的", r"要", r"好", r"确认", r"继续"],
-        [r"不用", r"不需要", r"^否$", r"先不", r"算了", r"不要"],
-    ),
-]
+GATE_REPLY_HINTS: dict[str, str] = {
+    "explore_repeat": "请回复：不需要 / 需要",
+    "explore_complete": "请回复：确认完成初探 / 还要继续聊聊",
+    "explore_review_complete": "请回复：确认复盘完成 / 再想想",
+    "optimize_confirm": "请回复：确认优化 / 先不优化",
+    "strategy_complete": "请回复：策略可以了 / 还要改策略",
+}
+
+GATE_CLARIFY_SUFFIX = "我没完全理解您的意思，请补充说明您的选择或下一步打算。"
+
+_DEFAULT_HINT = "请明确回复「同意」或「暂不」"
 
 
-def _matches_explore_complete_affirmative(message: str) -> bool:
-    return any(re.search(pattern, message, re.IGNORECASE) for pattern in _EXPLORE_COMPLETE_AFFIRMATIVE)
+def gate_reply_hint(gate_name: str | None) -> str:
+    if not gate_name:
+        return _DEFAULT_HINT
+    return GATE_REPLY_HINTS.get(gate_name, _DEFAULT_HINT)
+
+
+def append_gate_reply_hint(text: str, gate_name: str | None) -> str:
+    hint = gate_reply_hint(gate_name)
+    body = (text or "").rstrip()
+    if not body:
+        return hint
+    if hint in body:
+        return body
+    return f"{body}\n\n{hint}"
+
+
+def build_gate_clarify_text(pending_gate: dict[str, Any] | None) -> str:
+    pending = pending_gate or {}
+    prompt = (pending.get("prompt") or "").strip()
+    name = pending.get("name")
+    parts = [p for p in (prompt, GATE_CLARIFY_SUFFIX) if p]
+    return append_gate_reply_hint("\n\n".join(parts), name)
+
+
+def _emit_gate_trace(
+    trace: TraceWriter | None,
+    session_id: str | None,
+    result: dict[str, Any],
+) -> None:
+    if not trace or not session_id:
+        return
+    source = result.get("source")
+    gate_name = result.get("gate_name")
+    if source == "rule" and result.get("matched"):
+        trace.emit(
+            "gate.rule_hit",
+            session_id=session_id,
+            actor="harness",
+            tool_name="match_gate_intent",
+            detail={
+                "gate_name": gate_name,
+                "intent": result.get("intent"),
+                "pattern": result.get("pattern"),
+                "source": source,
+            },
+        )
+    elif source == "llm":
+        trace.emit(
+            "gate.llm_classify",
+            session_id=session_id,
+            actor="harness",
+            tool_name="match_gate_intent",
+            detail={
+                "gate_name": gate_name,
+                "intent": result.get("intent"),
+                "confidence": result.get("confidence"),
+                "matched": result.get("matched"),
+                "reason": result.get("reason"),
+                "source": source,
+            },
+        )
 
 
 def match_gate_intent(
     user_message: str,
     pending_gate: dict[str, Any] | None = None,
+    *,
+    session_id: str | None = None,
+    session_state: dict[str, Any] | None = None,
+    trace_writer: TraceWriter | None = None,
 ) -> dict[str, Any]:
-    message = user_message.strip()
+    rule_result = match_gate_intent_rules(user_message, pending_gate)
+    if is_rule_clear_hit(rule_result):
+        _emit_gate_trace(trace_writer, session_id, rule_result)
+        return rule_result
+
     pending_name = (pending_gate or {}).get("name")
+    if not pending_name:
+        return rule_result
 
-    if pending_name == "explore_complete" and _matches_explore_complete_affirmative(message):
-        return {
-            "matched": True,
-            "gate_name": "explore_complete",
-            "intent": "confirm",
-            "confidence": 0.95,
-        }
+    llm_result = classify_gate_intent_llm(
+        user_message,
+        pending_gate or {},
+        session_id=session_id,
+        session_state=session_state,
+    )
+    _emit_gate_trace(trace_writer, session_id, llm_result)
+    return llm_result
 
-    for gate_name, _default_intent, confirm_patterns, reject_patterns in GATE_PATTERNS:
-        if pending_name and gate_name != pending_name:
-            continue
-        for pattern in reject_patterns:
-            if re.search(pattern, message, re.IGNORECASE):
-                return {
-                    "matched": True,
-                    "gate_name": gate_name,
-                    "intent": "reject",
-                    "confidence": 0.95,
-                }
-        for pattern in confirm_patterns:
-            if re.search(pattern, message, re.IGNORECASE):
-                return {
-                    "matched": True,
-                    "gate_name": gate_name,
-                    "intent": "confirm",
-                    "confidence": 0.95,
-                }
 
-    if pending_name:
-        return {
-            "matched": False,
-            "gate_name": pending_name,
-            "intent": "unknown",
-            "confidence": 0.0,
-        }
-    return {
-        "matched": False,
-        "gate_name": None,
-        "intent": "unknown",
-        "confidence": 0.0,
-    }
+# Re-export for tests / legacy imports
+_matches_explore_complete_affirmative = matches_explore_complete_affirmative
+_EXPLORE_COMPLETE_AFFIRMATIVE = EXPLORE_COMPLETE_AFFIRMATIVE

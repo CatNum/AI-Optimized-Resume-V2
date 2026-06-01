@@ -38,12 +38,19 @@ class ChatRequest(BaseModel):
 
 
 def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str] | None:
+    session_state.pop("gate_clarify_pending", None)
     gates = dict(session_state.get("gates") or {})
     pending = gates.get("pending")
     if not pending:
         return None
 
-    match = match_gate_intent(message, pending)
+    match = match_gate_intent(
+        message,
+        pending,
+        session_id=session_state.get("session_id"),
+        session_state=session_state,
+        trace_writer=harness.trace,
+    )
     flags = dict(gates.get("flags") or {})
     gate_name = match.get("gate_name") or pending.get("name")
 
@@ -121,6 +128,9 @@ def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str
         session_state["gates"] = gates
         return []
 
+    if pending and not match.get("matched"):
+        session_state["gate_clarify_pending"] = True
+        session_state["gates"] = gates
     return []
 
 

@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class LLMRole(str, Enum):
     COORDINATOR = "coordinator"
     WORKER = "worker"
+    GATE_INTENT = "gate_intent"
 
 
 PROVIDER_PRESETS: dict[str, dict[str, Any]] = {
@@ -68,15 +69,12 @@ def resolve_llm_config(
     if preset is None:
         raise UnsupportedLLMProviderError(f"Unsupported LLM provider: {provider}")
 
-    role_model = (
-        model
-        or (
-            model_settings.coordinator_model
-            if role == LLMRole.COORDINATOR
-            else model_settings.worker_model
-        )
-        or preset["coordinator_model" if role == LLMRole.COORDINATOR else "worker_model"]
-    )
+    if model:
+        role_model = model
+    elif role == LLMRole.COORDINATOR:
+        role_model = model_settings.coordinator_model or preset["coordinator_model"]
+    else:
+        role_model = model_settings.worker_model or preset["worker_model"]
 
     return {
         "provider": provider,

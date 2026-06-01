@@ -26,6 +26,7 @@ from career_os.harness.session_activity import (
     explore_flow_active,
 )
 from career_os.harness.explore_intake import enforce_explore_intake, needs_repeat_intake
+from career_os.harness.gate import append_gate_reply_hint, build_gate_clarify_text
 from career_os.harness.explore_guidance import (
     build_explore_guidance_synthesis_draft,
     format_revealed_options,
@@ -318,6 +319,18 @@ def build_coordinator_graph(
         last = state.get("last_worker_result") or {}
         structured = last.get("structured_output") or {}
 
+        if session_state.get("gate_clarify_pending"):
+            pending_gate = (session_state.get("gates") or {}).get("pending") or {}
+            text = build_gate_clarify_text(pending_gate)
+            session_state.pop("gate_clarify_pending", None)
+            return {
+                **state,
+                "session_state": session_state,
+                "synthesis_text": text,
+                "synthesis_draft": text,
+                "last_worker_result": last or state.get("last_worker_result"),
+            }
+
         from career_os.harness.explore_depth import can_offer_explore_complete
         from career_os.platform.store.profile import ProfileStore
 
@@ -332,22 +345,26 @@ def build_coordinator_graph(
             and offer_explore
             and can_set_explore_gate_pending(session_state.get("explore_closure"))
         ):
-            text = "初探两线已完成，请确认是否完成初探？"
+            text = append_gate_reply_hint(
+                "初探两线已完成，请确认是否完成初探？", "explore_complete"
+            )
             gates = dict(session_state.get("gates") or {})
             gates["pending"] = {
                 "name": "explore_complete",
-                "prompt": text,
+                "prompt": "初探两线已完成，请确认是否完成初探？",
             }
             session_state["gates"] = gates
             explore = dict(session_state.get("explore_closure") or {})
             explore["gate_pending"] = True
             session_state["explore_closure"] = explore
         elif can_set_explore_gate_pending(session_state.get("explore_closure")):
-            text = "初探两线已完成，请确认是否完成初探？"
+            text = append_gate_reply_hint(
+                "初探两线已完成，请确认是否完成初探？", "explore_complete"
+            )
             gates = dict(session_state.get("gates") or {})
             gates["pending"] = {
                 "name": "explore_complete",
-                "prompt": text,
+                "prompt": "初探两线已完成，请确认是否完成初探？",
             }
             session_state["gates"] = gates
             explore = dict(session_state.get("explore_closure") or {})
@@ -355,22 +372,19 @@ def build_coordinator_graph(
             session_state["explore_closure"] = explore
         elif structured.get("gate_prompt"):
             gate = structured["gate_prompt"]
-            text = gate.get("prompt") or structured.get("user_visible_summary", "")
+            gate_name = gate.get("name") or gate.get("gate_name")
+            prompt = gate.get("prompt") or structured.get("user_visible_summary", "")
+            text = append_gate_reply_hint(prompt, gate_name)
             gates = dict(session_state.get("gates") or {})
-            gates["pending"] = {
-                "name": gate.get("name") or gate.get("gate_name"),
-                "prompt": text,
-            }
+            gates["pending"] = {"name": gate_name, "prompt": prompt}
             session_state["gates"] = gates
         elif session_state.get("jd_prerequisite_blocked"):
             text = jd_prerequisites_draft(session_state.get("jd_block_reason"))
         elif session_state.get("explore_repeat_blocked"):
-            text = explore_repeat_draft()
+            prompt = explore_repeat_draft()
+            text = append_gate_reply_hint(prompt, "explore_repeat")
             gates = dict(session_state.get("gates") or {})
-            gates["pending"] = {
-                "name": "explore_repeat",
-                "prompt": text,
-            }
+            gates["pending"] = {"name": "explore_repeat", "prompt": prompt}
             session_state["gates"] = gates
             session_state.pop("explore_repeat_blocked", None)
         elif session_state.get("explore_intake_blocked"):

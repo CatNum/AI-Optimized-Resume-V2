@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,6 +12,9 @@ class Settings(BaseSettings):
     chat_history_max_tokens: int = 12000
     chat_history_warn_ratio: float = 0.95
     cors_origins: str = "http://127.0.0.1:15173"
+    gate_llm_accept_threshold: float = Field(
+        default=0.75, validation_alias="GATE_LLM_ACCEPT_THRESHOLD"
+    )
 
 
 settings = Settings()
