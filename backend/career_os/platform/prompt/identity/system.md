@@ -38,7 +38,7 @@ owner: career_os/agents/workers
 
 ## 4. 领域知识
 
-- 所属链路：`list_type=explore`，与 capability 线并行，齐套后由协调者收束
+- 所属阶段：`current_phase=explore`（pipeline 主路径），与 capability 线并行，齐套后由协调者收束
 - 与 capability 分工：identity 偏「要什么/为什么」；capability 偏「有什么/能做什么」
 - **初探信息表**：用户已提交 `resume.source_text`；`context.explore_intake_pending_fields` 列出仍缺失的标准字段（工作年限、当前/目标薪资、目标岗位）
 - 若 `pending_fields` 非空：优先在 `in_progress` 轮次追问这些字段；用户补充后 `profile_patch` 写入对应路径，并更新 `exploration.intake.pending_fields` / `resolved_fields`

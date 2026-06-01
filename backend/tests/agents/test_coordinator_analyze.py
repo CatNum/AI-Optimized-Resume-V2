@@ -4,25 +4,35 @@ from career_os.harness.executor import Harness
 from career_os.platform.worker.registry import WorkerRegistry
 
 
-def test_analyze_workers_returns_workers_and_list_type(monkeypatch):
-    monkeypatch.setattr(coordinator_llm_mod, "llm_enabled", lambda: True)
+def test_analyze_workers_returns_workers_and_pipeline(monkeypatch):
+    monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(coordinator_llm_mod, "check_jd_prerequisites", lambda session_state: (True, None))
     monkeypatch.setattr(
-        coordinator_llm_mod,
+        coordinator_llm_mod.lc_client,
         "invoke_json",
         lambda system, user, role: {"workers": ["market", "opportunity"], "list_type": "jd"},
     )
 
     index = WorkerRegistry().get_worker_index()
-    result = coordinator_llm_mod.analyze_workers("评估这个 JD", {"prior_results": {}}, index)
+    result = coordinator_llm_mod.analyze_workers(
+        "评估这个 JD",
+        {
+            "prior_results": {},
+            "list_type": "pipeline",
+            "explore_gate_confirmed": True,
+        },
+        index,
+    )
 
-    assert result == {"workers": ["market", "opportunity"], "list_type": "jd"}
+    assert result is not None
+    assert result["workers"] == ["market", "opportunity"]
+    assert result["list_type"] == "pipeline"
 
 
 def test_coordinator_analyze_node_uses_llm_when_pending_empty(jd_ready_profile, monkeypatch):
-    monkeypatch.setattr(coordinator_llm_mod, "llm_enabled", lambda: True)
+    monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(
-        coordinator_llm_mod,
+        coordinator_llm_mod.lc_client,
         "invoke_json",
         lambda system, user, role: {"workers": ["market", "opportunity"], "list_type": "jd"},
     )
@@ -41,7 +51,12 @@ def test_coordinator_analyze_node_uses_llm_when_pending_empty(jd_ready_profile, 
     state = run_coordinator_turn(
         harness,
         session_id="sess_analyze_llm",
-        session_state={"prior_results": {}, "gates": {"flags": {}}},
+        session_state={
+            "prior_results": {},
+            "gates": {"flags": {}},
+            "list_type": "pipeline",
+            "explore_gate_confirmed": True,
+        },
         user_message="帮我分析这份 JD",
         pending_workers=[],
         worker_runner=runner,
@@ -49,4 +64,4 @@ def test_coordinator_analyze_node_uses_llm_when_pending_empty(jd_ready_profile, 
 
     assert calls == ["market", "opportunity"]
     assert state["delegate_count"] == 2
-    assert state["session_state"]["list_type"] == "jd"
+    assert state["session_state"]["list_type"] == "pipeline"

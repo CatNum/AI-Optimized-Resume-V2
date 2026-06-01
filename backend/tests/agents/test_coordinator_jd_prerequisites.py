@@ -32,9 +32,9 @@ def _seed_jd_ready(profile: ProfileStore) -> None:
 
 def test_jd_request_blocked_without_prerequisites(env, monkeypatch):
     harness = Harness()
-    monkeypatch.setattr(coordinator_llm_mod, "llm_enabled", lambda: True)
+    monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(
-        coordinator_llm_mod,
+        coordinator_llm_mod.lc_client,
         "invoke_json",
         lambda system, user, role: {"workers": ["market", "opportunity"], "list_type": "jd"},
     )
@@ -62,9 +62,9 @@ def test_jd_request_blocked_without_prerequisites(env, monkeypatch):
 def test_jd_request_allowed_when_prerequisites_met(env, monkeypatch):
     _seed_jd_ready(ProfileStore())
     harness = Harness()
-    monkeypatch.setattr(coordinator_llm_mod, "llm_enabled", lambda: True)
+    monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(
-        coordinator_llm_mod,
+        coordinator_llm_mod.lc_client,
         "invoke_json",
         lambda system, user, role: {"workers": ["market", "opportunity"], "list_type": "jd"},
     )
@@ -82,14 +82,19 @@ def test_jd_request_allowed_when_prerequisites_met(env, monkeypatch):
     state = run_coordinator_turn(
         harness,
         session_id="sess_jd_ok",
-        session_state={"prior_results": {}, "gates": {"flags": {}}},
+        session_state={
+            "prior_results": {},
+            "gates": {"flags": {}},
+            "list_type": "pipeline",
+            "explore_gate_confirmed": True,
+        },
         user_message="帮我评估这份 JD",
         pending_workers=[],
         worker_runner=runner,
     )
 
     assert calls == ["market", "opportunity"]
-    assert state["session_state"].get("list_type") == "jd"
+    assert state["session_state"].get("list_type") == "pipeline"
 
 
 def test_preset_queue_blocked_at_harness_delegate(env, monkeypatch):

@@ -30,7 +30,8 @@ def test_jd_chain_market_then_opportunity(harness):
         session_id="sess_jd",
         session_state={
             "session_id": "sess_jd",
-            "list_type": "jd",
+            "list_type": "pipeline",
+            "explore_gate_confirmed": True,
             "prior_results": {},
             "gates": {"flags": {}},
         },
@@ -59,7 +60,8 @@ def test_market_before_opportunity_order(harness):
         session_id="sess_order",
         session_state={
             "session_id": "sess_order",
-            "list_type": "jd",
+            "list_type": "pipeline",
+            "explore_gate_confirmed": True,
             "prior_results": {},
             "gates": {"flags": {}},
         },

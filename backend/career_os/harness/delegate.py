@@ -18,8 +18,11 @@ def check_delegate_rules(
     if b1:
         return b1
 
-    if worker_id == "opportunity" and list_type == "jd":
-        if "market" not in prior_results:
+    if worker_id == "opportunity":
+        from career_os.harness.pipeline_routing import is_pipeline_session
+
+        on_jd_chain = list_type == "jd" or is_pipeline_session(session_state)
+        if on_jd_chain and "market" not in prior_results:
             return HarnessError(
                 "delegate_blocked",
                 "JD-R1: opportunity requires prior_results.market",
@@ -107,7 +110,9 @@ def delegate_worker(
     merged_context = dict(context or {})
     merged_context["capability_bundle"] = _build_capability_bundle(worker_id)
     merged_context.setdefault("constraints", {"no_fabrication": True})
-    if worker_id in {"identity", "capability"} and session_state.get("list_type") == "explore":
+    from career_os.harness.pipeline_routing import is_pipeline_explore_phase
+
+    if worker_id in {"identity", "capability"} and is_pipeline_explore_phase(session_state):
         merged_context.update(worker_context_from_intake())
 
     return {

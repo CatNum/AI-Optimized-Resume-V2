@@ -89,7 +89,12 @@ def mock_run_worker_react(
                 "horizon_3_5y": "技术负责人方向",
             },
         }
-        if list_type == "jd" and context.get("requires_optimize_gate", True):
+        effective_list = list_type or session_state.get("list_type")
+        if effective_list == "plan":
+            pass
+        elif effective_list in ("jd", "pipeline") and context.get(
+            "requires_optimize_gate", True
+        ):
             payload["gate_prompt"] = {
                 "name": "optimize_confirm",
                 "prompt": "是否确认按该 JD 优化简历？",

@@ -62,7 +62,7 @@ owner: career_os/agents/workers
 | user_visible_summary | string | 是 | 策略摘要 |
 | path_options | array | 是 | 多路径选项 |
 | three_horizons | object | 是 | 三时间维度策略 |
-| gate_prompt | object | 条件 | list_type=jd 时**必填**，扁平：`{"name":"optimize_confirm","prompt":"是否确认按该 JD 优化简历？"}` |
+| gate_prompt | object | 条件 | `current_phase=resume_strategy`（pipeline）时**必填**，扁平：`{"name":"optimize_confirm","prompt":"是否确认按该 JD 优化简历？"}` |
 
 ## 6. 安全与合规
 

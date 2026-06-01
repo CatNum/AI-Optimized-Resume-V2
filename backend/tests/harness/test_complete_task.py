@@ -20,7 +20,7 @@ def test_coordinator_can_complete_task(harness):
     created = harness.execute_tool(
         "coordinator",
         "create_task_list",
-        {"session_id": "sess_1", "list_type": "explore", "status": "active"},
+        {"session_id": "sess_1", "list_type": "pipeline", "status": "active"},
     )
     list_id = created["list_id"]
     harness.execute_tool(
@@ -54,7 +54,7 @@ def test_proposed_completions_do_not_auto_complete(harness):
     created = harness.execute_tool(
         "coordinator",
         "create_task_list",
-        {"session_id": "sess_1", "list_type": "explore", "status": "active"},
+        {"session_id": "sess_1", "list_type": "pipeline", "status": "active"},
     )
     list_id = created["list_id"]
     harness.execute_tool(

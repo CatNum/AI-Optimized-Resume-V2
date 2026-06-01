@@ -147,7 +147,7 @@ def test_delete_session_removes_dir_index_and_tasks(tmp_path, monkeypatch):
     t = task_mod.TaskStore()
     sid = s.create_session()
     s.append_message(sid, "user", "hello")
-    list_id = t.create_task_list(sid, list_type="jd")
+    list_id = t.create_task_list(sid, list_type="plan")
     t.create_task(list_id, "milestone_1", "Step")
 
     s.delete_session(sid)

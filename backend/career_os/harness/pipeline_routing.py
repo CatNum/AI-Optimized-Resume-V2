@@ -17,6 +17,54 @@ PHASE_PRIMARY_WORKERS: dict[str, frozenset[str]] = {
 }
 
 JD_PHASES = frozenset({"market", "jd_analysis", "resume_strategy", "resume_optimize"})
+JD_CHAIN_WORKERS = frozenset({"market", "opportunity", "strategy", "resume", "asset"})
+
+_LEGACY_LIST_TYPES = frozenset({"explore", "jd"})
+
+
+def is_pipeline_session(session_state: dict[str, Any]) -> bool:
+    return session_state.get("list_type") == "pipeline"
+
+
+def is_pipeline_explore_phase(session_state: dict[str, Any]) -> bool:
+    if not is_pipeline_session(session_state):
+        return False
+    return get_current_phase(session_state) == "explore"
+
+
+def infer_pipeline_phase_from_workers(
+    workers: list[str],
+    session_state: dict[str, Any],
+) -> str:
+    phase_order = (
+        "resume_optimize",
+        "resume_strategy",
+        "jd_analysis",
+        "market",
+        "explore",
+    )
+    for phase in phase_order:
+        allowed = PHASE_PRIMARY_WORKERS.get(phase, frozenset())
+        if any(worker in allowed for worker in workers):
+            return phase
+    return get_current_phase(session_state) or "explore"
+
+
+def as_pipeline_analyze_result(
+    result: dict[str, Any],
+    session_state: dict[str, Any],
+) -> dict[str, Any]:
+    workers = list(result.get("workers") or [])
+    phase = result.get("pipeline_phase") or infer_pipeline_phase_from_workers(
+        workers, session_state
+    )
+    out: dict[str, Any] = {
+        **result,
+        "workers": workers,
+        "list_type": "pipeline",
+        "pipeline_phase": phase,
+    }
+    return enforce_pipeline_phase_rules(out, session_state, "")
 
 
 def get_pipeline_meta(session_state: dict[str, Any]) -> dict[str, Any] | None:
@@ -31,6 +79,8 @@ def get_pipeline_meta(session_state: dict[str, Any]) -> dict[str, Any] | None:
 def get_current_phase(session_state: dict[str, Any]) -> str | None:
     meta = get_pipeline_meta(session_state)
     if not meta:
+        if is_pipeline_session(session_state):
+            return "explore"
         return None
     return meta.get("current_phase") or "explore"
 
@@ -60,12 +110,18 @@ def pipeline_analyze_payload(session_state: dict[str, Any]) -> dict[str, Any]:
 def filter_workers_for_pipeline(
     workers: list[str],
     session_state: dict[str, Any],
+    *,
+    phase: str | None = None,
 ) -> list[str]:
-    phase = get_current_phase(session_state) or "explore"
-    allowed = PHASE_PRIMARY_WORKERS.get(phase, frozenset())
+    phase = phase or get_current_phase(session_state) or "explore"
     flags = (session_state.get("gates") or {}).get("flags") or {}
     if phase == "resume_optimize" and not flags.get("optimize_confirmed"):
         return []
+    if phase == "explore" and is_explore_gate_confirmed(session_state):
+        jd_chain = [w for w in workers if w in JD_CHAIN_WORKERS]
+        if jd_chain:
+            return jd_chain
+    allowed = PHASE_PRIMARY_WORKERS.get(phase, frozenset())
     filtered = [w for w in workers if w in allowed]
     if phase == "resume_optimize" and "resume" in filtered and "asset" not in filtered:
         if "asset" in allowed:
@@ -80,9 +136,23 @@ def enforce_pipeline_phase_rules(
 ) -> dict[str, Any]:
     if session_state.get("list_type") != "pipeline":
         return result
-    phase = get_current_phase(session_state) or "explore"
-    workers = filter_workers_for_pipeline(result.get("workers") or [], session_state)
-    out: dict[str, Any] = {"workers": workers, "list_type": "pipeline", "pipeline_phase": phase}
+    current_phase = get_current_phase(session_state) or "explore"
+    inferred_phase = result.get("pipeline_phase") or infer_pipeline_phase_from_workers(
+        result.get("workers") or [], session_state
+    )
+    phase = (
+        inferred_phase
+        if inferred_phase in PIPELINE_PHASES
+        else current_phase
+    )
+    workers = filter_workers_for_pipeline(
+        result.get("workers") or [], session_state, phase=current_phase
+    )
+    out: dict[str, Any] = {
+        "workers": workers,
+        "list_type": "pipeline",
+        "pipeline_phase": phase,
+    }
 
     if phase in JD_PHASES and workers:
         ready, reason = check_jd_prerequisites(session_state)
@@ -99,14 +169,18 @@ def enforce_pipeline_phase_rules(
         if not flags.get("optimize_confirmed"):
             return {"workers": [], "list_type": "pipeline", "pipeline_phase": phase}
 
-    if phase != "explore" and not is_explore_gate_confirmed(session_state):
-        if phase != "explore" and workers:
-            return {
-                "workers": [],
-                "list_type": "pipeline",
-                "pipeline_phase": phase,
-                "explore_gate_required": True,
-            }
+    if (
+        phase != "explore"
+        and current_phase == "explore"
+        and not is_explore_gate_confirmed(session_state)
+        and workers
+    ):
+        return {
+            "workers": [],
+            "list_type": "pipeline",
+            "pipeline_phase": phase,
+            "explore_gate_required": True,
+        }
 
     return out
 

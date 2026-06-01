@@ -20,7 +20,11 @@ def test_strategy_emits_optimize_gate_on_jd(harness):
         harness,
         worker_id="strategy",
         goal="plan strategy",
-        session_state={"list_type": "jd", "session_id": "s1"},
+        session_state={
+            "list_type": "pipeline",
+            "explore_gate_confirmed": True,
+            "session_id": "s1",
+        },
         context={"requires_optimize_gate": True},
     )
     assert result["structured_output"]["gate_prompt"]["name"] == "optimize_confirm"

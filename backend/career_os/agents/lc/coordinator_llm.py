@@ -2,7 +2,8 @@ import json
 import re
 from typing import Any
 
-from career_os.agents.lc.client import invoke_json, invoke_text, llm_enabled
+from career_os.agents.lc import client as lc_client
+from career_os.agents.lc.client import invoke_text
 from career_os.agents.lc.models import LLMRole
 from career_os.harness.jd_prerequisites import (
     check_jd_prerequisites,
@@ -15,7 +16,10 @@ from career_os.harness.explore_closure import (
 )
 from career_os.harness.explore_depth import can_offer_explore_complete
 from career_os.harness.pipeline_routing import (
+    as_pipeline_analyze_result,
     enforce_pipeline_phase_rules,
+    infer_pipeline_phase_from_workers,
+    is_pipeline_session,
     pipeline_analyze_payload,
     pipeline_fallback_workers,
 )
@@ -89,6 +93,7 @@ def is_small_talk(user_message: str) -> bool:
 def normalize_analyze_result(
     result: dict[str, Any] | None,
     allowed_workers: set[str],
+    session_state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if not result:
         return {"workers": []}
@@ -98,46 +103,36 @@ def normalize_analyze_result(
         for w in result.get("workers") or []
         if isinstance(w, str) and w in allowed_workers
     ]
-    list_type = result.get("list_type")
-    if list_type not in {"jd", "explore", "pipeline"}:
-        list_type = None
+    if not raw_workers:
+        return {"workers": []}
 
-    if list_type == "pipeline":
-        workers = raw_workers
-    elif list_type == "explore":
-        workers = [w for w in raw_workers if w in EXPLORE_WORKERS]
-    elif list_type == "jd":
-        workers = [w for w in raw_workers if w in JD_WORKERS]
-    else:
-        explore_picks = [w for w in raw_workers if w in EXPLORE_WORKERS]
-        jd_picks = [w for w in raw_workers if w in JD_WORKERS]
-        if explore_picks and not jd_picks:
-            workers = explore_picks
-            list_type = "explore"
-        elif jd_picks:
-            workers = jd_picks
-            list_type = "jd"
-        else:
-            workers = raw_workers
+    if session_state and (
+        is_pipeline_session(session_state) or session_state.get("list_id")
+    ):
+        coerced = as_pipeline_analyze_result(
+            {
+                **result,
+                "workers": raw_workers,
+                "pipeline_phase": result.get("pipeline_phase")
+                or infer_pipeline_phase_from_workers(raw_workers, session_state),
+            },
+            session_state,
+        )
+        return {
+            "workers": coerced.get("workers") or [],
+            "list_type": "pipeline",
+            "pipeline_phase": coerced.get("pipeline_phase"),
+        }
 
-    if list_type == "explore":
-        workers = [w for w in workers if w in EXPLORE_WORKERS]
-    elif list_type == "jd":
-        workers = [w for w in workers if w in JD_WORKERS]
-
-    out: dict[str, Any] = {"workers": workers}
-    if list_type and workers:
-        out["list_type"] = list_type
-    if result.get("pipeline_phase"):
-        out["pipeline_phase"] = result["pipeline_phase"]
-    return out
+    return {"workers": raw_workers}
 
 
 def _is_jd_route(result: dict[str, Any]) -> bool:
     workers = result.get("workers") or []
-    if result.get("list_type") == "jd":
-        return True
     if result.get("list_type") == "pipeline":
+        phase = result.get("pipeline_phase")
+        if phase in {"market", "jd_analysis", "resume_strategy", "resume_optimize"}:
+            return True
         return any(w in JD_WORKERS for w in workers)
     return any(w in JD_WORKERS for w in workers)
 
@@ -201,6 +196,79 @@ def fallback_analyze_workers(
     if is_small_talk(user_message):
         return {"workers": []}
 
+    text = user_message.lower()
+    prior = session_state.get("prior_results") or {}
+    flags = (session_state.get("gates") or {}).get("flags") or {}
+
+    if is_pipeline_session(session_state) or session_state.get("list_id"):
+        if is_jd_intent(user_message) or "jd" in text:
+            result = as_pipeline_analyze_result(
+                {
+                    "workers": ["market", "opportunity"],
+                    "pipeline_phase": "jd_analysis",
+                },
+                session_state,
+            )
+            return enforce_jd_prerequisites(result, session_state, user_message)
+        if any(keyword in user_message for keyword in _MARKET_INTENT_KEYWORDS):
+            ready, _ = check_jd_prerequisites(session_state)
+            if ready:
+                result = as_pipeline_analyze_result(
+                    {"workers": ["market"], "pipeline_phase": "market"},
+                    session_state,
+                )
+                return enforce_jd_prerequisites(result, session_state, user_message)
+        if "初探" in user_message or "explore" in text:
+            result = _apply_explore_dispatch_plan(
+                as_pipeline_analyze_result(
+                    {
+                        "workers": ["identity", "capability"],
+                        "pipeline_phase": "explore",
+                    },
+                    session_state,
+                ),
+                session_state,
+            )
+            return enforce_explore_intake(result, session_state)
+        if any(keyword in user_message for keyword in _EXPLORE_INTENT_KEYWORDS):
+            result = _apply_explore_dispatch_plan(
+                as_pipeline_analyze_result(
+                    {
+                        "workers": ["identity", "capability"],
+                        "pipeline_phase": "explore",
+                    },
+                    session_state,
+                ),
+                session_state,
+            )
+            return enforce_explore_intake(result, session_state)
+        if (
+            "market" in prior
+            and "opportunity" in prior
+            and "strategy" not in prior
+            and any(k in user_message for k in ("策略", "继续", "下一步", "制定"))
+        ):
+            return as_pipeline_analyze_result(
+                {"workers": ["strategy"], "pipeline_phase": "resume_strategy"},
+                session_state,
+            )
+        if flags.get("optimize_confirmed"):
+            if ("优化" in user_message or "resume" in text) and "resume" not in prior:
+                return as_pipeline_analyze_result(
+                    {
+                        "workers": ["resume", "asset"],
+                        "pipeline_phase": "resume_optimize",
+                    },
+                    session_state,
+                )
+        pipeline_fb = pipeline_fallback_workers(user_message, session_state)
+        if pipeline_fb is not None:
+            return enforce_explore_intake(pipeline_fb, session_state)
+        continued = explore_continuation_analyze(session_state)
+        if continued:
+            return enforce_explore_intake(continued, session_state)
+        return None
+
     pipeline_fb = pipeline_fallback_workers(user_message, session_state)
     if pipeline_fb is not None:
         return enforce_explore_intake(pipeline_fb, session_state)
@@ -209,42 +277,12 @@ def fallback_analyze_workers(
     if continued:
         return enforce_explore_intake(continued, session_state)
 
-    text = user_message.lower()
-    prior = session_state.get("prior_results") or {}
-    flags = (session_state.get("gates") or {}).get("flags") or {}
-
     if "jd" in text or "岗位" in user_message or "job" in text:
-        result = {"workers": ["market", "opportunity"], "list_type": "jd"}
+        result = as_pipeline_analyze_result(
+            {"workers": ["market", "opportunity"], "pipeline_phase": "jd_analysis"},
+            session_state,
+        )
         return enforce_jd_prerequisites(result, session_state, user_message)
-    if any(keyword in user_message for keyword in _MARKET_INTENT_KEYWORDS):
-        ready, _ = check_jd_prerequisites(session_state)
-        if ready:
-            return {"workers": ["market"], "list_type": "jd"}
-    if "初探" in user_message or "explore" in text:
-        result = _apply_explore_dispatch_plan(
-            {"workers": ["identity", "capability"], "list_type": "explore"},
-            session_state,
-        )
-        return enforce_explore_intake(result, session_state)
-    if any(keyword in user_message for keyword in _EXPLORE_INTENT_KEYWORDS):
-        result = _apply_explore_dispatch_plan(
-            {"workers": ["identity", "capability"], "list_type": "explore"},
-            session_state,
-        )
-        return enforce_explore_intake(result, session_state)
-
-    if session_state.get("list_type") == "jd":
-        if (
-            "market" in prior
-            and "opportunity" in prior
-            and "strategy" not in prior
-            and any(k in user_message for k in ("策略", "继续", "下一步", "制定"))
-        ):
-            return {"workers": ["strategy"]}
-
-    if flags.get("optimize_confirmed"):
-        if ("优化" in user_message or "resume" in text) and "resume" not in prior:
-            return {"workers": ["resume", "asset"]}
     return None
 
 
@@ -269,9 +307,9 @@ def analyze_workers(
         )
 
     if is_small_talk(user_message):
-        return normalize_analyze_result({"workers": []}, allowed_workers)
+        return normalize_analyze_result({"workers": []}, allowed_workers, session_state)
 
-    if not llm_enabled():
+    if not lc_client.llm_enabled():
         return None
 
     profile = ProfileStore().get(
@@ -294,18 +332,17 @@ def analyze_workers(
         analyze_payload.update(pipeline_analyze_payload(session_state))
     user = json.dumps(analyze_payload, ensure_ascii=False)
     try:
-        data = invoke_json(_coordinator_system(), user, role=LLMRole.COORDINATOR)
+        data = lc_client.invoke_json(_coordinator_system(), user, role=LLMRole.COORDINATOR)
         if not data:
             return None
 
         result: dict[str, Any] = {"workers": data.get("workers") or []}
-        list_type = data.get("list_type")
-        if session_state.get("list_type") == "pipeline":
+        if data.get("pipeline_phase"):
+            result["pipeline_phase"] = data["pipeline_phase"]
+        if is_pipeline_session(session_state) or session_state.get("list_id"):
             result["list_type"] = "pipeline"
-        elif isinstance(list_type, str) and list_type in {"jd", "explore"}:
-            result["list_type"] = list_type
-        normalized = normalize_analyze_result(result, allowed_workers)
-        if session_state.get("list_type") == "pipeline":
+        normalized = normalize_analyze_result(result, allowed_workers, session_state)
+        if is_pipeline_session(session_state) or session_state.get("list_id"):
             normalized = enforce_pipeline_phase_rules(
                 normalized, session_state, user_message
             )
@@ -358,7 +395,7 @@ def synthesize_with_llm(
     session_state: dict[str, Any],
     last_worker_result: dict[str, Any] | None,
 ) -> str | None:
-    if not llm_enabled():
+    if not lc_client.llm_enabled():
         return None
     system, user = build_synthesis_messages(
         user_message, draft_text, session_state, last_worker_result

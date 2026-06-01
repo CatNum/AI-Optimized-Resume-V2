@@ -37,17 +37,14 @@ def worker_context_from_intake() -> dict[str, Any]:
 
 
 def is_explore_route(result: dict[str, Any]) -> bool:
-    if result.get("list_type") == "explore":
-        return True
-    if result.get("list_type") == "pipeline":
-        if result.get("pipeline_phase") not in (None, "explore"):
-            return False
-        workers = result.get("workers") or []
-        return not workers or any(
-            worker_id in {"identity", "capability"} for worker_id in workers
-        )
+    if result.get("list_type") != "pipeline":
+        return False
+    if result.get("pipeline_phase") not in (None, "explore"):
+        return False
     workers = result.get("workers") or []
-    return any(worker_id in {"identity", "capability"} for worker_id in workers)
+    return not workers or any(
+        worker_id in {"identity", "capability"} for worker_id in workers
+    )
 
 
 def _gate_flags(session_state: dict[str, Any]) -> dict[str, Any]:
@@ -74,29 +71,33 @@ def enforce_explore_intake(
         return result
 
     flags = _gate_flags(session_state)
-    list_type = result.get("list_type") or "explore"
+    pipeline_result = {
+        **result,
+        "list_type": "pipeline",
+        "pipeline_phase": result.get("pipeline_phase") or "explore",
+    }
 
     if flags.get("explore_repeat_declined"):
-        return {"workers": [], "list_type": list_type}
+        return {**pipeline_result, "workers": []}
 
     if not explore_intake_submitted():
         return {
+            **pipeline_result,
             "workers": [],
-            "list_type": list_type,
             "explore_intake_blocked": True,
         }
 
     if flags.get("explore_repeat_accepted"):
         if needs_repeat_intake(session_state):
             return {
+                **pipeline_result,
                 "workers": [],
-                "list_type": list_type,
                 "explore_intake_blocked": True,
             }
-        return result
+        return pipeline_result
 
     return {
+        **pipeline_result,
         "workers": [],
-        "list_type": list_type,
         "explore_repeat_blocked": True,
     }

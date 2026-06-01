@@ -105,18 +105,11 @@ def maybe_run_depth_judges(
 def delegate_blocked_missing_capability_round(
     session_state: dict[str, Any], profile: dict[str, Any]
 ) -> str | None:
-    if session_state.get("list_type") != "pipeline":
-        if session_state.get("list_type") != "explore":
-            return None
-    meta_phase = session_state.get("pipeline_phase") or "explore"
-    if meta_phase != "explore" and session_state.get("list_type") == "pipeline":
-        store_list = session_state.get("list_id")
-        if store_list:
-            from career_os.platform.store.task import TaskStore
+    from career_os.harness.pipeline_routing import get_current_phase, is_pipeline_explore_phase
 
-            meta = TaskStore().get_list_meta(store_list)
-            if meta:
-                meta_phase = meta.get("current_phase") or "explore"
+    if not is_pipeline_explore_phase(session_state):
+        return None
+    meta_phase = session_state.get("pipeline_phase") or get_current_phase(session_state) or "explore"
     if meta_phase != "explore":
         return None
     if is_closure_ready(session_state.get("explore_closure")):

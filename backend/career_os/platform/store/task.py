@@ -38,6 +38,8 @@ class TaskStore:
     def _task_path(self, list_id: str, task_id: str) -> Path:
         return self._list_dir(list_id) / f"{task_id}.json"
 
+    _DEPRECATED_LIST_TYPES = frozenset({"explore", "jd"})
+
     def create_task_list(
         self,
         session_id: str,
@@ -46,6 +48,11 @@ class TaskStore:
         status: str = "active",
         current_phase: str | None = None,
     ) -> str | TaskStoreError:
+        if list_type in self._DEPRECATED_LIST_TYPES:
+            return TaskStoreError(
+                "list_type_deprecated",
+                f"list_type {list_type!r} is deprecated; use pipeline",
+            )
         if status == "active":
             existing = self._find_active_metas_for_session_unlocked(session_id)
             if existing:

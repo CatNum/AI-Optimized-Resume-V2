@@ -12,6 +12,7 @@ from career_os.agents.lc.client import llm_enabled, stream_text
 from career_os.agents.lc.models import LLMRole
 from career_os.agents.lc.coordinator_llm import build_synthesis_messages
 from career_os.harness.executor import Harness
+from career_os.harness.explore_intake import explore_intake_submitted
 from career_os.harness.gate import match_gate_intent
 from career_os.harness.pipeline_gates import (
     PipelineGateError,
@@ -105,7 +106,6 @@ def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str
             gates["flags"] = flags
             session_state["gates"] = gates
             session_state["explore_intake_blocked"] = True
-            session_state["list_type"] = "explore"
             return []
         gates["flags"] = flags
         session_state["gates"] = gates
@@ -115,6 +115,8 @@ def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str
         gates["pending"] = None
         if gate_name == "explore_repeat":
             flags["explore_repeat_declined"] = True
+            if explore_intake_submitted():
+                set_explore_gate_confirmed(session_state, True)
             gates["flags"] = flags
         session_state["gates"] = gates
         return []

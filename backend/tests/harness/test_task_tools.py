@@ -39,7 +39,7 @@ def test_create_task_list_updates_state_list_id(harness, session_id):
     result = harness.execute_tool(
         "coordinator",
         "create_task_list",
-        {"session_id": session_id, "list_type": "explore", "status": "active"},
+        {"session_id": session_id, "list_type": "pipeline", "status": "active"},
         session_id=session_id,
     )
     assert "list_id" in result
@@ -50,7 +50,7 @@ def test_list_tasks_defaults_to_state_list_id(harness, session_id):
     created = harness.execute_tool(
         "coordinator",
         "create_task_list",
-        {"session_id": session_id, "list_type": "explore", "status": "active"},
+        {"session_id": session_id, "list_type": "pipeline", "status": "active"},
         session_id=session_id,
     )
     harness.execute_tool(

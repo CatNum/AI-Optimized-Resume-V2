@@ -21,7 +21,7 @@ def explore_intake_ready(tmp_path, monkeypatch):
 
 def test_build_session_activity_shows_explore_in_progress():
     state = {
-        "list_type": "explore",
+        "list_type": "pipeline",
         "explore_closure": init_explore_closure(),
         "prior_results": {"identity": {"phase_status": PHASE_IN_PROGRESS}},
     }
@@ -38,7 +38,7 @@ def test_build_session_activity_shows_explore_in_progress():
 
 def test_explore_flow_active_when_identity_in_progress():
     state = {
-        "list_type": "explore",
+        "list_type": "pipeline",
         "explore_closure": init_explore_closure(),
         "prior_results": {"identity": {"phase_status": PHASE_IN_PROGRESS}},
     }

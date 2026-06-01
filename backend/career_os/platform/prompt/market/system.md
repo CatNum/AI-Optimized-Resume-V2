@@ -38,7 +38,7 @@ owner: career_os/agents/workers
 
 ## 4. 领域知识
 
-- 所属链路：`list_type=jd`，通常在 opportunity 之前执行
+- 所属阶段：`current_phase=market`（pipeline），通常在 opportunity 之前执行
 - 前置：用户已完成建档与初探落档（协调者 JD-B1）
 
 ## 5. ReAct 执行

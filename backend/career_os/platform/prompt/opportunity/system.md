@@ -40,7 +40,7 @@ owner: career_os/agents/workers
 
 ## 4. 领域知识
 
-- 所属链路：`list_type=jd`；Harness **JD-R1**：无 market 结果时不得 delegate opportunity
+- 所属阶段：`current_phase=jd_analysis`（pipeline）；Harness **JD-R1**：无 market 结果时不得 delegate opportunity
 - `recommendation=not_recommended` 时可含 gate：
 
 ```json

@@ -36,7 +36,8 @@ def test_gate_prompt_stops_delegate_chain_c3(jd_ready_profile):
         session_id="sess_c3",
         session_state={
             "session_id": "sess_c3",
-            "list_type": "jd",
+            "list_type": "pipeline",
+            "explore_gate_confirmed": True,
             "prior_results": {},
             "gates": {"flags": {}},
         },
@@ -68,7 +69,8 @@ def test_sequential_delegate_without_gate(jd_ready_profile):
 
     session_state = {
         "session_id": "sess_seq",
-        "list_type": "jd",
+        "list_type": "pipeline",
+        "explore_gate_confirmed": True,
         "prior_results": {},
         "gates": {"flags": {}},
     }

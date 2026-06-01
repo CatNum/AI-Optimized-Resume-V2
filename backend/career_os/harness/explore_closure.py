@@ -67,24 +67,21 @@ def plan_explore_worker_dispatch(
 
 
 def explore_continuation_analyze(session_state: dict[str, Any]) -> dict[str, Any] | None:
-    list_type = session_state.get("list_type")
-    if list_type == "pipeline":
-        from career_os.harness.pipeline_routing import get_current_phase
+    from career_os.harness.pipeline_routing import get_current_phase, is_pipeline_explore_phase
 
-        if get_current_phase(session_state) != "explore":
-            return None
-        out_list_type = "pipeline"
-    elif list_type != "explore":
+    if not is_pipeline_explore_phase(session_state):
         return None
-    else:
-        out_list_type = "explore"
     closure = session_state.get("explore_closure") or {}
     if closure.get("completed"):
         return None
     incomplete = incomplete_explore_workers(session_state)
     if not incomplete:
         return None
-    return {"workers": [incomplete[0]], "list_type": out_list_type}
+    return {
+        "workers": [incomplete[0]],
+        "list_type": "pipeline",
+        "pipeline_phase": get_current_phase(session_state) or "explore",
+    }
 
 
 def mark_worker_done(

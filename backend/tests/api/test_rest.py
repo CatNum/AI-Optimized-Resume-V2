@@ -389,7 +389,7 @@ def test_get_tasks_by_session_id_all_completed(client):
     pipeline_id = store.get_active_list_id_for_session(sid)
     assert pipeline_id
     store.abandon_task_list(pipeline_id)
-    list_id = store.create_task_list(sid, list_type="jd", status="active")
+    list_id = store.create_task_list(sid, list_type="plan", status="active")
     assert isinstance(list_id, str)
     store.create_task(list_id, "milestone_1", "Done step")
     store.complete_task(list_id, "milestone_1")

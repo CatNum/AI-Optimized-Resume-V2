@@ -17,7 +17,7 @@ from tests.conftest import explore_repeat_cleared_gates
 def harness(tmp_path, monkeypatch, explore_intake_profile):
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     monkeypatch.setattr(
-        "career_os.agents.lc.coordinator_llm.llm_enabled",
+        "career_os.agents.lc.client.llm_enabled",
         lambda: False,
     )
     import career_os.config as config_mod
@@ -30,7 +30,7 @@ def test_explore_first_turn_in_progress_no_gate(harness):
     runner = build_harness_worker_runner(harness)
     session_state = {
         "session_id": "sess_exp",
-        "list_type": "explore",
+        "list_type": "pipeline",
         "prior_results": {},
         "gates": explore_repeat_cleared_gates(),
         "explore_closure": init_explore_closure(),
@@ -58,7 +58,7 @@ def test_explore_gate_after_both_segments_complete(harness):
     runner = build_harness_worker_runner(harness)
     session_state = {
         "session_id": "sess_exp2",
-        "list_type": "explore",
+        "list_type": "pipeline",
         "prior_results": {},
         "gates": explore_repeat_cleared_gates(),
         "explore_closure": init_explore_closure(),

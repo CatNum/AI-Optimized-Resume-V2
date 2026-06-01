@@ -21,7 +21,8 @@ def harness(tmp_path, monkeypatch):
 @pytest.fixture
 def session_state():
     return {
-        "list_type": "jd",
+        "list_type": "pipeline",
+        "explore_gate_confirmed": True,
         "prior_results": {},
         "gates": {"flags": {"optimize_confirmed": False}},
     }
@@ -40,7 +41,7 @@ def test_market_allowed_with_jd_prerequisites(harness, session_state):
 
 
 def test_opportunity_blocked_without_market(harness, session_state, jd_ready_profile):
-    session_state["list_type"] = "jd"
+    session_state["list_type"] = "pipeline"
     session_state["prior_results"] = {}
     err = harness.delegate_worker(
         "coordinator", "opportunity", "eval jd", session_state

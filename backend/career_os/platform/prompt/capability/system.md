@@ -38,7 +38,7 @@ owner: career_os/agents/workers
 
 ## 4. 领域知识
 
-- 所属链路：`list_type=explore`
+- 所属阶段：`current_phase=explore`（pipeline 主路径）
 - 与 identity 齐套后，协调者统一 explore 确认问句
 
 ## 5. ReAct 执行

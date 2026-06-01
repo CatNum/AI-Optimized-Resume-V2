@@ -24,10 +24,10 @@ def traced_harness(tmp_path, monkeypatch):
 
 def test_coordinator_analyze_emits_trace(traced_harness, monkeypatch):
     harness, writer = traced_harness
-    monkeypatch.setattr(coordinator_llm_mod, "llm_enabled", lambda: True)
+    monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(coordinator_llm_mod, "check_jd_prerequisites", lambda session_state: (True, None))
     monkeypatch.setattr(
-        coordinator_llm_mod,
+        coordinator_llm_mod.lc_client,
         "invoke_json",
         lambda system, user, role: {"workers": ["market", "opportunity"], "list_type": "jd"},
     )
@@ -42,7 +42,12 @@ def test_coordinator_analyze_emits_trace(traced_harness, monkeypatch):
     run_coordinator_turn(
         harness,
         session_id="sess_coord_trace",
-        session_state={"prior_results": {}, "gates": {"flags": {}}},
+        session_state={
+            "prior_results": {},
+            "gates": {"flags": {}},
+            "list_type": "pipeline",
+            "explore_gate_confirmed": True,
+        },
         user_message="帮我分析这份 JD",
         pending_workers=[],
         worker_runner=runner,
@@ -53,7 +58,7 @@ def test_coordinator_analyze_emits_trace(traced_harness, monkeypatch):
     first = analyze_events[0]
     assert first["detail"]["source"] == "llm"
     assert first["detail"]["workers"] == ["market", "opportunity"]
-    assert first["detail"]["list_type"] == "jd"
+    assert first["detail"]["list_type"] == "pipeline"
     assert "_zh" in first
     assert "LLM 分析 (llm)" in first["_zh"]["detail"]["选型来源"]
     assert "市场智能体" in first["_zh"]["detail"]["派工队列"]

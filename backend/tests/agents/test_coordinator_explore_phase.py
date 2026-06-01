@@ -104,7 +104,7 @@ def test_explore_in_progress_stops_delegate_chain():
         session_id="sess_phase",
         session_state={
             "session_id": "sess_phase",
-            "list_type": "explore",
+            "list_type": "pipeline",
             "prior_results": {},
             "gates": explore_repeat_cleared_gates(),
             "explore_closure": init_explore_closure(),
@@ -143,7 +143,7 @@ def test_explore_segment_complete_can_chain_next_worker():
         session_id="sess_chain",
         session_state={
             "session_id": "sess_chain",
-            "list_type": "explore",
+            "list_type": "pipeline",
             "prior_results": {},
             "gates": explore_repeat_cleared_gates(),
             "explore_closure": init_explore_closure(),
@@ -160,9 +160,9 @@ def test_explore_segment_complete_can_chain_next_worker():
 
 
 def test_explore_continuation_when_llm_returns_empty_workers(monkeypatch):
-    monkeypatch.setattr(coordinator_llm_mod, "llm_enabled", lambda: True)
+    monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(
-        coordinator_llm_mod,
+        coordinator_llm_mod.lc_client,
         "invoke_json",
         lambda system, user, role: {"workers": []},
     )
@@ -190,7 +190,7 @@ def test_explore_continuation_when_llm_returns_empty_workers(monkeypatch):
         session_id="sess_cont",
         session_state={
             "session_id": "sess_cont",
-            "list_type": "explore",
+            "list_type": "pipeline",
             "prior_results": {
                 "identity": {
                     "phase_status": PHASE_IN_PROGRESS,
@@ -218,7 +218,7 @@ def test_identity_first_question_offers_options_without_listing_them():
         session_id="sess_offer",
         session_state={
             "session_id": "sess_offer",
-            "list_type": "explore",
+            "list_type": "pipeline",
             "prior_results": {},
             "gates": explore_repeat_cleared_gates(),
             "explore_closure": init_explore_closure(),
@@ -249,7 +249,7 @@ def test_capability_first_question_offers_options_without_listing_them():
         session_id="sess_cap_offer",
         session_state={
             "session_id": "sess_cap_offer",
-            "list_type": "explore",
+            "list_type": "pipeline",
             "prior_results": {
                 "identity": {"phase_status": PHASE_SEGMENT_COMPLETE},
             },
@@ -275,9 +275,9 @@ def test_capability_first_question_offers_options_without_listing_them():
 
 
 def test_explore_guidance_reveal_skips_worker_when_options_pending(monkeypatch):
-    monkeypatch.setattr(coordinator_llm_mod, "llm_enabled", lambda: True)
+    monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(
-        coordinator_llm_mod,
+        coordinator_llm_mod.lc_client,
         "invoke_json",
         lambda system, user, role: {"workers": []},
     )
@@ -302,7 +302,7 @@ def test_explore_guidance_reveal_skips_worker_when_options_pending(monkeypatch):
         session_id="sess_reveal",
         session_state={
             "session_id": "sess_reveal",
-            "list_type": "explore",
+            "list_type": "pipeline",
             "prior_results": {
                 "identity": {
                     "phase_status": PHASE_IN_PROGRESS,

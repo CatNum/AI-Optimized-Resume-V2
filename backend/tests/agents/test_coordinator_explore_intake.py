@@ -22,7 +22,11 @@ def test_explore_intake_blocked_skips_delegate(tmp_path, monkeypatch):
     state = run_coordinator_turn(
         harness,
         session_id="sess_intake",
-        session_state={"prior_results": {}, "gates": {"flags": {}}},
+        session_state={
+            "prior_results": {},
+            "gates": {"flags": {}},
+            "list_type": "pipeline",
+        },
         user_message="帮我理清职业方向",
         pending_workers=["identity", "capability"],
         worker_runner=runner,

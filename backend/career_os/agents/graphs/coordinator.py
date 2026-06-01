@@ -40,6 +40,20 @@ from career_os.platform.worker.registry import WorkerRegistry
 
 WorkerRunner = Callable[[str, str, dict[str, Any], dict[str, Any]], dict[str, Any]]
 
+_LEGACY_SESSION_LIST_TYPES = frozenset({"explore", "jd"})
+
+
+def _sync_session_list_type_from_analysis(
+    session_state: dict[str, Any],
+    result: dict[str, Any],
+) -> None:
+    if session_state.get("list_type") == "pipeline" or session_state.get("list_id"):
+        session_state["list_type"] = "pipeline"
+        return
+    list_type = result.get("list_type")
+    if list_type and list_type not in _LEGACY_SESSION_LIST_TYPES:
+        session_state["list_type"] = list_type
+
 
 def _emit_coordinator_analyze_trace(
     harness: Any,
@@ -128,17 +142,14 @@ def build_coordinator_graph(
                 return []
             if result.get("explore_intake_blocked"):
                 session_state["explore_intake_blocked"] = True
-                if result.get("list_type"):
-                    session_state["list_type"] = result["list_type"]
+                _sync_session_list_type_from_analysis(session_state, result)
                 return []
             if result.get("explore_repeat_blocked"):
                 session_state["explore_repeat_blocked"] = True
-                if result.get("list_type"):
-                    session_state["list_type"] = result["list_type"]
+                _sync_session_list_type_from_analysis(session_state, result)
                 return []
             workers = result.get("workers") or []
-            if result.get("list_type"):
-                session_state["list_type"] = result["list_type"]
+            _sync_session_list_type_from_analysis(session_state, result)
             return workers
 
         if pending:
@@ -175,8 +186,7 @@ def build_coordinator_graph(
             continued = explore_continuation_analyze(session_state)
             if continued and continued.get("workers"):
                 pending = continued["workers"]
-                if continued.get("list_type"):
-                    session_state["list_type"] = continued["list_type"]
+                _sync_session_list_type_from_analysis(session_state, continued)
                 source = "continuation" if source in (None, "llm", "none", "fallback") else source
 
         if pending and not session_state.get("explore_intake_blocked"):
@@ -186,13 +196,11 @@ def build_coordinator_graph(
             intake_check = enforce_explore_intake(intake_payload, session_state)
             if intake_check.get("explore_intake_blocked"):
                 session_state["explore_intake_blocked"] = True
-                if intake_check.get("list_type"):
-                    session_state["list_type"] = intake_check["list_type"]
+                _sync_session_list_type_from_analysis(session_state, intake_check)
                 pending = []
             elif intake_check.get("explore_repeat_blocked"):
                 session_state["explore_repeat_blocked"] = True
-                if intake_check.get("list_type"):
-                    session_state["list_type"] = intake_check["list_type"]
+                _sync_session_list_type_from_analysis(session_state, intake_check)
                 pending = []
             elif not intake_check.get("workers"):
                 pending = []

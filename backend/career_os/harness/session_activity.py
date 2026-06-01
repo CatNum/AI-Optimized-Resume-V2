@@ -22,17 +22,15 @@ LIST_TYPE_LABELS = {
 
 
 def explore_flow_active(session_state: dict[str, Any]) -> bool:
-    list_type = session_state.get("list_type")
-    if list_type == "pipeline":
-        from career_os.harness.pipeline_routing import get_current_phase
+    from career_os.harness.pipeline_routing import is_pipeline_explore_phase
 
-        if get_current_phase(session_state) != "explore":
-            return False
-    elif list_type != "explore":
+    if not is_pipeline_explore_phase(session_state):
         return False
     if session_state.get("explore_intake_blocked"):
         return False
     closure = session_state.get("explore_closure") or {}
+    if not closure:
+        return False
     if closure.get("gate_pending"):
         return False
     return not is_closure_ready(closure)
@@ -62,8 +60,12 @@ def build_session_activity(session_state: dict[str, Any]) -> dict[str, Any]:
     list_type = session_state.get("list_type")
     items: list[dict[str, str]] = []
 
+    from career_os.harness.pipeline_routing import get_current_phase, is_pipeline_session
+
     if session_state.get("explore_intake_blocked") or (
-        list_type == "explore" and not explore_intake_submitted()
+        is_pipeline_session(session_state)
+        and get_current_phase(session_state) == "explore"
+        and not explore_intake_submitted()
     ):
         items.append(
             {
@@ -72,7 +74,7 @@ def build_session_activity(session_state: dict[str, Any]) -> dict[str, Any]:
                 "status": "in_progress",
             }
         )
-    elif list_type == "explore":
+    elif is_pipeline_session(session_state) and get_current_phase(session_state) == "explore":
         closure = session_state.get("explore_closure") or {}
         required = closure.get("required_workers") or DEFAULT_REQUIRED_WORKERS
         for worker_id in required:
@@ -83,8 +85,20 @@ def build_session_activity(session_state: dict[str, Any]) -> dict[str, Any]:
                     "status": _explore_worker_status(worker_id, session_state),
                 }
             )
-    elif list_type == "jd":
-        items.append({"id": "jd_chain", "title": "JD 评估与策略", "status": "in_progress"})
+    elif is_pipeline_session(session_state) and get_current_phase(session_state) in {
+        "market",
+        "jd_analysis",
+        "resume_strategy",
+        "resume_optimize",
+    }:
+        phase = get_current_phase(session_state) or ""
+        items.append(
+            {
+                "id": f"phase_{phase}",
+                "title": LIST_TYPE_LABELS.get("pipeline", "职业路径"),
+                "status": "in_progress",
+            }
+        )
 
     headline = _activity_headline(session_state, items)
     return {
@@ -101,15 +115,25 @@ def _activity_headline(
     list_type = session_state.get("list_type")
     if session_state.get("explore_intake_blocked"):
         return "当前：请先填写初探信息表"
-    if list_type == "explore":
+    from career_os.harness.pipeline_routing import get_current_phase, is_pipeline_session
+
+    if is_pipeline_session(session_state):
+        phase = get_current_phase(session_state) or "explore"
+        label = LIST_TYPE_LABELS.get("pipeline", "职业路径")
+        phase_labels = {
+            "explore": "职业初探",
+            "market": "市场分析",
+            "jd_analysis": "JD 分析",
+            "resume_strategy": "简历优化策略",
+            "resume_optimize": "简历优化",
+        }
+        step = phase_labels.get(phase, phase)
         active = next((item for item in items if item["status"] == "in_progress"), None)
-        if active:
-            return f"当前：{LIST_TYPE_LABELS['explore']} · {active['title']}进行中"
-        if all(item["status"] == "completed" for item in items if items):
+        if active and phase == "explore":
+            return f"当前：{step} · {active['title']}进行中"
+        if phase == "explore" and all(item["status"] == "completed" for item in items if items):
             return "当前：职业初探 · 待确认收束"
-        return f"当前：{LIST_TYPE_LABELS['explore']}"
-    if list_type == "jd":
-        return f"当前：{LIST_TYPE_LABELS['jd']}"
+        return f"当前：{label} · {step}"
     return None
 
 

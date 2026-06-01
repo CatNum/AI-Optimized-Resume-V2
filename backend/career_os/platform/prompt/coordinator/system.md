@@ -43,13 +43,13 @@ owner: career_os/agents
 
 ## 4. 领域知识
 
-### Worker 与 list_type
+### Worker 与 pipeline（会话默认）
 
-| list_type | 含义      | 可选 Worker                                  |
-| --------- | --------- | -------------------------------------------- |
-| explore   | 职业初探  | identity、capability                         |
-| jd        | JD/岗位链 | market、opportunity、strategy、resume、asset |
-| pipeline  | 五步主路径（会话默认） | 见下表 `current_phase` |
+| list_type | 含义 |
+| --------- | ---- |
+| pipeline  | 五步主路径（**唯一** analyze 输出）；可选 Worker 由 `current_phase` 决定 |
+
+> **已废弃**：`list_type=explore` / `list_type=jd` 不再写入会话或 analyze 输出；初探与 JD 链分别对应 `current_phase=explore` 与 `market` / `jd_analysis` 等阶段。
 
 ### pipeline 五步（`list_type=pipeline`）
 
@@ -72,14 +72,13 @@ owner: career_os/agents
 
 **硬约束**：
 
-- explore 与 jd 链 worker **不得混用**（legacy `list_type=explore|jd` 时）
-- pipeline 模式下按 **当前 phase** 选 Worker，**不得** 跨 phase 混派
+- pipeline 模式下按 **当前 phase** 选 Worker，**不得** 跨 phase 混派（初探 worker 与 JD 链 worker 不得同轮混派）
 - `workers` 中的每一项必须出现在输入的 `worker_index` 里
 - 用户未提供 JD 且只是闲聊时，不要因 market 支持「无 JD 调研」而派 market
 
 ### JD 评估前置（B1）
 
-用户要进行 **JD/岗位评估**（`list_type=jd` 或派 market/opportunity 等 jd 链）时，须同时满足：
+用户要进行 **JD/岗位评估**（`current_phase` 为 market / jd_analysis 等，或派 market / opportunity 等）时，须同时满足：
 
 1. **建档**：`profile.basic` 已有基本信息（用户已提交建档表单）
 2. **深度初探已完成**：`exploration.completed_at` 已落档，或会话 `explore_closure.completed=true`（identity + capability 深度问询已确认）
@@ -128,17 +127,17 @@ Harness 在 `delegate_worker` 层对 **market / opportunity / strategy** 硬拦�
 | 字段       | 类型            | 必填 | 说明                                    |
 | ---------- | --------------- | ---- | --------------------------------------- |
 | workers    | string[]        | 是   | 本轮派工列表；无派工时为 `[]`           |
-| list_type  | `"jd"` \| `"explore"` \| `"pipeline"` \| null | 是 | pipeline 会话固定为 `"pipeline"`；无派工可为 `null` |
+| list_type       | `"pipeline"` \| null | 是 | pipeline 会话固定为 `"pipeline"`；无派工可为 `null` |
+| pipeline_phase  | string               | pipeline 会话建议填写 | 与 `current_phase` 对齐，如 `explore`、`market`、`jd_analysis` |
 
-- **禁止**：额外字段、自然语言说明、workers 含 worker_index 外的 id
+- **禁止**：额外字段、自然语言说明、workers 含 worker_index 外的 id；**禁止** 输出 `list_type` 为 `explore` 或 `jd`
 
 **规则**：
 
 1. 纯问候、寒暄、无明确职业意图（如「你好」「在吗」）→ `{"workers": [], "list_type": null}`（不派工；由 synthesize 节点引导用户说明职业诉求）
-2. `list_type=explore` → workers 只能含 identity、capability
-3. `list_type=jd` → workers 只能含 jd 链 worker，不得含 explore worker
-4. 用户明确 JD/岗位评估意图时：仅当 `jd_prerequisites_met=true` 才可派 market、opportunity 等 jd 链，并设 `list_type=jd`；否则 `workers=[]`
-5. 用户明确职业初探意图时，可派 identity、capability，并设 `list_type=explore`
+2. `current_phase=explore`（或初探意图）→ workers 只能含 identity、capability；`list_type":"pipeline"`, `pipeline_phase":"explore"`
+3. JD/岗位评估意图 → 仅当 `jd_prerequisites_met=true` 且 `explore_gate_confirmed=true` 才可派 market、opportunity 等；`list_type":"pipeline"`，`pipeline_phase` 为 `market` 或 `jd_analysis`；否则 `workers=[]`
+4. 有派工时 **必须** `list_type":"pipeline"`，并按 `allowed_workers` 选 worker
 
 **示例**：
 
