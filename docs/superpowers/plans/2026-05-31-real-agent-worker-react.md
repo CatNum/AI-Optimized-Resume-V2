@@ -1,8 +1,8 @@
 # 真 Agent（Worker ReAct + LiteLLM）Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **状态：** ✅ 已完成（2026-06-01 · 已合并 `main`）
 
-> **执行状态（2026-05-31）：** 分支 `feat/real-agent-worker-react` · L1 **88 passed** · 计划 Task 0–17 **全部打钩** · 4 条真 LLM eval 需本地配置 `LLM_API_KEY` 后复跑
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 将 v0.1「规则桩 Worker」升级为架构文档定义的完整 Agent：Worker ReAct 子图（boot→react→emit）、Harness `load_skill`/业务 tool、LiteLLM 推理；首个验真垂直切片为 **market → opportunity（JD 主路径）**。
 

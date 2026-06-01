@@ -1,6 +1,8 @@
 # 多 Session 任务隔离 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **状态：** ✅ 已完成（2026-06-01 · 已合并 `main` @ `dd83651`）
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 按 [spec v1.3](../specs/2026-06-01-session-task-isolation-design.md) 将任务系统改为按 session 隔离 active list，删除 `_active.json`，补齐 `start_task_list` / `abandon_task_list`，intake submit 后建 explore task list，前端 TaskProgress 仅读 tasks API。
 
@@ -10,7 +12,7 @@
 
 **Spec SSOT:** `docs/superpowers/specs/2026-06-01-session-task-isolation-design.md`（**v1.3**，与 plan 已对齐）
 
-**前置条件:** 分支 `feat/session-persistence` 上 session 持久化已落地；v0.1 architecture/PRD **不改**。
+**前置条件:** `main` 上 session 持久化已落地；v0.1 architecture/PRD **不改**。
 
 ---
 
@@ -83,7 +85,7 @@ flowchart TB
 
 **Spec refs:** §0.5 · §3.4 · §9.1 · 产品决策 #7
 
-- [ ] **Step 1: Write failing test — meta 含 updated_at**
+- [x] **Step 1: Write failing test — meta 含 updated_at**
 
 ```python
 def test_create_task_list_writes_created_and_updated_at(task_store):
@@ -94,11 +96,11 @@ def test_create_task_list_writes_created_and_updated_at(task_store):
     assert meta["updated_at"] == meta["created_at"]
 ```
 
-- [ ] **Step 2: Run — expect FAIL**
+- [x] **Step 2: Run — expect FAIL**
 
 Run: `cd backend && uv run pytest tests/store/test_task.py::test_create_task_list_writes_created_and_updated_at -v`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 在 `task.py`：
 - 删除 `_active_path`、`get_active`、`_set_active_unlocked`、`_read_active_unlocked`
@@ -107,15 +109,15 @@ Run: `cd backend && uv run pytest tests/store/test_task.py::test_create_task_lis
 - `delete_lists_for_session`：去掉 `_active.json` 清理分支
 - 新增 `get_active_list_id_for_session(session_id) -> str | None`：扫描 meta `status==active`（0 个 → None；>1 个暂返回 `created_at` 最新，Task 4 normalize 后保证唯一）
 
-- [ ] **Step 4: 更新 test_session_index.py**
+- [x] **Step 4: 更新 test_session_index.py**
 
 删除 `test_delete_session_removes_dir_index_and_tasks` 中对 `tasks/_active.json` 存在/为 `{}` 的断言（删 `_active.json` 后文件不应存在）。
 
-- [ ] **Step 5: Run store tests**
+- [x] **Step 5: Run store tests**
 
 Run: `cd backend && uv run pytest tests/store/test_task.py tests/store/test_session_index.py -q`
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```text
 refactor(tasks): 移除 _active.json 并写入 meta updated_at
@@ -137,7 +139,7 @@ refactor(tasks): 移除 _active.json 并写入 meta updated_at
 
 **实现约定（锁定）：** `create_task_list` 冲突时 **返回 `TaskStoreError`**，成功返回 `list_id: str`。
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```python
 def test_create_second_active_same_session_returns_error(task_store):
@@ -152,7 +154,7 @@ def test_cross_session_parallel_active_ok(task_store):
     assert isinstance(a, str) and isinstance(b, str)
 ```
 
-- [ ] **Step 2: 改写所有受影响的测试（清单）**
+- [x] **Step 2: 改写所有受影响的测试（清单）**
 
 | 文件 | 用例 | 改动 |
 |------|------|------|
@@ -164,13 +166,13 @@ def test_cross_session_parallel_active_ok(task_store):
 | `tests/api/test_rest.py` | `test_get_tasks_*` | store 调用已传 list_type，确认 `isinstance` |
 | `tests/harness/test_complete_task.py` | create_task_list 路径 | handler 返回 TaskStoreError 时断言 |
 
-- [ ] **Step 3: Implement `_find_active_meta_for_session` + 互斥**
+- [x] **Step 3: Implement `_find_active_meta_for_session` + 互斥**
 
-- [ ] **Step 4: Run**
+- [x] **Step 4: Run**
 
 Run: `cd backend && uv run pytest tests/store/test_task.py tests/store/test_session_index.py tests/harness/test_complete_task.py -q`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```text
 feat(tasks): 同 session 仅允许一个 active list
@@ -189,7 +191,7 @@ feat(tasks): 同 session 仅允许一个 active list
 
 **Spec refs:** §2.2 · §3 · §8
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```python
 def test_start_task_list_ready_to_active(task_store):
@@ -220,9 +222,9 @@ def test_abandon_task_list_deletes_files(task_store, tmp_path):
     assert not (tmp_path / "tasks" / list_id).exists()
 ```
 
-- [ ] **Step 2: Run — FAIL**
+- [x] **Step 2: Run — FAIL**
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```python
 def start_task_list(self, list_id: str) -> TaskStoreError | None:
@@ -232,11 +234,11 @@ def abandon_task_list(self, list_id: str) -> TaskStoreError | None:
     # 删 list 目录下全部文件 + rmdir；list_not_found → error
 ```
 
-- [ ] **Step 4: Run — PASS**
+- [x] **Step 4: Run — PASS**
 
 Run: `cd backend && uv run pytest tests/store/test_task.py -q`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```text
 feat(tasks): 实现 start_task_list 与 abandon_task_list
@@ -258,18 +260,18 @@ feat(tasks): 实现 start_task_list 与 abandon_task_list
 
 > **必须在 Task 6 之前完成。**
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 （bypass Task 2 互斥：直接 patch 两个 `status=active` 的 meta 文件模拟历史脏数据。）
 
-- [ ] **Step 2: Implement `normalize_multi_active_for_session(session_id)`**
+- [x] **Step 2: Implement `normalize_multi_active_for_session(session_id)`**
 
 - 按 `created_at` 降序保留 1 条 active，其余改 `ready` + `updated_at=now`
 - `logging.warning(...)`
 
-- [ ] **Step 3: 在 `list_lists_for_session` 开头调用 normalize**
+- [x] **Step 3: 在 `list_lists_for_session` 开头调用 normalize**
 
-- [ ] **Step 4: Run + Commit**
+- [x] **Step 4: Run + Commit**
 
 ```text
 feat(tasks): 迁移同 session 多 active 脏数据
@@ -289,7 +291,7 @@ feat(tasks): 迁移同 session 多 active 脏数据
 
 **Spec refs:** §2.2 · §3.2 · §4.2 · 产品决策 #6
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```python
 def test_start_task_list_tool_registered(harness):
@@ -313,7 +315,7 @@ def test_list_tasks_defaults_to_state_list_id(harness, session_id):
     assert len(listed["tasks"]) == 1
 ```
 
-- [ ] **Step 2: Implement handlers**
+- [x] **Step 2: Implement handlers**
 
 **`state.list_id` 同步规则（锁定）：**
 - **不**依赖 `args.session_id`（schema 无此字段时）
@@ -338,11 +340,11 @@ def list_tasks(actor, args):
     ...
 ```
 
-- [ ] **Step 3: Register start/abandon in executor.py**
+- [x] **Step 3: Register start/abandon in executor.py**
 
-- [ ] **Step 4: Fix `create_task_list` handler for `TaskStoreError` return type**
+- [x] **Step 4: Fix `create_task_list` handler for `TaskStoreError` return type**
 
-- [ ] **Step 5: Run + Commit**
+- [x] **Step 5: Run + Commit**
 
 ```text
 feat(tasks): 注册 start/abandon 工具并同步 state.list_id
@@ -364,7 +366,7 @@ feat(tasks): 注册 start/abandon 工具并同步 state.list_id
 
 **前置：** Task 4 已完成。
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```python
 def test_get_tasks_without_session_id_returns_400_object(client):
@@ -386,21 +388,21 @@ def test_get_tasks_active_list_id_from_meta_scan(client):
     assert body["active_list_id"] == list_id
 ```
 
-- [ ] **Step 2: 删除/改写旧测试**
+- [x] **Step 2: 删除/改写旧测试**
 
 - 删除 `test_get_tasks_without_session_id_v01_compat`
 - 改写 `test_get_tasks_invalid_session_id_400`：string detail → object detail
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - 新增 `_validate_session_id_for_tasks(session_id)` → object detail
 - `get_tasks`：无参 → 400 object；`active_list_id = store.get_active_list_id_for_session(session_id)`
 
-- [ ] **Step 4: Run**
+- [x] **Step 4: Run**
 
 Run: `cd backend && uv run pytest tests/api/test_rest.py -k tasks -q`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```text
 feat(api): GET /v1/tasks 必填 session_id 且 active 来自 meta 扫描
@@ -434,11 +436,11 @@ feat(api): GET /v1/tasks 必填 session_id 且 active 来自 meta 扫描
 | `identity` | milestone | 内心探索 |
 | `capability` | milestone | 能力素材补充 |
 
-- [ ] **Step 1: 扩展 API — `ExploreIntakeRequest` 增 `session_id: str`**
+- [x] **Step 1: 扩展 API — `ExploreIntakeRequest` 增 `session_id: str`**
 
 前端 `ExploreIntakeForm` 接收 `sessionId` prop，`submitExploreIntake` 一并提交。
 
-- [ ] **Step 2: Write failing test**
+- [x] **Step 2: Write failing test**
 
 ```python
 def test_explore_intake_submit_creates_explore_task_list(client):
@@ -465,7 +467,7 @@ def test_explore_intake_submit_creates_explore_task_list(client):
     assert len([l for l in tasks2["lists"] if l["list_type"] == "explore"]) == 1
 ```
 
-- [ ] **Step 3: Implement `ensure_explore_task_list(session_id)`**
+- [x] **Step 3: Implement `ensure_explore_task_list(session_id)`**
 
 在 `explore_intake.py`（或 `platform/store/task_helpers.py`）：
 
@@ -487,11 +489,11 @@ def ensure_explore_task_list(session_id: str) -> str | None:
 
 在 `submit_explore_intake` 末尾调用（须校验 `session_id` 格式且 session 存在）。
 
-- [ ] **Step 4: Run**
+- [x] **Step 4: Run**
 
 Run: `cd backend && uv run pytest tests/api/test_rest.py::test_explore_intake_submit tests/api/test_rest.py::test_explore_intake_submit_creates_explore_task_list -q`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```text
 feat(explore): intake 提交后为当前 session 创建 explore task list
@@ -512,7 +514,7 @@ feat(explore): intake 提交后为当前 session 创建 explore task list
 
 **Spec refs:** §6 · §9.5 · 产品决策 #4、#5
 
-- [ ] **Step 1: 更新 `pickTaskListForDisplay`**
+- [x] **Step 1: 更新 `pickTaskListForDisplay`**
 
 ```typescript
 export function pickTaskListForDisplay(lists: TaskListRow[]): TaskListRow | null {
@@ -531,20 +533,20 @@ export function pickTaskListForDisplay(lists: TaskListRow[]): TaskListRow | null
 }
 ```
 
-- [ ] **Step 2: 空骨架渲染**
+- [x] **Step 2: 空骨架渲染**
 
 当 `display.list` 存在但 `items.length === 0` 时，仍渲染 headline（如「职业初探」）+ 空 `<ul>`，**不** `return null`。
 
-- [ ] **Step 3: 移除 sessionActivity fallback**
+- [x] **Step 3: 移除 sessionActivity fallback**
 
 - `TaskProgress`：删除 `activity` prop 及 items fallback；headline 仅来自 tasks API / `LIST_TYPE_HEADLINES`
 - `ChatPage`：`<TaskProgress sessionId={sessionId} refreshTrigger={taskRefreshTrigger} />`
 
-- [ ] **Step 4: chat 结束后 refetch（产品决策 #4）**
+- [x] **Step 4: chat 结束后 refetch（产品决策 #4）**
 
 `ChatPage`：chat SSE 正常结束后 `setTaskRefreshTrigger(n => n + 1)`；`TaskProgress` `useEffect` 依赖 `[sessionId, refreshTrigger]`。
 
-- [ ] **Step 5: sessionsApi object detail**
+- [x] **Step 5: sessionsApi object detail**
 
 ```typescript
 // detail 支持 string | { code: string; message: string }
@@ -556,11 +558,11 @@ function formatApiDetail(detail: unknown): string {
 }
 ```
 
-- [ ] **Step 6: Build**
+- [x] **Step 6: Build**
 
 Run: `cd web && npm run build`
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```text
 feat(web): TaskProgress 仅读 tasks API 并支持空骨架与 chat 后刷新
@@ -576,23 +578,23 @@ feat(web): TaskProgress 仅读 tasks API 并支持空骨架与 chat 后刷新
 
 **Files:** —
 
-- [ ] **Step 1: Backend**
+- [x] **Step 1: Backend**
 
 Run: `cd backend && uv run pytest tests/ -q`
 
-- [ ] **Step 2: Frontend build**
+- [x] **Step 2: Frontend build**
 
 Run: `cd web && npm run build`
 
-- [ ] **Step 3: 手动 smoke**
+- [x] **Step 3: 手动 smoke**
 
-- [ ] 两 session 各 submit intake / 各有 explore active list，互不影响
-- [ ] 同 session 第二个 active 被拒绝
-- [ ] intake submit 后 `GET /v1/tasks` 有 explore list + 2 milestones
-- [ ] chat 结束后 TaskProgress 刷新
-- [ ] intake 填写期间（submit 前）TaskProgress 为空（预期；headline 在 chat 区）
+- [x] 两 session 各 submit intake / 各有 explore active list，互不影响
+- [x] 同 session 第二个 active 被拒绝
+- [x] intake submit 后 `GET /v1/tasks` 有 explore list + 2 milestones
+- [x] chat 结束后 TaskProgress 刷新
+- [x] intake 填写期间（submit 前）TaskProgress 为空（预期；headline 在 chat 区）
 
-- [ ] **Step 4: Commit（若有遗漏修复）**
+- [x] **Step 4: Commit（若有遗漏修复）**
 
 ```text
 test(tasks): 任务隔离全量回归通过
@@ -639,11 +641,4 @@ test(tasks): 任务隔离全量回归通过
 
 ## 执行方式
 
-Plan complete and saved to `docs/superpowers/plans/2026-06-01-session-task-isolation.md`.
-
-**两种执行选项：**
-
-1. **Subagent-Driven（推荐）** — 按 Task 1→9 派发子 agent，每 task 后 review  
-2. **Inline Executing** — 本会话连续实现，Task 5/7 处 checkpoint  
-
-Which approach?
+**已完成。** Task 1–9 全部落地；`196 passed`（backend pytest，2026-06-01）· `npm run build` 通过 · commit `dd83651`。
