@@ -40,6 +40,11 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
                 "type": "array",
                 "items": {"type": "string"},
             },
+            "target_role": {"type": "string"},
+            "tech_stack_tags": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
         },
     },
     "register_outputs_index": {

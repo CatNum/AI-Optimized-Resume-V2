@@ -76,3 +76,42 @@ def test_resolve_doubled_canonical_prefix(tmp_path, monkeypatch):
     fixed = outputs_mod.normalize_output_path(corrupted)
     assert fixed == "output/demo/2026-06-01/resume_进取_AI_Agent_后端开发"
     assert outputs_mod.resolve_output_file(corrupted) is not None
+
+
+def test_write_resume_html_uses_prd_filename_template(tmp_path, monkeypatch):
+    _reload_output_modules(tmp_path, monkeypatch, output_subdir="output/demo")
+    import career_os.platform.tool.handlers.resume_html as resume_mod
+
+    result = resume_mod.write_resume_html(
+        "resume",
+        {
+            "html": "<html><body>ok</body></html>",
+            "optimization_level": "标准",
+            "filename_tags": ["Go后端", "AIAgent"],
+            "filename": "resume_标准.html",
+        },
+    )
+    assert not hasattr(result, "code")
+    path = result["path"]
+    assert path.endswith("-标准.html")
+    assert "Go后端-AIAgent" in path
+
+
+def test_write_resume_html_auto_derives_tags_from_role_and_stack(tmp_path, monkeypatch):
+    _reload_output_modules(tmp_path, monkeypatch, output_subdir="output/demo")
+    import career_os.platform.tool.handlers.resume_html as resume_mod
+
+    result = resume_mod.write_resume_html(
+        "resume",
+        {
+            "html": "<html><body>ok</body></html>",
+            "optimization_level": "进取",
+            "target_role": "Agent开发工程师跨端方向",
+            "tech_stack_tags": ["Golang", "K8s", "LangGraph"],
+        },
+    )
+    assert not hasattr(result, "code")
+    assert result["filename_tags"] == ["Agent开发工程师跨端方向", "Golang", "K8s"]
+    path = result["path"]
+    assert path.endswith("-进取.html")
+    assert "Agent开发工程师跨端方向-Golang-K8s" in path

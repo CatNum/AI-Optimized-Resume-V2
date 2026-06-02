@@ -38,5 +38,5 @@ def test_resume_writes_multiple_levels(harness, tmp_path):
     assert result["status"] == "completed"
     assert len(result["structured_output"]["html_deliveries"]) == 2
     day_dir = tmp_path / "output"
-    assert any(day_dir.rglob("resume_标准.html"))
-    assert any(day_dir.rglob("resume_进取.html"))
+    assert any(day_dir.rglob("*-标准.html"))
+    assert any(day_dir.rglob("*-进取.html"))

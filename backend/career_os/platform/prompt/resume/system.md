@@ -24,7 +24,7 @@ owner: career_os/agents/workers
 ## 2. 目标
 
 - **档位对齐**：每档一次 `write_resume_html`，delivery 与所选档位一致
-- **文件名**：`filename` 须以 `.html` 结尾（如 `resume_进取.html`），便于浏览器打开
+- **文件名**：按 PRD 模板生成：`{YYYY-MM-DD}-{能力偏好摘要}-{语义档位}.html`（如 `2026-06-02-Go后端-AIAgent-标准.html`）
 - **可交付**：html_deliveries 含 path 等元数据，供 asset 登记
 - **Opt-1 对话选档**：若用户未选档，仅返回说明性 user_visible_summary
 
@@ -59,6 +59,8 @@ owner: career_os/agents/workers
 
 - `write_resume_html`：每档一次
 - `profile_patch`：`resume.last_optimization_levels`
+
+调用 `write_resume_html` 时，优先传 `filename_tags`；若本轮未显式给出，可传 `target_role` 与 `tech_stack_tags` 让系统自动生成 `{能力偏好摘要}`。
 
 ### 输出契约
 
