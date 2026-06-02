@@ -1,4 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type DragEvent } from "react";
+import {
+  FILE_REF_MIME,
+  fileRefFromOutputItem,
+} from "../lib/chatAttachments";
 
 type OutputEntry = { path: string; optimization_level?: string };
 
@@ -39,11 +43,17 @@ export function OutputsPanel({ refreshTrigger = 0 }: Props) {
     void load();
   }, [load, refreshTrigger]);
 
+  function handleDragStart(e: DragEvent<HTMLLIElement>, item: OutputEntry) {
+    const ref = fileRefFromOutputItem(item);
+    e.dataTransfer.setData(FILE_REF_MIME, JSON.stringify(ref));
+    e.dataTransfer.effectAllowed = "copy";
+  }
+
   return (
     <aside className="flex h-full w-72 shrink-0 flex-col border-l border-slate-800 bg-slate-950">
       <div className="border-b border-slate-800 px-3 py-3">
         <h2 className="font-medium text-slate-100">简历产物</h2>
-        <p className="mt-1 text-xs text-slate-500">优化后的 HTML 简历</p>
+        <p className="mt-1 text-xs text-slate-500">拖到下方输入框可引用</p>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
@@ -56,27 +66,33 @@ export function OutputsPanel({ refreshTrigger = 0 }: Props) {
         ) : (
           <ul className="space-y-1">
             {items.map((item) => (
-              <li key={item.path}>
-                <div className="rounded-lg border border-transparent px-3 py-2 hover:border-slate-700 hover:bg-slate-900/80">
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="min-w-0 flex-1 truncate text-sm text-slate-100" title={item.path}>
-                      {displayName(item.path)}
+              <li
+                key={item.path}
+                draggable
+                onDragStart={(e) => handleDragStart(e, item)}
+                className="cursor-grab rounded-lg border border-transparent px-3 py-2 active:cursor-grabbing hover:border-slate-700 hover:bg-slate-900/80"
+                title="拖到聊天输入框引用"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="min-w-0 flex-1 truncate text-sm text-slate-100" title={item.path}>
+                    {displayName(item.path)}
+                  </span>
+                  {item.optimization_level ? (
+                    <span className="shrink-0 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-400">
+                      {item.optimization_level}
                     </span>
-                    {item.optimization_level ? (
-                      <span className="shrink-0 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-400">
-                        {item.optimization_level}
-                      </span>
-                    ) : null}
-                  </div>
-                  <a
-                    className="mt-2 inline-block text-xs text-emerald-400 hover:text-emerald-300"
-                    href={openHref(item.path)}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    打开
-                  </a>
+                  ) : null}
                 </div>
+                <a
+                  className="mt-2 inline-block text-xs text-emerald-400 hover:text-emerald-300"
+                  href={openHref(item.path)}
+                  target="_blank"
+                  rel="noreferrer"
+                  draggable={false}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  打开
+                </a>
               </li>
             ))}
           </ul>

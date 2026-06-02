@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import type { FileRefAttachment } from "../lib/chatAttachments";
 import type { ContextUsage } from "../lib/contextUsage";
 
 type ChatHandlers = {
@@ -14,16 +15,29 @@ export function useChatSSE() {
   const [loading, setLoading] = useState(false);
 
   const sendMessage = useCallback(
-    async (message: string, sessionId: string | null, handlers: ChatHandlers) => {
+    async (
+      message: string,
+      sessionId: string | null,
+      handlers: ChatHandlers,
+      attachments?: FileRefAttachment[],
+    ) => {
       setLoading(true);
       try {
+        const payload: {
+          session_id: string | null;
+          message: string;
+          attachments?: FileRefAttachment[];
+        } = { session_id: sessionId, message };
+        if (attachments && attachments.length > 0) {
+          payload.attachments = attachments;
+        }
         const response = await fetch("/v1/chat", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Accept: "text/event-stream",
           },
-          body: JSON.stringify({ session_id: sessionId, message }),
+          body: JSON.stringify(payload),
         });
 
         if (response.status === 409) {

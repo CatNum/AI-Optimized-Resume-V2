@@ -20,6 +20,10 @@ from career_os.harness.pipeline_phase_transition import (
     on_explore_repeat_declined,
 )
 from career_os.platform.store.task import TaskStore
+from career_os.harness.chat_attachments import (
+    build_request_context_from_attachments,
+    enrich_user_message_with_attachments,
+)
 from career_os.harness.orchestrator import ChatOrchestrator
 from career_os.harness.session_activity import build_session_activity
 from career_os.platform.store.session import SessionStore
@@ -136,30 +140,24 @@ async def _chat_stream(
             orchestrator.context_usage_payload(meta),
         )
 
-    session_store.append_message(session_id, "user", body.message)
+    user_message = enrich_user_message_with_attachments(body.message, body.attachments)
+    session_store.append_message(session_id, "user", user_message)
     chat_history, meta = session_store.load_chat_history(session_id)
     pending = _apply_pending_gate(body.message, state)
     if pending is None:
         pending = []
-    context: dict[str, Any] = {}
-    if "resume" in pending:
-        context["selected_optimization_levels"] = ["标准", "进取"]
-        context["html_deliveries"] = []
-    if "asset" in pending and state.get("prior_results", {}).get("resume"):
-        context["run_kind"] = "register"
-        context["html_deliveries"] = state["prior_results"]["resume"].get(
-            "html_deliveries", []
-        )
+    request_context = build_request_context_from_attachments(body.attachments)
 
     result = run_coordinator_turn(
         harness,
         session_id=session_id,
         session_state=state,
-        user_message=body.message,
+        user_message=user_message,
         chat_history=chat_history,
         messages_meta=meta,
         pending_workers=pending,
         worker_runner=build_harness_worker_runner(harness),
+        request_context=request_context,
     )
     session_store.update_state(session_id, result["session_state"])
 
@@ -173,7 +171,7 @@ async def _chat_stream(
 
         history_syn = slice_synthesize_chat_history(chat_history)
         system, user = build_synthesis_messages(
-            body.message,
+            user_message,
             draft,
             result["session_state"],
             result.get("last_worker_result"),
@@ -202,6 +200,10 @@ async def _chat_stream(
 
 @router.post("/chat")
 async def chat(body: ChatRequest):
+    user_message = enrich_user_message_with_attachments(body.message, body.attachments)
+    if not user_message.strip():
+        raise HTTPException(status_code=400, detail="message_or_attachment_required")
+
     session_store = SessionStore()
     session_id = body.session_id or session_store.create_session()
     state = session_store.get_state(session_id)

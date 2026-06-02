@@ -1,4 +1,18 @@
-import { FormEvent, KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
+import {
+  DragEvent,
+  FormEvent,
+  KeyboardEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import {
+  FILE_REF_MIME,
+  type FileRefAttachment,
+  formatAttachmentsForMessage,
+  parseFileRefFromDataTransfer,
+} from "../lib/chatAttachments";
 import { ContextUsageIndicator } from "../components/ContextUsageIndicator";
 import { OutputsPanel } from "../components/OutputsPanel";
 import { SessionSwitcher } from "../components/SessionSwitcher";
@@ -39,6 +53,8 @@ export function ChatPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [attachments, setAttachments] = useState<FileRefAttachment[]>([]);
+  const [dropActive, setDropActive] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [contextUsage, setContextUsage] = useState<ContextUsage | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -133,9 +149,20 @@ export function ChatPage() {
     stickToBottomRef.current = distanceFromBottom < 96;
   }
 
+  function addAttachment(ref: FileRefAttachment) {
+    setAttachments((prev) =>
+      prev.some((a) => a.path === ref.path) ? prev : [...prev, ref],
+    );
+  }
+
+  function removeAttachment(path: string) {
+    setAttachments((prev) => prev.filter((a) => a.path !== path));
+  }
+
   function clearSessionWorkspace() {
     setMessages([]);
     setInput("");
+    setAttachments([]);
     setContextUsage(null);
     setNotice(null);
     stickToBottomRef.current = true;
@@ -164,19 +191,26 @@ export function ChatPage() {
     return streamSessionId === displayedSessionIdRef.current;
   }
 
-  async function dispatchChat(userText: string, appendUserMessage: boolean) {
-    if (!userText.trim() || chatBusyOnDisplayed) return;
+  async function dispatchChat(
+    userText: string,
+    appendUserMessage: boolean,
+    refs: FileRefAttachment[] = [],
+  ) {
+    const trimmed = userText.trim();
+    if ((!trimmed && refs.length === 0) || chatBusyOnDisplayed) return;
+    const apiMessage = trimmed || "请基于引用的简历继续处理。";
+    const bubbleText = trimmed + formatAttachmentsForMessage(refs);
     stickToBottomRef.current = true;
     const streamAtStart = sessionId;
     inFlightSessionIdRef.current = streamAtStart;
     let streamSessionId: string | null = streamAtStart;
 
     if (appendUserMessage && shouldApplyStreamUpdate(streamSessionId)) {
-      setMessages((prev) => [...prev, { role: "user", content: userText.trim() }]);
+      setMessages((prev) => [...prev, { role: "user", content: bubbleText }]);
     }
     let assistant = "";
 
-    await sendMessage(userText.trim(), sessionId, {
+    await sendMessage(apiMessage, sessionId, {
       onSession: (id) => {
         streamSessionId = id;
         inFlightSessionIdRef.current = id;
@@ -221,16 +255,18 @@ export function ChatPage() {
           setNotice("上一条仍在处理中，请稍候。");
         }
       },
-    });
+    }, refs);
     inFlightSessionIdRef.current = null;
   }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!input.trim() || chatBusyOnDisplayed) return;
+    if ((!input.trim() && attachments.length === 0) || chatBusyOnDisplayed) return;
     const userText = input.trim();
+    const refs = attachments;
     setInput("");
-    await dispatchChat(userText, true);
+    setAttachments([]);
+    await dispatchChat(userText, true, refs);
   }
 
   async function handleExploreIntakeSubmitted() {
@@ -252,10 +288,30 @@ export function ChatPage() {
   function handleInputKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key !== "Enter" || e.shiftKey) return;
     e.preventDefault();
-    if (!input.trim() || chatBusyOnDisplayed) return;
+    if ((!input.trim() && attachments.length === 0) || chatBusyOnDisplayed) return;
     void onSubmit(e as unknown as FormEvent);
   }
 
+  function handleDragOver(e: DragEvent) {
+    if (!e.dataTransfer.types.includes(FILE_REF_MIME)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setDropActive(true);
+  }
+
+  function handleDragLeave(e: DragEvent) {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setDropActive(false);
+  }
+
+  function handleDrop(e: DragEvent) {
+    e.preventDefault();
+    setDropActive(false);
+    const ref = parseFileRefFromDataTransfer(e.dataTransfer);
+    if (ref) addAttachment(ref);
+  }
+
+  const canSend = (input.trim().length > 0 || attachments.length > 0) && !chatBusyOnDisplayed;
   const inputDisabled = chatBusyOnDisplayed || !initDone;
 
   return (
@@ -318,23 +374,56 @@ export function ChatPage() {
         {isThinking ? <ThinkingIndicator active={isThinking} /> : null}
       </div>
 
-      <form onSubmit={onSubmit} className="flex shrink-0 gap-2 border-t border-slate-800 pt-4">
-        <textarea
-          className="flex-1 resize-none rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 leading-relaxed disabled:opacity-50"
-          rows={2}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleInputKeyDown}
-          placeholder="输入消息… Enter 发送，Shift+Enter 换行"
-          disabled={inputDisabled}
-        />
-        <button
-          className="rounded-lg bg-emerald-600 px-4 py-2 disabled:opacity-50"
-          disabled={inputDisabled}
-          type="submit"
-        >
-          {chatBusyOnDisplayed ? "处理中…" : "发送"}
-        </button>
+      <form
+        onSubmit={onSubmit}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`flex shrink-0 flex-col gap-2 border-t border-slate-800 pt-4 ${
+          dropActive ? "rounded-lg ring-1 ring-emerald-600/60" : ""
+        }`}
+      >
+        {attachments.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {attachments.map((att) => (
+              <span
+                key={att.path}
+                className="inline-flex max-w-full items-center gap-1 rounded-full border border-emerald-800/60 bg-emerald-950/50 px-2 py-1 text-xs text-emerald-100"
+                title={att.path}
+              >
+                <span className="truncate">
+                  {att.label || att.path.split("/").pop()}
+                </span>
+                <button
+                  type="button"
+                  className="shrink-0 text-emerald-300/80 hover:text-emerald-100"
+                  aria-label="移除引用"
+                  onClick={() => removeAttachment(att.path)}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : null}
+        <div className="flex gap-2">
+          <textarea
+            className="flex-1 resize-none rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 leading-relaxed disabled:opacity-50"
+            rows={2}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleInputKeyDown}
+            placeholder="输入消息… 可从右侧拖入简历引用；Enter 发送"
+            disabled={inputDisabled}
+          />
+          <button
+            className="rounded-lg bg-emerald-600 px-4 py-2 disabled:opacity-50"
+            disabled={inputDisabled || !canSend}
+            type="submit"
+          >
+            {chatBusyOnDisplayed ? "处理中…" : "发送"}
+          </button>
+        </div>
       </form>
 
       {showForm && <OnboardingForm onClose={() => setShowForm(false)} />}

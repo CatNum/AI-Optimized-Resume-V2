@@ -15,3 +15,4 @@ class CoordinatorState(TypedDict, total=False):
     synthesis_draft: str
     delegate_count: int
     user_message: str
+    request_context: dict[str, Any]

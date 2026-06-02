@@ -287,6 +287,9 @@ def build_coordinator_graph(
             "chat_history_scope": scope_label,
             "messages_meta": state.get("messages_meta") or {},
         }
+        request_context = state.get("request_context") or {}
+        if request_context:
+            delegate_context.update(request_context)
         attach_profile_memory_to_context(
             delegate_context,
             state.get("user_message", ""),
@@ -534,6 +537,7 @@ def run_coordinator_turn(
     messages_meta: dict[str, Any] | None = None,
     pending_workers: list[str] | None = None,
     worker_runner: WorkerRunner | None = None,
+    request_context: dict[str, Any] | None = None,
 ) -> CoordinatorState:
     worker_registry = WorkerRegistry()
     initial: CoordinatorState = {
@@ -544,6 +548,7 @@ def run_coordinator_turn(
         "worker_index": worker_registry.get_worker_index(),
         "pending_workers": pending_workers or [],
         "user_message": user_message,
+        "request_context": dict(request_context or {}),
         "stop_delegate": False,
         "delegate_count": 0,
     }
