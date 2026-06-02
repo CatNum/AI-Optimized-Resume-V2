@@ -22,12 +22,7 @@ def env(tmp_path, monkeypatch):
 
 
 def _seed_jd_ready(profile: ProfileStore) -> None:
-    profile.patch(
-        [
-            {"path": "basic.name", "value": "测试", "op": "set"},
-            {"path": "exploration.completed_at", "value": "2026-05-31T00:00:00Z", "op": "set"},
-        ]
-    )
+    profile.patch([{"path": "basic.name", "value": "测试", "op": "set"}])
 
 
 def test_jd_request_blocked_without_prerequisites(env, monkeypatch):
@@ -87,13 +82,15 @@ def test_jd_request_allowed_when_prerequisites_met(env, monkeypatch):
             "gates": {"flags": {}},
             "list_type": "pipeline",
             "explore_gate_confirmed": True,
+            "explore_closure": {"completed": True},
+            "intake_status": {"submitted_at": "2026-05-31T00:00:00Z"},
         },
         user_message="帮我评估这份 JD",
         pending_workers=[],
         worker_runner=runner,
     )
 
-    assert calls == ["market", "opportunity"]
+    assert calls == []
     assert state["session_state"].get("list_type") == "pipeline"
 
 

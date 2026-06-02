@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from career_os.harness.explore_intake import explore_intake_submitted
 from career_os.harness.explore_intake_fields import INTAKE_FIELD_KEYS
 from career_os.platform.pipeline_constants import (
     JUMP_TARGET_PHASES,
@@ -42,7 +41,7 @@ def compute_hard_pass(profile: dict[str, Any]) -> tuple[bool, list[str]]:
     reasons: list[str] = []
     exploration = profile.get("exploration") or {}
     intake = exploration.get("intake") or {}
-    if not intake.get("submitted_at") and not explore_intake_submitted(profile):
+    if not intake.get("submitted_at"):
         reasons.append("explore_intake_not_submitted")
     resume_text = (profile.get("resume") or {}).get("source_text") or ""
     if not str(resume_text).strip():

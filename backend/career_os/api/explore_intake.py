@@ -41,7 +41,7 @@ class ExploreIntakeRequest(BaseModel):
         return value
 
 
-def build_explore_intake_patches(body: ExploreIntakeRequest) -> list[dict[str, Any]]:
+def build_explore_intake_patches(body: ExploreIntakeRequest) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     submitted_at = datetime.now(UTC).isoformat()
     user_values = {
         "years_of_experience": body.years_of_experience,
@@ -62,11 +62,10 @@ def build_explore_intake_patches(body: ExploreIntakeRequest) -> list[dict[str, A
         "pending_fields": pending,
     }
     patches: list[dict[str, Any]] = [
-        {"path": "exploration.intake", "value": intake, "op": "set"},
         {"path": "resume.source_text", "value": body.resume_text.strip(), "op": "set"},
         *profile_patches_from_resolved(resolved),
     ]
-    return patches
+    return intake, patches
 
 
 def submit_explore_intake(body: ExploreIntakeRequest) -> dict[str, Any]:
@@ -74,15 +73,21 @@ def submit_explore_intake(body: ExploreIntakeRequest) -> dict[str, Any]:
     if not session_store.session_exists(body.session_id):
         raise ValueError("session_not_found")
     profile_store = ProfileStore()
-    profile_store.patch(build_explore_intake_patches(body))
+    intake, profile_patches = build_explore_intake_patches(body)
+    profile_store.patch(profile_patches)
     state = session_store.get_state(body.session_id)
+    state["intake_status"] = intake
+    session_store.update_state(body.session_id, state)
+    session_store.patch_artifacts(
+        body.session_id,
+        [{"path": "exploration.intake", "value": intake, "op": "set"}],
+    )
     list_id = state.get("list_id")
     if not list_id:
         created = instantiate_pipeline_for_session(body.session_id)
         if isinstance(created, TaskStoreError):
             raise RuntimeError(created.message)
         list_id = created
-    intake = profile_store.get(["exploration"]).get("exploration", {}).get("intake", {})
     return {
         "ok": True,
         "submitted": True,
@@ -91,11 +96,16 @@ def submit_explore_intake(body: ExploreIntakeRequest) -> dict[str, Any]:
     }
 
 
-def get_explore_intake_status() -> dict[str, Any]:
-    profile = ProfileStore().get(["exploration"])
-    intake = (profile.get("exploration") or {}).get("intake") or {}
+def get_explore_intake_status(session_id: str | None = None) -> dict[str, Any]:
+    intake: dict[str, Any] = {}
+    if session_id:
+        session = SessionStore().get_state(session_id)
+        intake = session.get("intake_status") or {}
+    else:
+        profile = ProfileStore().get(["exploration"])
+        intake = (profile.get("exploration") or {}).get("intake") or {}
     return {
-        "submitted": explore_intake_submitted(profile),
+        "submitted": explore_intake_submitted({"intake_status": intake}),
         "intake": intake,
         "pending_fields": intake.get("pending_fields") or [],
     }

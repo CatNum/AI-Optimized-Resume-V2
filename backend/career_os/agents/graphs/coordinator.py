@@ -48,10 +48,24 @@ from career_os.harness.explore_guidance import (
 from career_os.harness.errors import HarnessError
 from career_os.harness.jd_prerequisites import parse_jd_b1_block_reason
 from career_os.platform.worker.registry import WorkerRegistry
+from career_os.platform.store.session import SessionStore
 
 WorkerRunner = Callable[[str, str, dict[str, Any], dict[str, Any]], dict[str, Any]]
 
 _LEGACY_SESSION_LIST_TYPES = frozenset({"explore", "jd"})
+
+
+def _compact_prior_result(worker_id: str, structured: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(structured, dict):
+        return {}
+    keep_keys = {"phase_status", "user_visible_summary", "gate_prompt"}
+    if worker_id == "opportunity":
+        keep_keys |= {"recommendation", "jd_fingerprint"}
+    if worker_id == "resume":
+        keep_keys |= {"html_deliveries"}
+    if worker_id == "asset":
+        keep_keys |= {"html_deliveries", "reuse_recommendation"}
+    return {k: structured.get(k) for k in keep_keys if k in structured}
 
 
 def _sync_session_list_type_from_analysis(
@@ -308,8 +322,35 @@ def build_coordinator_graph(
         )
         prior_results = dict(session_state.get("prior_results") or {})
         if worker_result.get("status") == "completed":
-            prior_results[worker_id] = worker_result.get("structured_output") or {}
+            prior_results[worker_id] = _compact_prior_result(
+                worker_id, worker_result.get("structured_output") or {}
+            )
         session_state["prior_results"] = prior_results
+        if worker_result.get("status") == "completed" and state.get("session_id"):
+            structured_out = worker_result.get("structured_output") or {}
+            artifact_patches: list[dict[str, Any]] = []
+            if worker_id in {"market", "opportunity", "strategy"}:
+                artifact_patches.append(
+                    {"path": worker_id, "value": structured_out, "op": "set"}
+                )
+            if worker_id in {"identity", "capability"}:
+                artifact_patches.append(
+                    {
+                        "path": f"exploration.{worker_id}",
+                        "value": structured_out,
+                        "op": "set",
+                    }
+                )
+            if worker_id == "asset":
+                artifact_patches.append(
+                    {
+                        "path": "resume_outputs",
+                        "value": structured_out.get("html_deliveries") or [],
+                        "op": "set",
+                    }
+                )
+            if artifact_patches:
+                SessionStore().patch_artifacts(state["session_id"], artifact_patches)
 
         structured = worker_result.get("structured_output") or {}
         if worker_result.get("status") == "completed" and supports_explore_guidance(worker_id):

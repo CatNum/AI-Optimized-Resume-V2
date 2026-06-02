@@ -257,8 +257,8 @@ def session_context(session_id: str):
 
 
 @router.get("/profile/explore-intake/status")
-def explore_intake_status():
-    return get_explore_intake_status()
+def explore_intake_status(session_id: str | None = Query(default=None)):
+    return get_explore_intake_status(session_id)
 
 
 @router.post("/profile/explore-intake")
@@ -355,7 +355,10 @@ def get_tasks(session_id: str | None = Query(default=None)):
 
 
 @router.get("/outputs")
-def list_outputs():
+def list_outputs(
+    session_id: str | None = Query(default=None),
+    kind: str | None = Query(default=None),
+):
     profile = ProfileStore()
     raw = profile.get(["outputs_index"]).get("outputs_index", [])
     deduped = dedupe_outputs_index(raw)
@@ -364,7 +367,12 @@ def list_outputs():
         profile.patch([{"path": "outputs_index", "value": merged, "op": "set"}])
     elif len(deduped) != len(raw):
         profile.patch([{"path": "outputs_index", "value": deduped, "op": "set"}])
-    return {"outputs_index": merged}
+    active = [entry for entry in merged if entry.get("status", "active") != "deleted"]
+    if session_id:
+        active = [entry for entry in active if entry.get("session_id") == session_id]
+    if kind:
+        active = [entry for entry in active if entry.get("kind") == kind]
+    return {"outputs_index": active}
 
 
 @router.delete("/outputs/{encoded_path:path}")

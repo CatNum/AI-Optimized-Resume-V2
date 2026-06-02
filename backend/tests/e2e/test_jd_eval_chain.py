@@ -7,6 +7,7 @@ from career_os.agents.graphs.coordinator import run_coordinator_turn
 from career_os.agents.graphs.workers.registry import build_harness_worker_runner
 from career_os.harness.executor import Harness
 from career_os.platform.store.profile import ProfileStore
+from career_os.platform.store.session import SessionStore
 from tests.conftest import seed_jd_ready_profile
 
 
@@ -40,8 +41,8 @@ def test_jd_chain_market_then_opportunity(harness):
         worker_runner=runner,
     )
     assert state["delegate_count"] == 2
-    profile = ProfileStore().get(["market.opportunity_snapshots"])
-    assert len(profile["market"]["opportunity_snapshots"]) >= 1
+    artifacts = SessionStore().get_artifacts("sess_jd")
+    assert len((artifacts.get("market") or {}).get("opportunity_snapshots") or []) >= 1
 
 
 def test_market_before_opportunity_order(harness):

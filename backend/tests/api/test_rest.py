@@ -181,7 +181,7 @@ def test_explore_intake_submit(client):
     assert r.status_code == 200
     body = r.json()
     assert body["submitted"] is True
-    status = client.get("/v1/profile/explore-intake/status").json()
+    status = client.get("/v1/profile/explore-intake/status", params={"session_id": sid}).json()
     assert status["submitted"] is True
     assert status["intake"]["resolved_fields"]["years_of_experience"] == "6年"
     assert status["intake"]["resolved_fields"]["target_role"] == "Java开发"
@@ -264,27 +264,13 @@ def test_chat_jd_gate_chain(client):
         "/v1/profile/onboarding",
         json={"basic": {"name": "E2E"}, "intent": {"target_city": "上海"}},
     )
-    import career_os.platform.store.profile as profile_mod
-
-    profile_mod.ProfileStore().patch(
-        [
-            {
-                "path": "exploration.completed_at",
-                "value": "2026-05-31T00:00:00Z",
-                "op": "set",
-            },
-            {
-                "path": "exploration.intake.submitted_at",
-                "value": "2026-05-31T00:00:00Z",
-                "op": "set",
-            },
-        ]
-    )
     from career_os.harness.pipeline_gates import jump_to_phase, set_explore_gate_confirmed
     from career_os.platform.store.session import SessionStore
 
     session_store = SessionStore()
     state = session_store.get_state(session)
+    state["intake_status"] = {"submitted_at": "2026-05-31T00:00:00Z"}
+    state["explore_completed_at"] = "2026-05-31T00:00:00Z"
     set_explore_gate_confirmed(state, True)
     list_id = state.get("list_id")
     assert list_id
@@ -311,7 +297,7 @@ def test_chat_jd_gate_chain(client):
     assert "event: done" in body3
     assert "context_usage" in body3
 
-    outputs = client.get("/v1/outputs").json().get("outputs_index") or []
+    outputs = client.get("/v1/outputs", params={"session_id": session}).json().get("outputs_index") or []
     assert len(outputs) >= 1
 
 

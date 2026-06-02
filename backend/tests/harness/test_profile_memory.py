@@ -70,3 +70,24 @@ def test_materialize_full_resume_for_worker(tmp_path, monkeypatch):
     assert memory["resume"]["resume_on_file"] is True
     assert memory["resume"].get("source_text")
     assert len(memory["resume"]["source_text"]) > 50
+
+
+def test_materialize_market_and_strategy_from_session_state(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    import career_os.config as config_mod
+    import career_os.platform.store.profile as profile_mod
+
+    importlib.reload(config_mod)
+    importlib.reload(profile_mod)
+    seed_explore_intake_profile(profile_mod.ProfileStore())
+    session_state = {
+        "prior_results": {
+            "market": {"role_families": ["session-role"]},
+            "strategy": {"path_options": [{"id": "session"}]},
+        }
+    }
+    memory = materialize_profile_memory(
+        ["market", "strategy"], full_resume_text=False, session_state=session_state
+    )
+    assert memory["market"]["role_families"] == ["session-role"]
+    assert memory["strategy"]["path_options"] == [{"id": "session"}]

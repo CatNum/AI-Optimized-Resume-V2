@@ -47,8 +47,16 @@ def test_react_loads_two_skills_trace(harness, monkeypatch):
         "coordinator",
         "strategy",
         "制定 JD 投递策略",
-        {"session_id": "s1", "prior_results": {}, "gates": {"flags": {}}},
-        context={"list_type": "jd"},
+        {
+            "session_id": "s1",
+            "prior_results": {},
+            "gates": {"flags": {}},
+            "list_type": "pipeline",
+            "explore_gate_confirmed": True,
+            "explore_closure": {"completed": True},
+            "intake_status": {"submitted_at": "2026-05-31T00:00:00Z"},
+        },
+        context={"list_type": "pipeline"},
         session_id="s1",
     )
     assert not hasattr(delegated, "code")
@@ -127,8 +135,16 @@ def test_worker_loads_skill_twice_trace_llm(harness):
         "coordinator",
         "strategy",
         "制定 JD 投递策略",
-        {"session_id": "s1", "prior_results": {}, "gates": {"flags": {}}},
-        context={"list_type": "jd"},
+        {
+            "session_id": "s1",
+            "prior_results": {},
+            "gates": {"flags": {}},
+            "list_type": "pipeline",
+            "explore_gate_confirmed": True,
+            "explore_closure": {"completed": True},
+            "intake_status": {"submitted_at": "2026-05-31T00:00:00Z"},
+        },
+        context={"list_type": "pipeline"},
         session_id="s1",
     )
     assert not hasattr(delegated, "code")

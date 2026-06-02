@@ -178,7 +178,9 @@ def _resume_strategy_continue_draft(
             "应基于用户所述项目类型，直接协助写进简历或给 STAR/技术栈表述建议。"
         )
     memory_sections = resolve_profile_memory_sections(user_message, session_state)
-    memory = materialize_profile_memory(memory_sections, full_resume_text=False)
+    memory = materialize_profile_memory(
+        memory_sections, full_resume_text=False, session_state=session_state
+    )
     facts = format_profile_memory_for_draft(memory)
     lines.append(f"【本回合档案事实 — 回答须与此一致】\n{facts}")
     return "\n".join(lines)
@@ -213,7 +215,9 @@ def build_phase_synthesis_draft(
     else:
         base = _resume_optimize_continue_draft(session_state)
     memory_sections = resolve_profile_memory_sections(user_message, session_state)
-    memory = materialize_profile_memory(memory_sections, full_resume_text=False)
+    memory = materialize_profile_memory(
+        memory_sections, full_resume_text=False, session_state=session_state
+    )
     facts = format_profile_memory_for_draft(memory)
     return (
         f"{base}\n\n【本回合档案事实】\n{facts}\n"
@@ -385,7 +389,7 @@ def fallback_analyze_workers(
             match_pipeline_intent_rule_ids,
         )
 
-        rule_ids = match_pipeline_intent_rule_ids(user_message)
+        rule_ids = set(match_pipeline_intent_rule_ids(user_message))
         if rule_ids & {"intent_resume_strategy", "intent_declare_agent_project"}:
             result = enforce_pipeline_phase_rules(
                 {
@@ -492,13 +496,13 @@ def analyze_workers(
         "can_offer_explore_complete": offer_explore,
         "explore_depth_diag": explore_diag,
         **jd_prerequisites_payload(session_state),
-        **explore_intake_payload(),
+        **explore_intake_payload(session_state),
     }
     memory_sections = resolve_profile_memory_sections(user_message, session_state)
     if memory_sections:
         analyze_payload["profile_memory_sections"] = memory_sections
         analyze_payload["profile_memory"] = materialize_profile_memory(
-            memory_sections, full_resume_text=False
+            memory_sections, full_resume_text=False, session_state=session_state
         )
     if session_state.get("list_type") == "pipeline":
         analyze_payload.update(

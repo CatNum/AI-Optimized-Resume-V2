@@ -51,3 +51,22 @@ def test_reset_session_clears_messages_and_state(tmp_path, monkeypatch):
     assert meta["total_count"] == 0
     state = s.get_state(sid)
     assert state.get("gates", {}).get("flags", {}).get("deep_explore_accepted") is not True
+
+
+def test_session_artifacts_default_and_patch(tmp_path, monkeypatch):
+    SessionStore = _reload_store(tmp_path, monkeypatch)
+    s = SessionStore()
+    sid = s.create_session()
+    artifacts = s.get_artifacts(sid)
+    assert artifacts["session_id"] == sid
+    assert artifacts["market"] == {}
+    s.patch_artifacts(
+        sid,
+        [
+            {"path": "market", "value": {"role_families": ["x"]}, "op": "set"},
+            {"path": "exploration.identity", "value": {"summary": "ok"}, "op": "set"},
+        ],
+    )
+    updated = s.get_artifacts(sid)
+    assert updated["market"]["role_families"] == ["x"]
+    assert updated["exploration"]["identity"]["summary"] == "ok"

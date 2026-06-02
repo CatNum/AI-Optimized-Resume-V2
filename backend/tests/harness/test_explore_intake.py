@@ -3,7 +3,6 @@ from career_os.harness.explore_intake import (
     explore_intake_submitted,
     is_explore_route,
 )
-from career_os.platform.store.profile import ProfileStore
 
 
 def test_is_explore_route():
@@ -48,24 +47,19 @@ def test_enforce_explore_intake_repeat_gate_when_already_submitted(tmp_path, mon
     importlib.reload(config_mod)
     importlib.reload(profile_mod)
 
-    ProfileStore().patch(
-        [
-            {
-                "path": "exploration.intake.submitted_at",
-                "value": "2026-05-31T00:00:00Z",
-                "op": "set",
-            }
-        ]
-    )
     original = {
         "workers": ["identity"],
         "list_type": "pipeline",
         "pipeline_phase": "explore",
     }
-    result = enforce_explore_intake(original, {"list_type": "pipeline"})
+    session_state = {
+        "list_type": "pipeline",
+        "intake_status": {"submitted_at": "2026-05-31T00:00:00Z"},
+    }
+    result = enforce_explore_intake(original, session_state)
     assert result["explore_repeat_blocked"] is True
     assert result["workers"] == []
-    assert explore_intake_submitted()
+    assert explore_intake_submitted(session_state)
 
 
 def test_enforce_explore_intake_allows_after_repeat_accepted_and_resubmit(
@@ -80,15 +74,6 @@ def test_enforce_explore_intake_allows_after_repeat_accepted_and_resubmit(
     importlib.reload(config_mod)
     importlib.reload(profile_mod)
 
-    ProfileStore().patch(
-        [
-            {
-                "path": "exploration.intake.submitted_at",
-                "value": "2026-05-31T00:00:00Z",
-                "op": "set",
-            }
-        ]
-    )
     original = {
         "workers": ["identity"],
         "list_type": "pipeline",
@@ -102,6 +87,7 @@ def test_enforce_explore_intake_allows_after_repeat_accepted_and_resubmit(
                 "explore_repeat_baseline_at": "2026-05-30T00:00:00Z",
             }
         },
+        "intake_status": {"submitted_at": "2026-05-31T00:00:00Z"},
     }
     result = enforce_explore_intake(original, session_state)
     assert result["workers"] == original["workers"]

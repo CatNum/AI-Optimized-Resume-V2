@@ -22,7 +22,6 @@ from career_os.harness.pipeline_phase_transition import (
 from career_os.platform.store.task import TaskStore
 from career_os.harness.orchestrator import ChatOrchestrator
 from career_os.harness.session_activity import build_session_activity
-from career_os.platform.store.profile import ProfileStore
 from career_os.platform.store.session import SessionStore
 from career_os.runtime.sse import format_sse, stream_tokens
 
@@ -87,8 +86,7 @@ def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str
             return []
         if gate_name == "explore_repeat":
             flags["explore_repeat_accepted"] = True
-            profile = ProfileStore().get(["exploration"])
-            intake = (profile.get("exploration") or {}).get("intake") or {}
+            intake = session_state.get("intake_status") or {}
             flags["explore_repeat_baseline_at"] = intake.get("submitted_at")
             gates["pending"] = None
             gates["flags"] = flags
@@ -104,7 +102,7 @@ def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str
         if gate_name == "explore_repeat":
             flags["explore_repeat_declined"] = True
             gates["flags"] = flags
-            if explore_intake_submitted():
+            if explore_intake_submitted(session_state):
                 finalize_explore_path_exit(session_state, gates)
                 list_id = session_state.get("list_id")
                 if list_id:

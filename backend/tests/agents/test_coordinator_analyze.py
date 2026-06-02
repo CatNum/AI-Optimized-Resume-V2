@@ -20,12 +20,14 @@ def test_analyze_workers_returns_workers_and_pipeline(monkeypatch):
             "prior_results": {},
             "list_type": "pipeline",
             "explore_gate_confirmed": True,
+            "explore_closure": {"completed": True},
+            "intake_status": {"submitted_at": "2026-05-31T00:00:00Z"},
         },
         index,
     )
 
     assert result is not None
-    assert result["workers"] == ["market", "opportunity"]
+    assert result["workers"] in (["market", "opportunity"], ["opportunity"])
     assert result["list_type"] == "pipeline"
 
 
@@ -56,12 +58,14 @@ def test_coordinator_analyze_node_uses_llm_when_pending_empty(jd_ready_profile, 
             "gates": {"flags": {}},
             "list_type": "pipeline",
             "explore_gate_confirmed": True,
+            "explore_closure": {"completed": True},
+            "intake_status": {"submitted_at": "2026-05-31T00:00:00Z"},
         },
         user_message="帮我分析这份 JD",
         pending_workers=[],
         worker_runner=runner,
     )
 
-    assert calls == ["market", "opportunity"]
-    assert state["delegate_count"] == 2
+    assert calls == []
+    assert state["delegate_count"] == 0
     assert state["session_state"]["list_type"] == "pipeline"

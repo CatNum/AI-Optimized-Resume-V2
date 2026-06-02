@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from career_os.platform.store.profile import ProfileStore
+from career_os.platform.store.session import SessionStore
 
 PROFILE_PATCH_WHITELIST: dict[str, list[str]] = {
     "identity": ["exploration."],
@@ -12,6 +13,8 @@ PROFILE_PATCH_WHITELIST: dict[str, list[str]] = {
     "resume": ["resume.last_optimization_levels"],
     "coordinator": ["career.jd_override"],
 }
+SESSION_ARTIFACT_PREFIXES = ("exploration.", "market.", "strategy.")
+SESSION_STATE_PREFIXES = ("career.jd_override",)
 
 
 @dataclass
@@ -36,6 +39,7 @@ def profile_patch(actor: str, args: dict[str, Any]) -> ProfilePatchError | dict[
     path = args.get("path", "")
     value = args.get("value")
     op = args.get("op", "set")
+    session_id = args.get("session_id")
     if op != "set":
         return ProfilePatchError("profile_patch_rejected", f"Unsupported op {op}")
     if not _path_allowed(actor, path):
@@ -43,9 +47,32 @@ def profile_patch(actor: str, args: dict[str, Any]) -> ProfilePatchError | dict[
             "profile_patch_rejected",
             f"Actor {actor} cannot patch {path}",
         )
-    store = ProfileStore()
-    store.patch([{"path": path, "value": value, "op": "set"}])
-    return {"ok": True, "path": path}
+    if path.startswith(SESSION_ARTIFACT_PREFIXES):
+        if not session_id:
+            return ProfilePatchError(
+                "profile_patch_rejected",
+                f"Session scoped patch requires session_id: {path}",
+            )
+        SessionStore().patch_artifacts(
+            session_id, [{"path": path, "value": value, "op": "set"}]
+        )
+        return {"ok": True, "path": path, "scope": "session_artifacts"}
+    if path in SESSION_STATE_PREFIXES:
+        if not session_id:
+            return ProfilePatchError(
+                "profile_patch_rejected",
+                f"Session scoped patch requires session_id: {path}",
+            )
+        state = SessionStore().get_state(session_id)
+        if path == "career.jd_override":
+            state["jd_override"] = value
+        SessionStore().update_state(session_id, state)
+        return {"ok": True, "path": path, "scope": "session_state"}
+    try:
+        ProfileStore().patch([{"path": path, "value": value, "op": "set"}])
+    except ValueError as exc:
+        return ProfilePatchError("profile_path_forbidden", str(exc))
+    return {"ok": True, "path": path, "scope": "profile"}
 
 
 def apply_proposed_patches(
@@ -73,7 +100,10 @@ def apply_proposed_patches(
         else:
             valid.append({"path": path, "value": patch.get("value"), "op": "set"})
     if valid:
-        store.patch(valid)
+        try:
+            store.patch(valid)
+        except ValueError as exc:
+            return ProfilePatchError("profile_path_forbidden", str(exc))
     return {"ok": True, "applied": len(valid)}
 
 

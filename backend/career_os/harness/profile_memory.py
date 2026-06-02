@@ -9,6 +9,7 @@ from career_os.harness.micro_classifier import classify
 from career_os.harness.micro_classifier_rules import match_profile_memory_rules
 from career_os.harness.pipeline_routing import get_current_phase
 from career_os.platform.store.profile import ProfileStore
+from career_os.platform.store.session import SessionStore
 
 # Logical section id -> ProfileStore.get path prefixes
 SECTION_PATHS: dict[str, tuple[str, ...]] = {
@@ -82,10 +83,15 @@ def resolve_profile_memory_sections(
     return [s for s in order if s in found]
 
 
-def _resume_payload(profile: dict[str, Any], *, full_text: bool) -> dict[str, Any]:
+def _resume_payload(
+    profile: dict[str, Any],
+    *,
+    full_text: bool,
+    intake_override: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     resume = profile.get("resume") or {}
     exploration = profile.get("exploration") or {}
-    intake = exploration.get("intake") or {}
+    intake = intake_override or exploration.get("intake") or {}
     source = (resume.get("source_text") or intake.get("resume_text") or "").strip()
     basic = profile.get("basic") or {}
     intent = profile.get("intent") or {}
@@ -112,10 +118,53 @@ def _resume_payload(profile: dict[str, Any], *, full_text: bool) -> dict[str, An
     return out
 
 
+def _session_artifact_memory(session_state: dict[str, Any] | None) -> dict[str, Any]:
+    state = session_state or {}
+    prior = state.get("prior_results") or {}
+    artifacts: dict[str, Any] = {}
+    session_id = state.get("session_id")
+    if session_id:
+        artifacts = SessionStore().get_artifacts(session_id)
+    ref_artifacts: list[dict[str, Any]] = []
+    for ref in state.get("artifact_refs") or []:
+        if isinstance(ref, str):
+            ref_artifacts.append(SessionStore().get_artifacts(ref))
+    out: dict[str, Any] = {}
+    if isinstance(artifacts.get("market"), dict) and artifacts.get("market"):
+        out["market"] = artifacts.get("market") or {}
+    elif isinstance(prior.get("market"), dict):
+        out["market"] = prior.get("market") or {}
+    if isinstance(artifacts.get("strategy"), dict) and artifacts.get("strategy"):
+        out["strategy"] = artifacts.get("strategy") or {}
+    elif isinstance(prior.get("strategy"), dict):
+        out["strategy"] = prior.get("strategy") or {}
+    exploration: dict[str, Any] = {}
+    for key in ("identity", "capability"):
+        blob = (artifacts.get("exploration") or {}).get(key)
+        if isinstance(blob, dict):
+            exploration[key] = blob
+    for worker_id in ("identity", "capability"):
+        blob = prior.get(worker_id)
+        if isinstance(blob, dict):
+            exploration[worker_id] = blob
+    if exploration:
+        out["exploration"] = exploration
+    # Explicit references only; do not auto-load historical sessions.
+    for ref_blob in ref_artifacts:
+        if not out.get("market") and isinstance(ref_blob.get("market"), dict):
+            out["market"] = ref_blob.get("market") or {}
+        if not out.get("strategy") and isinstance(ref_blob.get("strategy"), dict):
+            out["strategy"] = ref_blob.get("strategy") or {}
+        if not out.get("exploration") and isinstance(ref_blob.get("exploration"), dict):
+            out["exploration"] = ref_blob.get("exploration") or {}
+    return out
+
+
 def materialize_profile_memory(
     sections: list[str],
     *,
     full_resume_text: bool = False,
+    session_state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if not sections:
         return {}
@@ -126,19 +175,30 @@ def materialize_profile_memory(
     profile = ProfileStore().get(paths)
 
     memory: dict[str, Any] = {"sections_loaded": sections}
+    session_memory = _session_artifact_memory(session_state)
     if "resume" in sections:
-        memory["resume"] = _resume_payload(profile, full_text=full_resume_text)
+        intake_override = (
+            (session_state or {}).get("intake_status")
+            if isinstance((session_state or {}).get("intake_status"), dict)
+            else None
+        )
+        memory["resume"] = _resume_payload(
+            profile, full_text=full_resume_text, intake_override=intake_override
+        )
     if "basic_intent" in sections:
         memory["basic"] = profile.get("basic") or {}
         memory["intent"] = profile.get("intent") or {}
     if "exploration" in sections:
-        exploration = dict(profile.get("exploration") or {})
-        exploration.pop("intake", None)
-        memory["exploration"] = exploration
+        if session_memory.get("exploration"):
+            memory["exploration"] = session_memory["exploration"]
+        else:
+            exploration = dict(profile.get("exploration") or {})
+            exploration.pop("intake", None)
+            memory["exploration"] = exploration
     if "market" in sections:
-        memory["market"] = profile.get("market") or {}
+        memory["market"] = session_memory.get("market") or {}
     if "strategy" in sections:
-        memory["strategy"] = profile.get("strategy") or {}
+        memory["strategy"] = session_memory.get("strategy") or {}
     if "capability" in sections:
         memory["capability"] = profile.get("capability") or {}
     return memory
@@ -155,7 +215,9 @@ def attach_profile_memory_to_context(
         user_message, session_state, worker_id=worker_id
     )
     full_resume = bool(worker_id and worker_id in WORKERS_REQUIRE_RESUME)
-    memory = materialize_profile_memory(sections, full_resume_text=full_resume)
+    memory = materialize_profile_memory(
+        sections, full_resume_text=full_resume, session_state=session_state
+    )
     if memory:
         context["profile_memory"] = memory
         context["profile_memory_sections"] = sections
@@ -199,7 +261,9 @@ def build_profile_aware_chat_draft(
     from career_os.agents.lc.coordinator_llm import chat_only_synthesis_draft
 
     sections = resolve_profile_memory_sections(user_message, session_state)
-    memory = materialize_profile_memory(sections, full_resume_text=False)
+    memory = materialize_profile_memory(
+        sections, full_resume_text=False, session_state=session_state
+    )
     base = chat_only_synthesis_draft(session_state)
     facts = format_profile_memory_for_draft(memory)
     return (

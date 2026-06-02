@@ -16,7 +16,14 @@ def test_delegate_includes_capability_bundle(harness, jd_ready_profile):
         "coordinator",
         "strategy",
         "制定 JD 投递策略",
-        {"session_id": "s1", "prior_results": {}, "gates": {"flags": {}}},
+        {
+            "session_id": "s1",
+            "prior_results": {},
+            "gates": {"flags": {}},
+            "list_type": "pipeline",
+            "explore_gate_confirmed": True,
+            "explore_closure": {"completed": True},
+        },
         context={"list_type": "jd"},
         session_id="s1",
     )

@@ -30,7 +30,10 @@ def test_golden_jd_to_html_structure(harness):
     runner = build_harness_worker_runner(harness)
     session_state = {
         "session_id": "sess_golden",
-        "list_type": "jd",
+        "list_type": "pipeline",
+        "explore_gate_confirmed": True,
+        "explore_closure": {"completed": True},
+        "intake_status": {"submitted_at": "2026-05-31T00:00:00Z"},
         "prior_results": {},
         "gates": {"flags": {"optimize_confirmed": True}},
     }

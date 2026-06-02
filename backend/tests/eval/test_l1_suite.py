@@ -35,7 +35,7 @@ def test_jd_r1_blocks_opportunity(harness, jd_ready_profile):
         {"list_type": "jd", "prior_results": {}, "gates": {"flags": {}}},
     )
     assert err.code == "delegate_blocked"
-    assert "JD-R1" in err.message
+    assert "JD-B1" in err.message
 
 
 @pytest.mark.no_llm

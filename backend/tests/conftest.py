@@ -1,4 +1,5 @@
 import importlib
+import json
 
 from typing import Any
 
@@ -25,23 +26,46 @@ def seed_explore_intake_profile(store: ProfileStore | None = None) -> ProfileSto
     )
     profile.patch(
         [
-            {
-                "path": "exploration.intake.submitted_at",
-                "value": "2026-05-31T00:00:00Z",
-                "op": "set",
-            },
-            {"path": "exploration.intake.resume_text", "value": resume, "op": "set"},
-            {"path": "exploration.intake.pending_fields", "value": [], "op": "set"},
-            {"path": "exploration.intake.resolved_fields", "value": {
-                "years_of_experience": "5年",
-                "current_salary": "30K",
-                "target_salary": "35万",
-                "target_role": "后端工程师",
-            }, "op": "set"},
             {"path": "resume.source_text", "value": resume, "op": "set"},
             {"path": "basic.name", "value": "测试", "op": "set"},
+            {"path": "basic.years_of_experience", "value": "5年", "op": "set"},
+            {"path": "intent.current_salary", "value": "30K", "op": "set"},
+            {"path": "intent.target_salary", "value": "35万", "op": "set"},
+            {"path": "intent.target_role", "value": "后端工程师", "op": "set"},
         ]
     )
+    # Legacy compatibility for tests still reading global exploration intake.
+    raw = profile.get(
+        [
+            "meta",
+            "basic",
+            "skills",
+            "intent",
+            "constraints",
+            "exploration",
+            "career",
+            "capability",
+            "market",
+            "strategy",
+            "resume",
+            "preference_tags",
+            "outputs_index",
+        ]
+    )
+    exploration = dict(raw.get("exploration") or {})
+    exploration["intake"] = {
+        "submitted_at": "2026-05-31T00:00:00Z",
+        "resume_text": resume,
+        "pending_fields": [],
+        "resolved_fields": {
+            "years_of_experience": "5年",
+            "current_salary": "30K",
+            "target_salary": "35万",
+            "target_role": "后端工程师",
+        },
+    }
+    raw["exploration"] = exploration
+    profile._profile_path.write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
     return profile
 
 
@@ -50,9 +74,29 @@ def seed_jd_ready_profile(store: ProfileStore | None = None) -> ProfileStore:
     profile.patch(
         [
             {"path": "basic.name", "value": "测试", "op": "set"},
-            {"path": "exploration.completed_at", "value": "2026-05-31T00:00:00Z", "op": "set"},
         ]
     )
+    raw = profile.get(
+        [
+            "meta",
+            "basic",
+            "skills",
+            "intent",
+            "constraints",
+            "exploration",
+            "career",
+            "capability",
+            "market",
+            "strategy",
+            "resume",
+            "preference_tags",
+            "outputs_index",
+        ]
+    )
+    exploration = dict(raw.get("exploration") or {})
+    exploration["completed_at"] = "2026-05-31T00:00:00Z"
+    raw["exploration"] = exploration
+    profile._profile_path.write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
     return profile
 
 

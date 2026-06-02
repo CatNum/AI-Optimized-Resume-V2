@@ -7,6 +7,17 @@ from typing import Any
 from career_os.config import settings
 
 _lock = threading.Lock()
+_FORBIDDEN_PREFIXES = ("exploration.", "market.", "strategy.", "career.jd_override")
+_ALLOWED_PREFIXES = (
+    "basic.",
+    "skills.",
+    "intent.",
+    "constraints.",
+    "capability.",
+    "resume.source_",
+    "resume.experience_bank.",
+    "preference_tags.",
+)
 
 # 空档案骨架：仅结构，无业务默认值；不复制 profile.example.json
 EMPTY_PROFILE: dict[str, Any] = {
@@ -99,8 +110,39 @@ class ProfileStore:
             for patch in patches:
                 if patch.get("op") != "set":
                     continue
-                _set_by_path(data, patch["path"], patch["value"])
+                path = str(patch["path"])
+                value = patch["value"]
+                _validate_patch_path(path, value)
+                _set_by_path(data, path, value)
             self._save(data)
+
+
+def _validate_patch_path(path: str, value: Any) -> None:
+    if path == "outputs_index":
+        _validate_outputs_index(value)
+        return
+    if path.startswith(_FORBIDDEN_PREFIXES):
+        raise ValueError(f"profile_path_forbidden:{path}")
+    if path.startswith(_ALLOWED_PREFIXES):
+        return
+    # Allow exact roots for limited updates.
+    if path in {"basic", "skills", "intent", "constraints", "capability", "preference_tags"}:
+        return
+    if path in {"resume.source_text", "resume.source_path"}:
+        return
+    if path.startswith("resume.experience_bank"):
+        return
+    raise ValueError(f"profile_path_forbidden:{path}")
+
+
+def _validate_outputs_index(value: Any) -> None:
+    if not isinstance(value, list):
+        raise ValueError("profile_path_forbidden:outputs_index")
+    for idx, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise ValueError(f"profile_path_forbidden:outputs_index[{idx}]")
+        if not str(item.get("session_id") or "").strip():
+            raise ValueError(f"profile_path_forbidden:outputs_index[{idx}].session_id")
 
 
 def _get_by_path(data: dict[str, Any], path: str) -> Any:

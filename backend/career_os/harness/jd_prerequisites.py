@@ -22,18 +22,18 @@ def _onboarding_complete(profile: dict[str, Any]) -> bool:
 
 
 def _explore_completed(profile: dict[str, Any], session_state: dict[str, Any]) -> bool:
+    _ = profile
+    if session_state.get("explore_completed_at"):
+        return True
     if is_explore_gate_confirmed(session_state):
         return True
     explore = session_state.get("explore_closure") or {}
-    if explore.get("completed"):
-        return True
-    exploration = profile.get("exploration") or {}
-    return bool(exploration.get("completed_at"))
+    return bool(explore.get("completed"))
 
 
 def check_jd_prerequisites(session_state: dict[str, Any]) -> tuple[bool, str | None]:
     """Return (ready, block_reason). block_reason is onboarding | explore."""
-    profile = ProfileStore().get(["basic", "exploration", "capability"])
+    profile = ProfileStore().get(["basic", "capability"])
     if not _onboarding_complete(profile):
         return False, "onboarding"
     if not _explore_completed(profile, session_state):
@@ -67,7 +67,7 @@ def parse_jd_b1_block_reason(message: str) -> str | None:
 
 
 def jd_prerequisites_payload(session_state: dict[str, Any]) -> dict[str, Any]:
-    profile = ProfileStore().get(["basic", "exploration"])
+    profile = ProfileStore().get(["basic"])
     ready, reason = check_jd_prerequisites(session_state)
     return {
         "jd_prerequisites_met": ready,

@@ -5,7 +5,7 @@ from typing import Any
 
 from career_os.harness.explore_closure import PHASE_SEGMENT_COMPLETE, explore_phase_status
 from career_os.harness.pipeline_gates import set_explore_gate_confirmed
-from career_os.platform.store.profile import ProfileStore
+from career_os.platform.store.session import SessionStore
 from career_os.platform.store.task import TaskStore, TaskStoreError
 
 WORKER_SEGMENT_PHASE: dict[str, str] = {
@@ -60,16 +60,15 @@ def finalize_explore_path_exit(
     gates["flags"] = flags
     session_state["gates"] = gates
 
-    profile = ProfileStore().get(["exploration", "basic", "intent", "resume"])
-    exploration = dict(profile.get("exploration") or {})
-    intake = exploration.get("intake") or {}
-    completed_at = exploration.get("completed_at") or datetime.now(UTC).isoformat()
-    ProfileStore().patch(
-        [
-            {"path": "exploration.intake_baseline", "value": dict(intake), "op": "set"},
-            {"path": "exploration.completed_at", "value": completed_at, "op": "set"},
-        ]
-    )
+    completed_at = datetime.now(UTC).isoformat()
+    session_id = session_state.get("session_id")
+    if session_id:
+        SessionStore().update_state(
+            session_id,
+            {
+                "explore_completed_at": completed_at,
+            },
+        )
 
 
 def on_explore_complete_confirmed(list_id: str) -> str:

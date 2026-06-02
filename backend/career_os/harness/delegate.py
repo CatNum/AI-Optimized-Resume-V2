@@ -113,7 +113,7 @@ def delegate_worker(
     from career_os.harness.pipeline_routing import is_pipeline_explore_phase
 
     if worker_id in {"identity", "capability"} and is_pipeline_explore_phase(session_state):
-        merged_context.update(worker_context_from_intake())
+        merged_context.update(worker_context_from_intake(session_state))
 
     return {
         "worker_id": worker_id,

@@ -64,7 +64,13 @@ def test_delegate_worker_writes_agent_run_start(traced_harness, jd_ready_profile
         "coordinator",
         "market",
         "research market",
-        {"list_type": "jd", "prior_results": {}, "gates": {"flags": {}}},
+        {
+            "list_type": "pipeline",
+            "explore_gate_confirmed": True,
+            "explore_closure": {"completed": True},
+            "prior_results": {},
+            "gates": {"flags": {}},
+        },
         session_id="sess_delegate",
     )
     events = writer.read_events()

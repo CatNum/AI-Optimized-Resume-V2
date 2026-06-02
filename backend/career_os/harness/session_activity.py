@@ -71,7 +71,7 @@ def build_session_activity(session_state: dict[str, Any]) -> dict[str, Any]:
     if session_state.get("explore_intake_blocked") or (
         is_pipeline_session(session_state)
         and get_current_phase(session_state) == "explore"
-        and not explore_intake_submitted()
+        and not explore_intake_submitted(session_state)
     ):
         items.append(
             {

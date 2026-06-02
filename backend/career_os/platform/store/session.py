@@ -18,6 +18,15 @@ _DEFAULT_STATE: dict[str, Any] = {
     "messages_meta": {},
     "gates": {},
 }
+_DEFAULT_ARTIFACTS: dict[str, Any] = {
+    "version": 1,
+    "session_id": None,
+    "exploration": {},
+    "market": {},
+    "opportunity": {},
+    "strategy": {},
+    "resume_outputs": [],
+}
 
 _INDEX_VERSION = 1
 _DEFAULT_TITLE = "未命名会话"
@@ -59,6 +68,16 @@ def slice_synthesize_chat_history(
     return [messages[-1]]
 
 
+def _set_by_path(data: dict[str, Any], path: str, value: Any) -> None:
+    keys = path.split(".")
+    current: Any = data
+    for key in keys[:-1]:
+        if key not in current or not isinstance(current[key], dict):
+            current[key] = {}
+        current = current[key]
+    current[keys[-1]] = value
+
+
 class SessionStore:
     def __init__(self) -> None:
         self._data_dir = Path(settings.data_dir)
@@ -73,6 +92,9 @@ class SessionStore:
 
     def _state_path(self, session_id: str) -> Path:
         return self._session_dir(session_id) / "state.json"
+
+    def _artifacts_path(self, session_id: str) -> Path:
+        return self._session_dir(session_id) / "artifacts.json"
 
     def _index_path(self) -> Path:
         return self._sessions_dir / "_index.json"
@@ -164,6 +186,9 @@ class SessionStore:
             }
             self._write_state_unlocked(session_id, state)
             self._write_messages_unlocked(session_id, [])
+            self._write_artifacts_unlocked(
+                session_id, {**_DEFAULT_ARTIFACTS, "session_id": session_id}
+            )
             self._touch_index_unlocked(session_id)
         return session_id
 
@@ -221,6 +246,19 @@ class SessionStore:
             if "list_type" in patch and patch.get("list_type") != old_list_type:
                 self._touch_index_unlocked(session_id)
 
+    def get_artifacts(self, session_id: str) -> dict[str, Any]:
+        with _lock:
+            return self._read_artifacts_unlocked(session_id)
+
+    def patch_artifacts(self, session_id: str, patches: list[dict[str, Any]]) -> None:
+        with _lock:
+            artifacts = self._read_artifacts_unlocked(session_id)
+            for patch in patches:
+                if patch.get("op") != "set":
+                    continue
+                _set_by_path(artifacts, patch["path"], patch.get("value"))
+            self._write_artifacts_unlocked(session_id, artifacts)
+
     def delete_session(self, session_id: str) -> None:
         with _lock:
             session_dir = self._session_dir(session_id)
@@ -253,6 +291,9 @@ class SessionStore:
             session_dir.mkdir(parents=True, exist_ok=True)
             self._write_state_unlocked(session_id, state)
             self._write_messages_unlocked(session_id, [])
+            self._write_artifacts_unlocked(
+                session_id, {**_DEFAULT_ARTIFACTS, "session_id": session_id}
+            )
 
     @staticmethod
     def _estimate_tokens(messages: list[dict[str, str]]) -> int:
@@ -286,11 +327,30 @@ class SessionStore:
         with path.open(encoding="utf-8") as f:
             return json.load(f)
 
+    def _read_artifacts_unlocked(self, session_id: str) -> dict[str, Any]:
+        path = self._artifacts_path(session_id)
+        if not path.exists():
+            return {**_DEFAULT_ARTIFACTS, "session_id": session_id}
+        with path.open(encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return {**_DEFAULT_ARTIFACTS, "session_id": session_id}
+        out = {**_DEFAULT_ARTIFACTS, **data}
+        out["session_id"] = session_id
+        return out
+
     def _write_state_unlocked(self, session_id: str, state: dict[str, Any]) -> None:
         path = self._state_path(session_id)
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", encoding="utf-8") as f:
             json.dump(state, f, ensure_ascii=False, indent=2)
+
+    def _write_artifacts_unlocked(self, session_id: str, artifacts: dict[str, Any]) -> None:
+        path = self._artifacts_path(session_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {**_DEFAULT_ARTIFACTS, **artifacts, "session_id": session_id}
+        with path.open("w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
 
     def _read_index_unlocked(self) -> dict[str, Any]:
         path = self._index_path()
