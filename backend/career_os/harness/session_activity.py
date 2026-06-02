@@ -22,11 +22,17 @@ LIST_TYPE_LABELS = {
 
 
 def explore_flow_active(session_state: dict[str, Any]) -> bool:
+    from career_os.harness.pipeline_gates import is_explore_gate_confirmed
     from career_os.harness.pipeline_routing import is_pipeline_explore_phase
 
     if not is_pipeline_explore_phase(session_state):
         return False
     if session_state.get("explore_intake_blocked"):
+        return False
+    if is_explore_gate_confirmed(session_state):
+        return False
+    flags = (session_state.get("gates") or {}).get("flags") or {}
+    if flags.get("explore_repeat_declined"):
         return False
     closure = session_state.get("explore_closure") or {}
     if not closure:

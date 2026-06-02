@@ -1,5 +1,4 @@
 import json
-from datetime import UTC, datetime
 from typing import Any, AsyncIterator
 
 from fastapi import APIRouter, HTTPException
@@ -14,10 +13,11 @@ from career_os.agents.lc.coordinator_llm import build_synthesis_messages
 from career_os.harness.executor import Harness
 from career_os.harness.explore_intake import explore_intake_submitted
 from career_os.harness.gate import match_gate_intent
-from career_os.harness.pipeline_gates import (
-    PipelineGateError,
-    advance_current_phase,
-    set_explore_gate_confirmed,
+from career_os.harness.pipeline_gates import PipelineGateError, advance_current_phase
+from career_os.harness.pipeline_phase_transition import (
+    finalize_explore_path_exit,
+    on_explore_complete_confirmed,
+    on_explore_repeat_declined,
 )
 from career_os.platform.store.task import TaskStore
 from career_os.harness.orchestrator import ChatOrchestrator
@@ -79,30 +79,11 @@ def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str
             session_state["gates"] = gates
             return []
         if gate_name == "explore_complete":
-            explore = dict(session_state.get("explore_closure") or {})
-            explore["gate_pending"] = False
-            explore["completed"] = True
-            session_state["explore_closure"] = explore
-            set_explore_gate_confirmed(session_state, True)
-            flags["fresh_pass"] = True
-            gates["flags"] = flags
-            session_state["gates"] = gates
-            profile = ProfileStore().get(["exploration", "basic", "intent", "resume"])
-            exploration = dict(profile.get("exploration") or {})
-            intake = exploration.get("intake") or {}
-            exploration["intake_baseline"] = dict(intake)
-            exploration["completed_at"] = exploration.get("completed_at") or datetime.now(
-                UTC
-            ).isoformat()
-            ProfileStore().patch(
-                [
-                    {"path": "exploration.intake_baseline", "value": dict(intake), "op": "set"},
-                    {"path": "exploration.completed_at", "value": exploration["completed_at"], "op": "set"},
-                ]
-            )
+            finalize_explore_path_exit(session_state, gates)
             list_id = session_state.get("list_id")
             if list_id:
                 TaskStore().clear_works_for_phase(list_id, "explore")
+                on_explore_complete_confirmed(list_id)
             return []
         if gate_name == "explore_repeat":
             flags["explore_repeat_accepted"] = True
@@ -122,10 +103,15 @@ def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str
         gates["pending"] = None
         if gate_name == "explore_repeat":
             flags["explore_repeat_declined"] = True
-            if explore_intake_submitted():
-                set_explore_gate_confirmed(session_state, True)
             gates["flags"] = flags
-        session_state["gates"] = gates
+            if explore_intake_submitted():
+                finalize_explore_path_exit(session_state, gates)
+                list_id = session_state.get("list_id")
+                if list_id:
+                    prior = session_state.get("prior_results") or {}
+                    TaskStore().clear_works_for_phase(list_id, "explore")
+                    on_explore_repeat_declined(list_id, prior)
+            session_state["gates"] = gates
         return []
 
     if pending and not match.get("matched"):

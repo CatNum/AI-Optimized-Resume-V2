@@ -140,21 +140,20 @@ def enforce_pipeline_phase_rules(
     inferred_phase = result.get("pipeline_phase") or infer_pipeline_phase_from_workers(
         result.get("workers") or [], session_state
     )
-    phase = (
-        inferred_phase
-        if inferred_phase in PIPELINE_PHASES
-        else current_phase
+    pipeline_phase = (
+        inferred_phase if inferred_phase in PIPELINE_PHASES else current_phase
     )
+    requested_workers = list(result.get("workers") or [])
     workers = filter_workers_for_pipeline(
-        result.get("workers") or [], session_state, phase=current_phase
+        requested_workers, session_state, phase=current_phase
     )
     out: dict[str, Any] = {
         "workers": workers,
         "list_type": "pipeline",
-        "pipeline_phase": phase,
+        "pipeline_phase": pipeline_phase,
     }
 
-    if phase in JD_PHASES and workers:
+    if current_phase in JD_PHASES and workers:
         ready, reason = check_jd_prerequisites(session_state)
         if not ready:
             return {
@@ -162,23 +161,28 @@ def enforce_pipeline_phase_rules(
                 "list_type": "pipeline",
                 "jd_prerequisite_blocked": True,
                 "jd_block_reason": reason or "explore",
+                "pipeline_phase": pipeline_phase,
             }
 
-    if phase == "resume_optimize":
+    if current_phase == "resume_optimize":
         flags = (session_state.get("gates") or {}).get("flags") or {}
         if not flags.get("optimize_confirmed"):
-            return {"workers": [], "list_type": "pipeline", "pipeline_phase": phase}
+            return {
+                "workers": [],
+                "list_type": "pipeline",
+                "pipeline_phase": pipeline_phase,
+            }
 
     if (
-        phase != "explore"
+        pipeline_phase != "explore"
         and current_phase == "explore"
         and not is_explore_gate_confirmed(session_state)
-        and workers
+        and (workers or requested_workers)
     ):
         return {
             "workers": [],
             "list_type": "pipeline",
-            "pipeline_phase": phase,
+            "pipeline_phase": pipeline_phase,
             "explore_gate_required": True,
         }
 

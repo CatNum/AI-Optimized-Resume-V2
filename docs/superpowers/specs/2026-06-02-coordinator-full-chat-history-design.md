@@ -6,7 +6,7 @@
 | 版本 | **0.4.1** |
 | 日期 | 2026-06-02 |
 | 适用范围 | `SessionStore`、`micro_classifier`、`POST /v1/chat`、协调者、Worker ReAct、架构文档 |
-| 关联 | [10-会话闸门与state.md](../../architecture/10-会话闸门与state.md) §1.5、[gate-intent spec](./2026-06-01-gate-intent-llm-fallback-design.md) |
+| 关联 | [10-会话闸门与state.md](../../architecture/10-会话闸门与state.md) §1.5、[gate-intent spec](./2026-06-01-gate-intent-llm-fallback-design.md)、[profile-long-term-memory spec](./2026-06-02-profile-long-term-memory-design.md) |
 
 ---
 

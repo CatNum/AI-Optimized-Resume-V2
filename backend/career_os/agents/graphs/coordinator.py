@@ -15,7 +15,15 @@ from career_os.agents.lc.coordinator_llm import (
 from career_os.agents.state.coordinator import CoordinatorState
 from career_os.config import settings
 from career_os.harness.chat_history_scope import select_worker_chat_history
+from career_os.harness.profile_memory import (
+    attach_profile_memory_to_context,
+    build_profile_aware_chat_draft,
+)
 from career_os.platform.store.session import slice_chat_rounds
+from career_os.harness.pipeline_phase_transition import (
+    apply_list_phase,
+    phase_after_worker_segment_complete,
+)
 from career_os.harness.explore_closure import (
     EXPLORE_WORKERS,
     can_set_explore_gate_pending,
@@ -267,6 +275,12 @@ def build_coordinator_graph(
             "chat_history_scope": scope_label,
             "messages_meta": state.get("messages_meta") or {},
         }
+        attach_profile_memory_to_context(
+            delegate_context,
+            state.get("user_message", ""),
+            session_state,
+            worker_id=worker_id,
+        )
         result = harness.delegate_worker(
             "coordinator",
             worker_id,
@@ -309,6 +323,16 @@ def build_coordinator_graph(
             structured_output=structured,
         )
         session_state["explore_closure"] = explore_closure
+
+        if worker_result.get("status") == "completed":
+            list_id = session_state.get("list_id")
+            if list_id:
+                advanced = phase_after_worker_segment_complete(
+                    worker_id, structured
+                )
+                if advanced:
+                    apply_list_phase(list_id, advanced)
+                    session_state["pipeline_phase"] = advanced
 
         stop_delegate = bool(gate_prompt)
         if (
@@ -416,7 +440,9 @@ def build_coordinator_graph(
                 if explore_flow_active(session_state):
                     text = explore_continue_synthesis_draft(session_state)
                 else:
-                    text = chat_only_synthesis_draft()
+                    text = build_profile_aware_chat_draft(
+                        state.get("user_message", ""), session_state
+                    )
             elif worker_id := (last.get("worker_id") or state.get("current_worker_id")):
                 if supports_explore_guidance(worker_id) and structured:
                     text = build_explore_guidance_synthesis_draft(structured, session_state)
@@ -426,7 +452,9 @@ def build_coordinator_graph(
                 text = structured.get("user_visible_summary") or "已完成本轮处理。"
 
         if text is None:
-            text = chat_only_synthesis_draft()
+            text = build_profile_aware_chat_draft(
+                state.get("user_message", ""), session_state
+            )
 
         return {
             **state,

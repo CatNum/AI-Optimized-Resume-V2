@@ -10,11 +10,14 @@ from career_os.agents.lc.client import invoke_json, llm_enabled
 from career_os.agents.lc.models import LLMRole
 from career_os.config import settings
 from career_os.harness.gate_rules import is_rule_clear_hit, match_gate_intent_rules
-from career_os.harness.micro_classifier_rules import match_history_scope_rules
+from career_os.harness.micro_classifier_rules import (
+    match_history_scope_rules,
+    match_profile_memory_rules,
+)
 from career_os.platform.prompt.loader import load_gate_intent_prompt, load_micro_classifier_prompt
 
 _LLM_TIMEOUT_S = 3.0
-_TASKS = frozenset({"gate_intent", "history_scope"})
+_TASKS = frozenset({"gate_intent", "history_scope", "profile_memory_scope"})
 
 
 def classify(
@@ -27,7 +30,9 @@ def classify(
     context = context or {}
     if task == "gate_intent":
         return _classify_gate_intent(user_message, context)
-    return _classify_history_scope(user_message)
+    if task == "history_scope":
+        return _classify_history_scope(user_message)
+    return _classify_profile_memory_scope(user_message, context)
 
 
 def _classify_gate_intent(user_message: str, context: dict[str, Any]) -> dict[str, Any]:
@@ -120,6 +125,55 @@ def _classify_history_scope(user_message: str) -> dict[str, Any]:
         "confidence": confidence,
         "source": "llm",
         "reason": reason,
+    }
+
+
+def _classify_profile_memory_scope(
+    user_message: str,
+    context: dict[str, Any],
+) -> dict[str, Any]:
+    rule_sections = match_profile_memory_rules(user_message)
+    if rule_sections:
+        return {
+            "sections": sorted(rule_sections),
+            "confidence": 0.95,
+            "source": "rule",
+            "reason": "keyword_match",
+        }
+    if not llm_enabled():
+        return {"sections": [], "confidence": 0.0, "source": "none"}
+    payload = {
+        "user_message": user_message,
+        "current_phase": context.get("current_phase"),
+        "worker_id": context.get("worker_id"),
+        "list_type": context.get("list_type"),
+    }
+    data = _invoke_task(
+        "profile_memory_scope",
+        load_micro_classifier_prompt("profile_memory_scope"),
+        payload,
+    )
+    if not data:
+        return {"sections": [], "confidence": 0.0, "source": "llm"}
+    sections = [
+        s for s in (data.get("sections") or []) if isinstance(s, str) and s in {
+            "resume",
+            "basic_intent",
+            "exploration",
+            "market",
+            "strategy",
+            "capability",
+        }
+    ]
+    confidence = float(data.get("confidence") or 0.0)
+    threshold = settings.history_scope_llm_accept_threshold
+    if confidence < threshold:
+        sections = []
+    return {
+        "sections": sections,
+        "confidence": confidence,
+        "source": "llm",
+        "reason": (data.get("reason") or "")[:120] or None,
     }
 
 

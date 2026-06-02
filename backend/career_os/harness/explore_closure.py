@@ -67,9 +67,15 @@ def plan_explore_worker_dispatch(
 
 
 def explore_continuation_analyze(session_state: dict[str, Any]) -> dict[str, Any] | None:
+    from career_os.harness.pipeline_gates import is_explore_gate_confirmed
     from career_os.harness.pipeline_routing import get_current_phase, is_pipeline_explore_phase
 
     if not is_pipeline_explore_phase(session_state):
+        return None
+    if is_explore_gate_confirmed(session_state):
+        return None
+    flags = (session_state.get("gates") or {}).get("flags") or {}
+    if flags.get("explore_repeat_declined"):
         return None
     closure = session_state.get("explore_closure") or {}
     if closure.get("completed"):

@@ -29,6 +29,10 @@ from career_os.harness.explore_guidance import (
     sanitize_structured_for_synthesis,
 )
 from career_os.harness.explore_intake import enforce_explore_intake, explore_intake_payload
+from career_os.harness.profile_memory import (
+    materialize_profile_memory,
+    resolve_profile_memory_sections,
+)
 from career_os.platform.prompt.loader import load_coordinator_prompt
 
 EXPLORE_WORKERS = frozenset({"identity", "capability"})
@@ -56,8 +60,22 @@ def _coordinator_system() -> str:
     return load_coordinator_prompt().system
 
 
-def chat_only_synthesis_draft() -> str:
-    return load_coordinator_prompt().chat_only_draft
+def chat_only_synthesis_draft(session_state: dict[str, Any] | None = None) -> str:
+    base = load_coordinator_prompt().chat_only_draft
+    if not session_state or session_state.get("list_type") != "pipeline":
+        return base
+    from career_os.harness.session_activity import build_session_activity
+
+    activity = build_session_activity(session_state)
+    headline = activity.get("headline") or ""
+    payload = pipeline_analyze_payload(session_state)
+    phase = payload.get("current_phase") or "explore"
+    return (
+        f"{base}\n\n"
+        f"【pipeline 阶段 SSOT】current_phase={phase}；{headline}。"
+        "用户若询问「当前在什么阶段/进行什么」，必须按 SSOT 回答，"
+        "不得声称仍在职业初探，除非 current_phase 为 explore。"
+    )
 
 
 def jd_prerequisites_draft(reason: str | None) -> str:
@@ -341,6 +359,12 @@ def analyze_workers(
         **jd_prerequisites_payload(session_state),
         **explore_intake_payload(),
     }
+    memory_sections = resolve_profile_memory_sections(user_message, session_state)
+    if memory_sections:
+        analyze_payload["profile_memory_sections"] = memory_sections
+        analyze_payload["profile_memory"] = materialize_profile_memory(
+            memory_sections, full_resume_text=False
+        )
     if session_state.get("list_type") == "pipeline":
         analyze_payload.update(pipeline_analyze_payload(session_state))
     user = json.dumps(analyze_payload, ensure_ascii=False)
@@ -391,31 +415,34 @@ def build_synthesis_messages(
             "（对话已超过建议上下文上限，请在回复末尾简短建议用户"
             " POST /v1/sessions/new 开新会话；档案与产物保留。）"
         )
-    user = json.dumps(
-        {
-            "node": "synthesize",
-            "synthesis_voice": (
-                "你是职业规划助手，对用户用第一人称「我」直接回复；"
-                "draft 是内部提纲，融入正文后勿出现「系统提示」「系统需要」等措辞。"
-                + over_limit_hint
+    payload: dict[str, Any] = {
+        "node": "synthesize",
+        "synthesis_voice": (
+            "你是职业规划助手，对用户用第一人称「我」直接回复；"
+            "draft 是内部提纲，融入正文后勿出现「系统提示」「系统需要」等措辞。"
+            + over_limit_hint
+        ),
+        "user_message": user_message,
+        "chat_history": chat_history or [],
+        "messages_meta": meta,
+        "draft": draft_text,
+        "prior_results": prior_results,
+        "last_worker_result": last_worker,
+        "gates": session_state.get("gates"),
+        "explore_guidance": {
+            "revealed": (explore_guidance or {}).get("revealed"),
+            "has_hidden_options": bool(
+                (explore_guidance or {}).get("options")
+                and not (explore_guidance or {}).get("revealed")
             ),
-            "user_message": user_message,
-            "chat_history": chat_history or [],
-            "messages_meta": meta,
-            "draft": draft_text,
-            "prior_results": prior_results,
-            "last_worker_result": last_worker,
-            "gates": session_state.get("gates"),
-            "explore_guidance": {
-                "revealed": (explore_guidance or {}).get("revealed"),
-                "has_hidden_options": bool(
-                    (explore_guidance or {}).get("options")
-                    and not (explore_guidance or {}).get("revealed")
-                ),
-            },
         },
-        ensure_ascii=False,
-    )
+    }
+    if session_state.get("list_type") == "pipeline":
+        from career_os.harness.session_activity import build_session_activity
+
+        payload["pipeline"] = pipeline_analyze_payload(session_state)
+        payload["session_activity"] = build_session_activity(session_state)
+    user = json.dumps(payload, ensure_ascii=False)
     return _coordinator_system(), user
 
 
