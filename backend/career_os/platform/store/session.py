@@ -24,11 +24,45 @@ _DEFAULT_TITLE = "未命名会话"
 SESSION_ID_PATTERN = re.compile(r"^sess_[0-9a-f]{32}$")
 
 
+def slice_chat_rounds(
+    messages: list[dict[str, str]],
+    *,
+    max_rounds: int,
+) -> list[dict[str, str]]:
+    if max_rounds < 1 or not messages:
+        return []
+    round_starts: list[int] = []
+    for i, m in enumerate(messages):
+        if m.get("role") == "user":
+            round_starts.append(i)
+    if not round_starts:
+        return list(messages)
+    keep_from = (
+        round_starts[-max_rounds] if len(round_starts) >= max_rounds else round_starts[0]
+    )
+    return list(messages[keep_from:])
+
+
+def slice_synthesize_chat_history(
+    messages: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    """Last dialogue beat: prior assistant (if any) + current user message."""
+    if not messages:
+        return []
+    if messages[-1].get("role") != "user":
+        return list(messages[-1:])
+    if len(messages) == 1:
+        return list(messages)
+    prev = messages[-2]
+    if prev.get("role") == "assistant":
+        return [prev, messages[-1]]
+    return [messages[-1]]
+
+
 class SessionStore:
     def __init__(self) -> None:
         self._data_dir = Path(settings.data_dir)
         self._sessions_dir = self._data_dir / "sessions"
-        self._max_messages = settings.chat_history_max_messages
         self._max_tokens = settings.chat_history_max_tokens
 
     def _session_dir(self, session_id: str) -> Path:
@@ -153,16 +187,26 @@ class SessionStore:
 
             schedule_maybe_generate_title(session_id)
 
-    def load_messages_for_coordinator(
+    def load_chat_history(
         self, session_id: str
     ) -> tuple[list[dict[str, str]], dict[str, Any]]:
         with _lock:
             messages = self._read_messages_unlocked(session_id)
-            loaded, meta = self._apply_m1_trim(messages)
+            token_count = self._estimate_tokens(messages)
+            max_tokens = self._max_tokens
+            over_limit = token_count > max_tokens if max_tokens > 0 else False
+            meta = {
+                "total_count": len(messages),
+                "loaded_count": len(messages),
+                "token_count": token_count,
+                "max_tokens": max_tokens,
+                "usage_ratio": round(token_count / max_tokens, 4) if max_tokens else 0.0,
+                "over_limit": over_limit,
+            }
             state = self._read_state_unlocked(session_id)
             state["messages_meta"] = meta
             self._write_state_unlocked(session_id, state)
-            return loaded, meta
+            return messages, meta
 
     def get_state(self, session_id: str) -> dict[str, Any]:
         with _lock:
@@ -209,78 +253,6 @@ class SessionStore:
             session_dir.mkdir(parents=True, exist_ok=True)
             self._write_state_unlocked(session_id, state)
             self._write_messages_unlocked(session_id, [])
-
-    def _apply_m1_trim(
-        self, messages: list[dict[str, str]]
-    ) -> tuple[list[dict[str, str]], dict[str, Any]]:
-        total_count = len(messages)
-        if total_count == 0:
-            return [], self._build_messages_meta([], [], trimmed=False)
-
-        first_user = next((m for m in messages if m["role"] == "user"), None)
-        loaded = self._trim_by_count(messages, first_user)
-        loaded = self._trim_by_tokens(loaded, first_user)
-
-        loaded_count = len(loaded)
-        trimmed = loaded_count < total_count
-        meta = self._build_messages_meta(messages, loaded, trimmed=trimmed)
-        return loaded, meta
-
-    def _build_messages_meta(
-        self,
-        all_messages: list[dict[str, str]],
-        loaded_messages: list[dict[str, str]],
-        *,
-        trimmed: bool,
-    ) -> dict[str, Any]:
-        total_count = len(all_messages)
-        loaded_count = len(loaded_messages)
-        token_count = self._estimate_tokens(all_messages)
-        token_ratio = token_count / self._max_tokens if self._max_tokens > 0 else 0.0
-        return {
-            "total_count": total_count,
-            "loaded_count": loaded_count,
-            "trimmed": trimmed,
-            "message_count": total_count,
-            "max_messages": self._max_messages,
-            "token_count": token_count,
-            "max_tokens": self._max_tokens,
-            "usage_ratio": round(token_ratio, 4),
-        }
-
-    def _trim_by_count(
-        self, messages: list[dict[str, str]], first_user: dict[str, str] | None
-    ) -> list[dict[str, str]]:
-        if len(messages) <= self._max_messages:
-            return list(messages)
-
-        tail_count = self._max_messages - (1 if first_user else 0)
-        tail = messages[-tail_count:] if tail_count > 0 else []
-
-        if first_user is None:
-            return messages[-self._max_messages :]
-
-        if first_user in tail:
-            return messages[-self._max_messages :]
-
-        return [first_user, *tail]
-
-    def _trim_by_tokens(
-        self, messages: list[dict[str, str]], first_user: dict[str, str] | None
-    ) -> list[dict[str, str]]:
-        if self._estimate_tokens(messages) <= self._max_tokens:
-            return messages
-
-        result = list(messages)
-        while len(result) > 1 and self._estimate_tokens(result) > self._max_tokens:
-            if first_user and result[0] is first_user:
-                if len(result) > 2:
-                    result.pop(1)
-                else:
-                    break
-            else:
-                result.pop(0)
-        return result
 
     @staticmethod
     def _estimate_tokens(messages: list[dict[str, str]]) -> int:

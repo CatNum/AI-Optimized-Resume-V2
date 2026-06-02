@@ -38,4 +38,4 @@ version: 1.0
 
 ## 输入
 
-用户消息为 JSON，含 `user_message`、`pending_gate`（含 `name` 与 `prompt`）、`recent_turns`、`session_hints`。
+用户消息为 JSON，仅含 `user_message` 与 `pending_gate`（含 `name` 与 `prompt`）。

@@ -249,7 +249,7 @@ def session_context(session_id: str):
     state = store.get_state(session_id)
     if not state.get("last_activity_at"):
         raise HTTPException(status_code=404, detail="session_not_found")
-    _, meta = store.load_messages_for_coordinator(session_id)
+    _, meta = store.load_chat_history(session_id)
     return {
         **orchestrator.context_usage_payload(meta),
         "session_activity": build_session_activity(state),

@@ -46,9 +46,8 @@ def test_explore_gate_intent():
 
 
 @pytest.mark.no_llm
-def test_session_m1_trim(tmp_path, monkeypatch):
+def test_load_chat_history_no_trim(tmp_path, monkeypatch):
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
-    monkeypatch.setenv("CHAT_HISTORY_MAX_MESSAGES", "5")
     import career_os.config as config_mod
     import career_os.platform.store.session as session_mod
 
@@ -58,9 +57,9 @@ def test_session_m1_trim(tmp_path, monkeypatch):
     sid = store.create_session()
     for i in range(10):
         store.append_message(sid, "user" if i % 2 == 0 else "assistant", f"m{i}")
-    loaded, meta = store.load_messages_for_coordinator(sid)
-    assert meta["trimmed"] is True
-    assert loaded[0]["content"] == "m0"
+    loaded, meta = store.load_chat_history(sid)
+    assert len(loaded) == 10
+    assert "trimmed" not in meta
 
 
 @pytest.mark.no_llm

@@ -14,7 +14,7 @@ def orchestrator():
 def test_chat_in_progress(orchestrator):
     session_id = "sess_1"
     state = {"last_activity_at": datetime.now(UTC).isoformat()}
-    meta = {"trimmed": False, "usage_ratio": 0.1}
+    meta = {"usage_ratio": 0.1, "over_limit": False}
     first = orchestrator.begin_chat(session_id, state, meta)
     assert first["session_id"] == session_id
     second = orchestrator.begin_chat(session_id, state, meta)
@@ -34,12 +34,11 @@ def test_session_expired(orchestrator):
 def test_recommend_new_session_near_limit(orchestrator):
     state = {"last_activity_at": datetime.now(UTC).isoformat()}
     meta = {
-        "trimmed": False,
         "usage_ratio": 0.96,
-        "message_count": 38,
-        "max_messages": 40,
+        "total_count": 38,
         "token_count": 100,
         "max_tokens": 12000,
+        "over_limit": False,
     }
     result = orchestrator.begin_chat("sess_near", state, meta)
     assert result["recommend_new_session"] is True
@@ -49,15 +48,15 @@ def test_recommend_new_session_near_limit(orchestrator):
 
 def test_no_recommend_at_low_usage(orchestrator):
     state = {"last_activity_at": datetime.now(UTC).isoformat()}
-    meta = {"trimmed": False, "usage_ratio": 0.1, "message_count": 4, "max_messages": 40}
+    meta = {"usage_ratio": 0.1, "total_count": 4, "over_limit": False}
     result = orchestrator.begin_chat("sess_low", state, meta)
     assert result["recommend_new_session"] is False
     orchestrator.end_chat("sess_low")
 
 
-def test_recommend_new_session_on_trim(orchestrator):
+def test_recommend_new_session_on_over_limit(orchestrator):
     state = {"last_activity_at": datetime.now(UTC).isoformat()}
-    meta = {"trimmed": True, "usage_ratio": 0.5}
-    result = orchestrator.begin_chat("sess_trim", state, meta)
-    assert result["recommend_new_session"] is False
-    orchestrator.end_chat("sess_trim")
+    meta = {"over_limit": True, "usage_ratio": 0.5}
+    result = orchestrator.begin_chat("sess_over", state, meta)
+    assert result["recommend_new_session"] is True
+    orchestrator.end_chat("sess_over")

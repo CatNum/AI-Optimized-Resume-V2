@@ -1,10 +1,10 @@
 export type ContextUsage = {
-  message_count: number;
-  max_messages: number;
+  total_count?: number;
+  loaded_count?: number;
   token_count: number;
   max_tokens: number;
   usage_ratio: number;
-  trimmed?: boolean;
+  over_limit?: boolean;
   recommend_new_session?: boolean;
   session_activity?: import("./sessionActivity").SessionActivity;
 };

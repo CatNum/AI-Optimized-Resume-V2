@@ -1,90 +1,52 @@
-def test_usage_ratio_is_token_based(tmp_path, monkeypatch):
-    monkeypatch.setenv("DATA_DIR", str(tmp_path))
-    monkeypatch.setenv("CHAT_HISTORY_MAX_MESSAGES", "40")
-    monkeypatch.setenv("CHAT_HISTORY_MAX_TOKENS", "12000")
-    import importlib
+import importlib
 
+
+def _reload_store(tmp_path, monkeypatch, **env):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    for k, v in env.items():
+        monkeypatch.setenv(k, str(v))
     import career_os.config as config_mod
     import career_os.platform.store.session as session_mod
 
     importlib.reload(config_mod)
     importlib.reload(session_mod)
-    SessionStore = session_mod.SessionStore
-
-    s = SessionStore()
-    sid = s.create_session()
-    for i in range(4):
-        s.append_message(sid, "user" if i % 2 == 0 else "assistant", f"m{i}")
-    _, meta = s.load_messages_for_coordinator(sid)
-    assert meta["message_count"] == 4
-    assert meta["max_messages"] == 40
-    assert meta["token_count"] == 4
-    assert meta["usage_ratio"] == round(4 / 12000, 4)
-    assert meta["trimmed"] is False
+    return session_mod.SessionStore
 
 
-def test_usage_ratio_not_inflated_by_message_count(tmp_path, monkeypatch):
-    monkeypatch.setenv("DATA_DIR", str(tmp_path))
-    monkeypatch.setenv("CHAT_HISTORY_MAX_MESSAGES", "40")
-    monkeypatch.setenv("CHAT_HISTORY_MAX_TOKENS", "12000")
-    import importlib
-
-    import career_os.config as config_mod
-    import career_os.platform.store.session as session_mod
-
-    importlib.reload(config_mod)
-    importlib.reload(session_mod)
-    SessionStore = session_mod.SessionStore
-
-    s = SessionStore()
-    sid = s.create_session()
-    for i in range(38):
-        s.append_message(sid, "user" if i % 2 == 0 else "assistant", "x")
-    _, meta = s.load_messages_for_coordinator(sid)
-    assert meta["message_count"] == 38
-    assert meta["usage_ratio"] == round(38 / 12000, 4)
-    assert meta["usage_ratio"] < 0.95
-
-
-def test_messages_trim_keeps_first_user(tmp_path, monkeypatch):
-    monkeypatch.setenv("DATA_DIR", str(tmp_path))
-    monkeypatch.setenv("CHAT_HISTORY_MAX_MESSAGES", "5")
-    import importlib
-
-    import career_os.config as config_mod
-    import career_os.platform.store.session as session_mod
-
-    importlib.reload(config_mod)
-    importlib.reload(session_mod)
-    SessionStore = session_mod.SessionStore
-
+def test_load_chat_history_full_count(tmp_path, monkeypatch):
+    SessionStore = _reload_store(tmp_path, monkeypatch, CHAT_HISTORY_MAX_TOKENS="200000")
     s = SessionStore()
     sid = s.create_session()
     for i in range(10):
         s.append_message(sid, "user" if i % 2 == 0 else "assistant", f"m{i}")
-    loaded, meta = s.load_messages_for_coordinator(sid)
-    assert loaded[0]["content"] == "m0"  # 首条 user
-    assert len(loaded) <= 5
-    assert meta["trimmed"] is True
+    loaded, meta = s.load_chat_history(sid)
+    assert len(loaded) == 10
+    assert meta["total_count"] == 10
+    assert meta["loaded_count"] == 10
+    assert "trimmed" not in meta
+    assert meta["over_limit"] is False
+
+
+def test_usage_ratio_is_token_based(tmp_path, monkeypatch):
+    SessionStore = _reload_store(tmp_path, monkeypatch, CHAT_HISTORY_MAX_TOKENS="12000")
+    s = SessionStore()
+    sid = s.create_session()
+    for i in range(4):
+        s.append_message(sid, "user" if i % 2 == 0 else "assistant", f"m{i}")
+    _, meta = s.load_chat_history(sid)
+    assert meta["total_count"] == 4
+    assert meta["token_count"] == 4
+    assert meta["usage_ratio"] == round(4 / 12000, 4)
 
 
 def test_reset_session_clears_messages_and_state(tmp_path, monkeypatch):
-    monkeypatch.setenv("DATA_DIR", str(tmp_path))
-    import importlib
-
-    import career_os.config as config_mod
-    import career_os.platform.store.session as session_mod
-
-    importlib.reload(config_mod)
-    importlib.reload(session_mod)
-    SessionStore = session_mod.SessionStore
-
+    SessionStore = _reload_store(tmp_path, monkeypatch)
     s = SessionStore()
     sid = s.create_session()
     s.append_message(sid, "user", "hello")
     s.update_state(sid, {"gates": {"flags": {"deep_explore_accepted": True}}})
     s.reset_session(sid)
-    loaded, meta = s.load_messages_for_coordinator(sid)
+    loaded, meta = s.load_chat_history(sid)
     assert loaded == []
     assert meta["total_count"] == 0
     state = s.get_state(sid)

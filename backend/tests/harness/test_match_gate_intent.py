@@ -29,7 +29,7 @@ def test_optimize_confirm_reject():
 
 
 def test_unknown_when_no_match(monkeypatch):
-    monkeypatch.setattr("career_os.harness.gate_llm.llm_enabled", lambda: False)
+    monkeypatch.setattr("career_os.harness.micro_classifier.llm_enabled", lambda: False)
     result = match_gate_intent(
         "随便聊聊",
         pending_gate={"name": "optimize_confirm"},
@@ -39,7 +39,7 @@ def test_unknown_when_no_match(monkeypatch):
 
 
 def test_explore_complete_with_next_step_pending(monkeypatch):
-    monkeypatch.setattr("career_os.harness.gate_llm.llm_enabled", lambda: False)
+    monkeypatch.setattr("career_os.harness.micro_classifier.llm_enabled", lambda: False)
     result = match_gate_intent(
         "已经完成初探 下一步",
         pending_gate={"name": "explore_complete", "prompt": "请确认完成初探"},

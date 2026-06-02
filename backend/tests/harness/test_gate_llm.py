@@ -3,9 +3,9 @@ from career_os.harness.gate_llm import classify_gate_intent_llm
 
 
 def test_classify_mock_llm_reject(monkeypatch):
-    monkeypatch.setattr("career_os.harness.gate_llm.llm_enabled", lambda: True)
+    monkeypatch.setattr("career_os.harness.micro_classifier.llm_enabled", lambda: True)
     monkeypatch.setattr(
-        "career_os.harness.gate_llm.invoke_json",
+        "career_os.harness.micro_classifier.invoke_json",
         lambda system, user, **kw: {
             "gate_name": "explore_repeat",
             "intent": "reject",
@@ -23,9 +23,9 @@ def test_classify_mock_llm_reject(monkeypatch):
 
 
 def test_low_confidence_unknown_source_llm(monkeypatch):
-    monkeypatch.setattr("career_os.harness.gate_llm.llm_enabled", lambda: True)
+    monkeypatch.setattr("career_os.harness.micro_classifier.llm_enabled", lambda: True)
     monkeypatch.setattr(
-        "career_os.harness.gate_llm.invoke_json",
+        "career_os.harness.micro_classifier.invoke_json",
         lambda system, user, **kw: {
             "gate_name": "explore_repeat",
             "intent": "reject",

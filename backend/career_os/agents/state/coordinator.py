@@ -3,6 +3,7 @@ from typing import Any, TypedDict
 
 class CoordinatorState(TypedDict, total=False):
     messages: list[dict[str, str]]
+    messages_meta: dict[str, Any]
     session_id: str
     session_state: dict[str, Any]
     worker_index: list[dict[str, Any]]

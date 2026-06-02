@@ -13,6 +13,9 @@ from career_os.agents.lc.coordinator_llm import (
     jd_prerequisites_draft,
 )
 from career_os.agents.state.coordinator import CoordinatorState
+from career_os.config import settings
+from career_os.harness.chat_history_scope import select_worker_chat_history
+from career_os.platform.store.session import slice_chat_rounds
 from career_os.harness.explore_closure import (
     EXPLORE_WORKERS,
     can_set_explore_gate_pending,
@@ -160,10 +163,16 @@ def build_coordinator_graph(
             source = "fallback"
             pending = []
         else:
+            history_analyze = slice_chat_rounds(
+                state.get("messages") or [],
+                max_rounds=settings.coordinator_analyze_max_rounds,
+            )
             analysis = analyze_workers(
                 state.get("user_message", ""),
                 session_state,
                 state.get("worker_index") or [],
+                chat_history=history_analyze,
+                messages_meta=state.get("messages_meta"),
             )
             if analysis is not None:
                 source = "llm"
@@ -247,12 +256,24 @@ def build_coordinator_graph(
             return state
 
         session_state = dict(state.get("session_state") or {})
+        full_history = state.get("messages") or []
+        worker_history, scope_label = select_worker_chat_history(
+            full_history,
+            state.get("user_message", ""),
+            state.get("messages_meta"),
+        )
+        delegate_context: dict[str, Any] = {
+            "chat_history": worker_history,
+            "chat_history_scope": scope_label,
+            "messages_meta": state.get("messages_meta") or {},
+        }
         result = harness.delegate_worker(
             "coordinator",
             worker_id,
             state.get("user_message", ""),
             session_state,
             session_id=state.get("session_id"),
+            context=delegate_context,
         )
         if isinstance(result, HarnessError):
             session_state = dict(state.get("session_state") or {})
@@ -442,12 +463,15 @@ def run_coordinator_turn(
     session_id: str,
     session_state: dict[str, Any],
     user_message: str,
+    chat_history: list[dict[str, str]] | None = None,
+    messages_meta: dict[str, Any] | None = None,
     pending_workers: list[str] | None = None,
     worker_runner: WorkerRunner | None = None,
 ) -> CoordinatorState:
     worker_registry = WorkerRegistry()
     initial: CoordinatorState = {
-        "messages": [],
+        "messages": list(chat_history or []),
+        "messages_meta": dict(messages_meta or {}),
         "session_id": session_id,
         "session_state": session_state,
         "worker_index": worker_registry.get_worker_index(),

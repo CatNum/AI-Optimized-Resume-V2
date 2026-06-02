@@ -99,3 +99,11 @@ def load_coordinator_prompt() -> CoordinatorPrompt:
 def load_gate_intent_prompt() -> str:
     path = _PROMPT_DIR / "gate_intent" / "system.md"
     return _read_system_document(path)
+
+
+@lru_cache(maxsize=8)
+def load_micro_classifier_prompt(task: str) -> str:
+    path = _PROMPT_DIR / "micro_classifier" / task / "system.md"
+    if not path.exists():
+        raise FileNotFoundError(f"micro_classifier prompt not found: {task}")
+    return _read_system_document(path)

@@ -153,6 +153,7 @@ async def _chat_stream(
         )
 
     session_store.append_message(session_id, "user", body.message)
+    chat_history, meta = session_store.load_chat_history(session_id)
     pending = _apply_pending_gate(body.message, state)
     if pending is None:
         pending = []
@@ -171,6 +172,8 @@ async def _chat_stream(
         session_id=session_id,
         session_state=state,
         user_message=body.message,
+        chat_history=chat_history,
+        messages_meta=meta,
         pending_workers=pending,
         worker_runner=build_harness_worker_runner(harness),
     )
@@ -182,11 +185,16 @@ async def _chat_stream(
     draft = result.get("synthesis_draft") or result.get("synthesis_text") or "已完成处理。"
 
     if llm_enabled():
+        from career_os.platform.store.session import slice_synthesize_chat_history
+
+        history_syn = slice_synthesize_chat_history(chat_history)
         system, user = build_synthesis_messages(
             body.message,
             draft,
             result["session_state"],
             result.get("last_worker_result"),
+            chat_history=history_syn,
+            messages_meta=meta,
         )
         parts: list[str] = []
         for token in stream_text(system, user, role=LLMRole.COORDINATOR):
@@ -200,7 +208,7 @@ async def _chat_stream(
 
     session_store.append_message(session_id, "assistant", text)
 
-    _, meta_after = session_store.load_messages_for_coordinator(session_id)
+    _, meta_after = session_store.load_chat_history(session_id)
     context_usage = orchestrator.context_usage_payload(meta_after)
     context_usage["session_activity"] = build_session_activity(result["session_state"])
 
@@ -214,7 +222,7 @@ async def chat(body: ChatRequest):
     session_id = body.session_id or session_store.create_session()
     state = session_store.get_state(session_id)
     state["session_id"] = session_id
-    _, meta = session_store.load_messages_for_coordinator(session_id)
+    _, meta = session_store.load_chat_history(session_id)
     begin = orchestrator.begin_chat(session_id, state, meta)
     if hasattr(begin, "code"):
         if begin.code == "session_expired":

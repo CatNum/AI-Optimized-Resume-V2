@@ -8,7 +8,7 @@ export function ContextUsageIndicator({ usage }: Props) {
   if (!usage) return null;
 
   const percent = usageDisplayPercent(usage);
-  const warn = usage.recommend_new_session || usage.trimmed;
+  const warn = usage.recommend_new_session || usage.over_limit;
   const tokenCount = usage.token_count ?? 0;
   const maxTokens = usage.max_tokens ?? 12000;
 

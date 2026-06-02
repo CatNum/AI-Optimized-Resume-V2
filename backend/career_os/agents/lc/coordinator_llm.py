@@ -298,6 +298,9 @@ def analyze_workers(
     user_message: str,
     session_state: dict[str, Any],
     worker_index: list[dict[str, Any]],
+    *,
+    chat_history: list[dict[str, str]] | None = None,
+    messages_meta: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     worker_summary: list[dict[str, Any]] = []
     allowed_workers: set[str] = set()
@@ -327,6 +330,8 @@ def analyze_workers(
     analyze_payload: dict[str, Any] = {
         "node": "analyze",
         "message": user_message,
+        "chat_history": chat_history or [],
+        "messages_meta": messages_meta or {},
         "list_type": session_state.get("list_type"),
         "gates": session_state.get("gates"),
         "prior_workers": list((session_state.get("prior_results") or {}).keys()),
@@ -369,6 +374,9 @@ def build_synthesis_messages(
     draft_text: str,
     session_state: dict[str, Any],
     last_worker_result: dict[str, Any] | None,
+    *,
+    chat_history: list[dict[str, str]] | None = None,
+    messages_meta: dict[str, Any] | None = None,
 ) -> tuple[str, str]:
     explore_guidance = session_state.get("explore_guidance")
     prior_results = sanitize_prior_results_for_synthesis(
@@ -376,14 +384,24 @@ def build_synthesis_messages(
         explore_guidance if isinstance(explore_guidance, dict) else None,
     )
     last_worker = sanitize_structured_for_synthesis(last_worker_result)
+    meta = messages_meta or {}
+    over_limit_hint = ""
+    if meta.get("over_limit"):
+        over_limit_hint = (
+            "（对话已超过建议上下文上限，请在回复末尾简短建议用户"
+            " POST /v1/sessions/new 开新会话；档案与产物保留。）"
+        )
     user = json.dumps(
         {
             "node": "synthesize",
             "synthesis_voice": (
                 "你是职业规划助手，对用户用第一人称「我」直接回复；"
                 "draft 是内部提纲，融入正文后勿出现「系统提示」「系统需要」等措辞。"
+                + over_limit_hint
             ),
             "user_message": user_message,
+            "chat_history": chat_history or [],
+            "messages_meta": meta,
             "draft": draft_text,
             "prior_results": prior_results,
             "last_worker_result": last_worker,
@@ -410,7 +428,10 @@ def synthesize_with_llm(
     if not lc_client.llm_enabled():
         return None
     system, user = build_synthesis_messages(
-        user_message, draft_text, session_state, last_worker_result
+        user_message,
+        draft_text,
+        session_state,
+        last_worker_result,
     )
     try:
         return invoke_text(system, user, role=LLMRole.COORDINATOR).strip()

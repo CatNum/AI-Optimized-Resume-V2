@@ -73,10 +73,8 @@ export function ChatPage() {
 
   const applyContextUsage = useCallback((usage: ContextUsage) => {
     setContextUsage(usage);
-    if (usage.recommend_new_session) {
+    if (usage.recommend_new_session || usage.over_limit) {
       setNotice("对话较长，建议新开对话；档案与 HTML 仍保留。");
-    } else if (usage.trimmed) {
-      setNotice("较早的对话未纳入当前上下文；如有遗漏可简要复述。");
     }
   }, []);
 

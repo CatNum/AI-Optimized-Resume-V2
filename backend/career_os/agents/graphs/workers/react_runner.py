@@ -19,10 +19,19 @@ def _format_boot_user(
     session_state: dict[str, Any] | None,
     context: dict[str, Any] | None,
 ) -> str:
+    ctx = dict(context or {})
+    scope = str(ctx.get("chat_history_scope") or "recent_10")
+    chat_history = ctx.pop("chat_history", None) or []
+    messages_meta = ctx.pop("messages_meta", None) or {}
+    ctx.pop("chat_history_scope", None)
+    slim_state = dict(session_state or {})
     payload = {
         "goal": goal,
-        "session_state": session_state or {},
-        "context": context or {},
+        "chat_history": chat_history,
+        "chat_history_scope": scope,
+        "messages_meta": messages_meta,
+        "session_state": slim_state,
+        "context": ctx,
     }
     payload = json.dumps(payload, ensure_ascii=False, indent=2)
     return render_prompt(load_worker_llm_prompt("react_boot_user"), payload=payload)
