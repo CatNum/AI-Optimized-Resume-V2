@@ -78,6 +78,27 @@ def test_resolve_doubled_canonical_prefix(tmp_path, monkeypatch):
     assert outputs_mod.resolve_output_file(corrupted) is not None
 
 
+def test_validate_resume_html_rejects_plain_text():
+    import career_os.platform.tool.handlers.resume_html as resume_mod
+
+    plain = "苑晓龙\nGo 后端工程师\nEXPERIENCE\n..."
+    ok, reason = resume_mod.validate_resume_html_content(plain)
+    assert not ok
+    assert "HTML" in reason
+
+
+def test_write_resume_html_rejects_invalid_content(tmp_path, monkeypatch):
+    _reload_output_modules(tmp_path, monkeypatch, output_subdir="output/demo")
+    import career_os.platform.tool.handlers.resume_html as resume_mod
+
+    result = resume_mod.write_resume_html(
+        "resume",
+        {"html": "纯文本简历\n无标签", "optimization_level": "保守"},
+    )
+    assert hasattr(result, "code")
+    assert result.code == "invalid_html"
+
+
 def test_write_resume_html_uses_prd_filename_template(tmp_path, monkeypatch):
     _reload_output_modules(tmp_path, monkeypatch, output_subdir="output/demo")
     import career_os.platform.tool.handlers.resume_html as resume_mod

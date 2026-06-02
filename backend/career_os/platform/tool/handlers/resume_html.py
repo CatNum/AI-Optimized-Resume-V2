@@ -10,6 +10,39 @@ from career_os.platform.tool.handlers.outputs import normalize_output_path
 
 LEVEL_ORDER = ["保守", "标准", "进取"]
 
+_RE_HTML_ROOT = re.compile(r"<html\b", re.IGNORECASE)
+_RE_BODY_OPEN = re.compile(r"<body\b", re.IGNORECASE)
+_RE_HTML_CLOSE = re.compile(r"</html\s*>", re.IGNORECASE)
+_RE_BODY_CLOSE = re.compile(r"</body\s*>", re.IGNORECASE)
+_RE_DOC_START = re.compile(r"<(!DOCTYPE|html|head|body)\b", re.IGNORECASE)
+
+
+def validate_resume_html_content(content: str) -> tuple[bool, str]:
+    """Return (ok, message). Reject plain-text/markdown resumes masquerading as .html."""
+    stripped = (content or "").strip()
+    if not stripped:
+        return False, "简历 HTML 内容为空"
+    if "<" not in stripped or ">" not in stripped:
+        return (
+            False,
+            "内容未包含 HTML 标签；须输出完整 HTML 文档，不可写入纯文本或 Markdown。",
+        )
+    if not _RE_HTML_ROOT.search(stripped):
+        return False, "缺少 <html> 根元素；须包含 <!DOCTYPE html> 与 <html>…</html>。"
+    if not _RE_BODY_OPEN.search(stripped):
+        return False, "缺少 <body> 元素。"
+    if not _RE_HTML_CLOSE.search(stripped):
+        return False, "缺少 </html> 闭合标签。"
+    if not _RE_BODY_CLOSE.search(stripped):
+        return False, "缺少 </body> 闭合标签。"
+    head = stripped[:400].lstrip()
+    if not _RE_DOC_START.search(head):
+        return (
+            False,
+            "文档须以 HTML 结构开头（<!DOCTYPE html> 或 <html>），勿将正文纯文本直接写入文件。",
+        )
+    return True, ""
+
 
 def ensure_html_filename(filename: str) -> str:
     name = (filename or "resume").strip() or "resume"
@@ -83,6 +116,9 @@ def write_resume_html(actor: str, args: dict[str, Any]) -> ResumeHtmlError | dic
     if actor != "resume":
         return ResumeHtmlError("tool_not_allowed", "write_resume_html is resume-only")
     content = args.get("html") or args.get("content") or ""
+    ok, reason = validate_resume_html_content(content)
+    if not ok:
+        return ResumeHtmlError("invalid_html", reason)
     level = args.get("optimization_level") or "标准"
     today = date.today()
     tags = _derive_filename_tags(args)

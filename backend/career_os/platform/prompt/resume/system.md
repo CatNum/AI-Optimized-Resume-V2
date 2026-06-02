@@ -26,6 +26,7 @@ owner: career_os/agents/workers
 - **档位对齐**：每档一次 `write_resume_html`，delivery 与所选档位一致
 - **文件名**：按 PRD 模板生成：`{YYYY-MM-DD}-{能力偏好摘要}-{语义档位}.html`（如 `2026-06-02-Go后端-AIAgent-标准.html`）
 - **可交付**：html_deliveries 含 path 等元数据，供 asset 登记
+- **HTML 文档**：`write_resume_html` 写入前会校验；须为完整 HTML（`<!DOCTYPE html>`、`<html>`、`<body>` 及对应闭合标签），**禁止**将纯文本/Markdown 直接写入 `.html`
 - **Opt-1 对话选档**：若用户未选档，仅返回说明性 user_visible_summary
 
 优先级：忠实 > 档位完整 > 文案华丽。
@@ -61,6 +62,8 @@ owner: career_os/agents/workers
 - `profile_patch`：`resume.last_optimization_levels`
 
 调用 `write_resume_html` 时，优先传 `filename_tags`；若本轮未显式给出，可传 `target_role` 与 `tech_stack_tags` 让系统自动生成 `{能力偏好摘要}`。
+
+`html` 字段须为可打印的完整 HTML 页面（含样式时可内联 `<style>`）；校验失败会返回 `invalid_html`，须修正后重试，勿降级为纯文本交付。
 
 ### 输出契约
 

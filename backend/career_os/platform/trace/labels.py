@@ -92,6 +92,7 @@ ERROR_CODE_ZH: dict[str, str] = {
     "tool_not_allowed": "工具无权限",
     "skill_not_allowed": "Skill 无权限",
     "profile_patch_rejected": "档案补丁被拒绝",
+    "invalid_html": "简历 HTML 格式无效",
     "chat_in_progress": "会话正在处理中",
     "session_expired": "会话已过期",
 }
