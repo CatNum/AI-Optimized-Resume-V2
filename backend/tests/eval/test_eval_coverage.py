@@ -49,7 +49,7 @@ EVAL_INVENTORY: dict[str, list[str]] = {
         "test_browser_fetch_degrades_without_api_key",
         "test_worker_can_complete_despite_browser_fetch_failure",
         "test_chat_in_progress",
-        "test_session_expired",
+        "test_idle_session_can_begin_chat",
     ],
 }
 

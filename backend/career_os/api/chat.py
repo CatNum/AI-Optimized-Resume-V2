@@ -209,8 +209,6 @@ async def chat(body: ChatRequest):
     _, meta = session_store.load_chat_history(session_id)
     begin = orchestrator.begin_chat(session_id, state, meta)
     if hasattr(begin, "code"):
-        if begin.code == "session_expired":
-            raise HTTPException(status_code=410, detail={"code": begin.code, "message": begin.message})
         if begin.code == "chat_in_progress":
             raise HTTPException(status_code=409, detail={"code": begin.code, "message": begin.message})
 

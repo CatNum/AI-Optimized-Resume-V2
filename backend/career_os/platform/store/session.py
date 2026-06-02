@@ -3,7 +3,7 @@ import re
 import shutil
 import threading
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -109,13 +109,9 @@ class SessionStore:
 
     @staticmethod
     def is_expired(session_state: dict[str, Any]) -> bool:
-        from career_os.config import settings
-
-        last_activity = session_state.get("last_activity_at")
-        if not last_activity:
-            return False
-        last_dt = datetime.fromisoformat(last_activity.replace("Z", "+00:00"))
-        return datetime.now(UTC) - last_dt > timedelta(seconds=settings.session_idle_ttl)
+        """I2 闲置过期已移除；会话不因闲置时间失效。"""
+        _ = session_state
+        return False
 
     def session_exists(self, session_id: str) -> bool:
         return self._session_dir(session_id).exists()

@@ -36,7 +36,10 @@ def test_resume_writes_multiple_levels(harness, tmp_path):
         context={"selected_optimization_levels": ["标准", "进取"]},
     )
     assert result["status"] == "completed"
-    assert len(result["structured_output"]["html_deliveries"]) == 2
-    day_dir = tmp_path / "output"
-    assert any(day_dir.rglob("*-标准.html"))
-    assert any(day_dir.rglob("*-进取.html"))
+    deliveries = result["structured_output"]["html_deliveries"]
+    assert len(deliveries) == 2
+    levels_written = {d["optimization_level"] for d in deliveries}
+    assert levels_written == {"标准", "进取"}
+    for d in deliveries:
+        assert d["path"].endswith(".html")
+        assert d["optimization_level"] in d["path"]

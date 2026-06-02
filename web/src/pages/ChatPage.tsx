@@ -1,16 +1,13 @@
 import { FormEvent, KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import { ContextUsageIndicator } from "../components/ContextUsageIndicator";
 import { OutputsPanel } from "../components/OutputsPanel";
-import { ExpiredSessionBanner } from "../components/ExpiredSessionBanner";
 import { SessionSwitcher } from "../components/SessionSwitcher";
 import { TaskProgress } from "../components/TaskProgress";
 import { ThinkingIndicator } from "../components/ThinkingIndicator";
 import { useChatSSE } from "../hooks/useChatSSE";
 import type { ContextUsage } from "../lib/contextUsage";
 import {
-  createSession,
   getMessages,
-  getSession,
   listSessions,
   SessionApiError,
   type SessionRow,
@@ -40,7 +37,6 @@ function pickInitialSessionId(
 
 export function ChatPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [sessionExpired, setSessionExpired] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
@@ -80,9 +76,8 @@ export function ChatPage() {
 
   const loadSessionView = useCallback(
     async (id: string) => {
-      const [msgRes, sessionRow] = await Promise.all([getMessages(id), getSession(id)]);
+      const msgRes = await getMessages(id);
       setMessages(msgRes.messages);
-      setSessionExpired(Boolean(sessionRow.expired ?? msgRes.expired));
       const usage = await fetchSessionContext(id);
       if (usage) applyContextUsage(usage);
       else setContextUsage(null);
@@ -96,7 +91,6 @@ export function ChatPage() {
     const selected = pickInitialSessionId(stored, sessions);
     setSessionId(selected);
     if (!selected) {
-      setSessionExpired(false);
       setMessages([]);
       setInitDone(true);
       return;
@@ -114,7 +108,6 @@ export function ChatPage() {
           await loadSessionView(fallback);
         } else {
           setMessages([]);
-          setSessionExpired(false);
         }
       }
     } finally {
@@ -142,9 +135,9 @@ export function ChatPage() {
 
   function clearSessionWorkspace() {
     setMessages([]);
+    setInput("");
     setContextUsage(null);
     setNotice(null);
-    setSessionExpired(false);
     stickToBottomRef.current = true;
   }
 
@@ -159,12 +152,6 @@ export function ChatPage() {
     setSessionId(id);
     localStorage.setItem("session_id", id);
     clearSessionWorkspace();
-    try {
-      const row = await getSession(id);
-      setSessionExpired(Boolean(row.expired));
-    } catch {
-      /* ignore */
-    }
   }
 
   function handleSessionCleared() {
@@ -178,7 +165,7 @@ export function ChatPage() {
   }
 
   async function dispatchChat(userText: string, appendUserMessage: boolean) {
-    if (!userText.trim() || chatBusyOnDisplayed || sessionExpired) return;
+    if (!userText.trim() || chatBusyOnDisplayed) return;
     stickToBottomRef.current = true;
     const streamAtStart = sessionId;
     inFlightSessionIdRef.current = streamAtStart;
@@ -197,7 +184,6 @@ export function ChatPage() {
         if (displayed === streamAtStart || (streamAtStart === null && displayed === null)) {
           setSessionId(id);
           localStorage.setItem("session_id", id);
-          setSessionExpired(false);
         }
       },
       onToken: (delta) => {
@@ -226,23 +212,11 @@ export function ChatPage() {
           applyContextUsage(payload.context_usage);
         }
         if (streamSessionId && shouldApplyStreamUpdate(streamSessionId)) {
-          try {
-            const row = await getSession(streamSessionId);
-            setSessionExpired(Boolean(row.expired));
-          } catch {
-            // Ignore secondary metadata refresh errors.
-          }
           setSessionRefreshTrigger((n) => n + 1);
           setTaskRefreshTrigger((n) => n + 1);
         }
       },
       onError: (message) => {
-        if (message === "session_expired") {
-          if (shouldApplyStreamUpdate(streamSessionId)) {
-            setSessionExpired(true);
-          }
-          return;
-        }
         if (message === "chat_in_progress") {
           setNotice("上一条仍在处理中，请稍候。");
         }
@@ -253,7 +227,7 @@ export function ChatPage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!input.trim() || chatBusyOnDisplayed || sessionExpired) return;
+    if (!input.trim() || chatBusyOnDisplayed) return;
     const userText = input.trim();
     setInput("");
     await dispatchChat(userText, true);
@@ -278,11 +252,11 @@ export function ChatPage() {
   function handleInputKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key !== "Enter" || e.shiftKey) return;
     e.preventDefault();
-    if (!input.trim() || chatBusyOnDisplayed || sessionExpired) return;
+    if (!input.trim() || chatBusyOnDisplayed) return;
     void onSubmit(e as unknown as FormEvent);
   }
 
-  const inputDisabled = chatBusyOnDisplayed || sessionExpired || !initDone;
+  const inputDisabled = chatBusyOnDisplayed || !initDone;
 
   return (
     <div className="flex h-screen bg-slate-950">
@@ -305,16 +279,7 @@ export function ChatPage() {
           </div>
         </header>
 
-        {sessionExpired ? (
-          <ExpiredSessionBanner
-            onNewSession={async () => {
-              const { session_id } = await createSession();
-              await handleNewSession(session_id);
-            }}
-          />
-        ) : null}
-
-      {notice && !sessionExpired ? (
+      {notice ? (
         <div className="mb-3 shrink-0 rounded border border-amber-700/50 bg-amber-950/40 px-3 py-2 text-sm text-amber-200">
           {notice}
         </div>
@@ -360,11 +325,7 @@ export function ChatPage() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleInputKeyDown}
-          placeholder={
-            sessionExpired
-              ? "会话已过期，请切换或新建会话"
-              : "输入消息… Enter 发送，Shift+Enter 换行"
-          }
+          placeholder="输入消息… Enter 发送，Shift+Enter 换行"
           disabled={inputDisabled}
         />
         <button

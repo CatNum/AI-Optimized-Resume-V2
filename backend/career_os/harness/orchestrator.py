@@ -1,5 +1,5 @@
 import threading
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 
 from career_os.config import settings
@@ -11,7 +11,6 @@ _active_runs: dict[str, bool] = {}
 
 class ChatOrchestrator:
     def __init__(self) -> None:
-        self._session_idle_ttl = settings.session_idle_ttl
         self._warn_ratio = settings.chat_history_warn_ratio
 
     def begin_chat(
@@ -23,10 +22,6 @@ class ChatOrchestrator:
         with _chat_lock:
             if _active_runs.get(session_id):
                 return HarnessError("chat_in_progress", "Another chat run is active")
-
-            expired = self._is_session_expired(session_state)
-            if expired:
-                return HarnessError("session_expired", "Session idle TTL exceeded")
 
             _active_runs[session_id] = True
 
@@ -54,13 +49,6 @@ class ChatOrchestrator:
         state = dict(session_state)
         state["last_activity_at"] = datetime.now(UTC).isoformat()
         return state
-
-    def _is_session_expired(self, session_state: dict[str, Any]) -> bool:
-        last_activity = session_state.get("last_activity_at")
-        if not last_activity:
-            return False
-        last_dt = datetime.fromisoformat(last_activity.replace("Z", "+00:00"))
-        return datetime.now(UTC) - last_dt > timedelta(seconds=self._session_idle_ttl)
 
     def _should_recommend_new_session(self, messages_meta: dict[str, Any]) -> bool:
         if messages_meta.get("over_limit"):

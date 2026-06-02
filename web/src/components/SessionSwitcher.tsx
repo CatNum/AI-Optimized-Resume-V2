@@ -176,11 +176,6 @@ export function SessionSwitcher({
                         {row.title || "未命名会话"}
                       </span>
                       <span className="flex shrink-0 gap-1">
-                        {row.expired ? (
-                          <span className="rounded bg-rose-900/60 px-1 text-[10px] text-rose-200">
-                            过期
-                          </span>
-                        ) : null}
                         {row.archived ? (
                           <span className="rounded bg-slate-700 px-1 text-[10px] text-slate-300">
                             归档

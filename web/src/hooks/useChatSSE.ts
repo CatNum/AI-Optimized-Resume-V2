@@ -30,10 +30,6 @@ export function useChatSSE() {
           handlers.onError("chat_in_progress");
           return;
         }
-        if (response.status === 410) {
-          handlers.onError("session_expired");
-          return;
-        }
         if (!response.ok || !response.body) {
           handlers.onError(`HTTP ${response.status}`);
           return;

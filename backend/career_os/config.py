@@ -7,7 +7,6 @@ class Settings(BaseSettings):
 
     data_dir: str = "./data"
     output_dir: str = "./output"
-    session_idle_ttl: int = 86400
     chat_history_max_tokens: int = 200_000
     chat_history_warn_ratio: float = 0.95
     coordinator_analyze_max_rounds: int = 6

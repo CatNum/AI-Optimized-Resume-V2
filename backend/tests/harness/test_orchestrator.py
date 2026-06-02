@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 import pytest
 
@@ -23,12 +23,12 @@ def test_chat_in_progress(orchestrator):
     orchestrator.end_chat(session_id)
 
 
-def test_session_expired(orchestrator):
-    old = (datetime.now(UTC) - timedelta(hours=25)).isoformat()
+def test_idle_session_can_begin_chat(orchestrator):
+    old = "2026-06-01T10:28:43.542993+00:00"
     state = {"last_activity_at": old}
-    result = orchestrator.begin_chat("sess_exp", state, {})
-    assert isinstance(result, HarnessError)
-    assert result.code == "session_expired"
+    result = orchestrator.begin_chat("sess_old", state, {})
+    assert result["session_id"] == "sess_old"
+    orchestrator.end_chat("sess_old")
 
 
 def test_recommend_new_session_near_limit(orchestrator):
