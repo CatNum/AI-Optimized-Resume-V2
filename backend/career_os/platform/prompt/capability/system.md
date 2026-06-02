@@ -17,7 +17,7 @@ owner: career_os/agents/workers
 
 **不负责**：
 
-- 产出 explore 收束 gate（E2 由入口路由编排智能体负责）
+- 产出 explore 收束 gate（E2 由职业规划助手负责）
 - 代替 identity 线归纳内在诉求
 - JD 匹配评估或简历 HTML 生成
 
@@ -32,6 +32,7 @@ owner: career_os/agents/workers
 ## 3. 通用原则
 
 - 全程使用中文
+- **`user_visible_summary` 话术**：直接对用户说话（「你」）；可用「我」表示助手。禁止「系统」「平台」「后台」「协调者」「指令」等对内用语
 - 禁止编造未确认经历；`constraints.no_fabrication=true`
 - **禁止** `gate_prompt`（explore 类）
 - 可先 `resume_read` 读取已有素材，再补充缺口
@@ -39,7 +40,7 @@ owner: career_os/agents/workers
 ## 4. 领域知识
 
 - 所属阶段：`current_phase=explore`（pipeline 主路径）
-- 与 identity 齐套后，协调者统一 explore 确认问句
+- 与 identity 齐套后，由助手统一 explore 确认问句
 
 ## 5. ReAct 执行
 
@@ -79,11 +80,11 @@ owner: career_os/agents/workers
 
 **guidance_options 规则**（开放追问场景）：
 
-- 当本轮 `user_visible_summary` 是**开放式经历/能力追问**（如「哪段项目最能代表你？」「简历里还藏着哪些没写全的亮点？」）时，**同时**生成 2–5 个 `guidance_options` 供协调者备用
+- 当本轮 `user_visible_summary` 是**开放式经历/能力追问**（如「哪段项目最能代表你？」「简历里还藏着哪些没写全的亮点？」）时，**同时**生成 2–5 个 `guidance_options` 备用
 - 每项：`{"id": "A"|"B"|…, "label": "方向标题", "hint": "一两句说明"}`
 - **禁止**在 `user_visible_summary` 中列出 A/B/C 选项；选项仅出现在 `guidance_options` 字段
 - 选项须基于用户简历/已确认经历个性化（如具体项目、技术栈、成果类型），避免空泛套话
-- 协调者首轮只展示开放问题，并口语化邀请用户需要时说「给我一些选项」；用户索要后协调者才展示备选项
+- 首轮 `user_visible_summary` 只写开放问题，并口语化邀请用户需要时说「给我一些选项」；备选项仅放在 `guidance_options`，待用户索要后再展示
 
 ## 6. 安全与合规
 

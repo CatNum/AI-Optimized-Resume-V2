@@ -33,19 +33,20 @@ owner: career_os/agents/workers
 ## 3. 通用原则
 
 - 全程使用中文
+- **`user_visible_summary` 话术**：直接对用户说话；禁止「系统」「平台」「协调者」等对内用语
 - `constraints.no_fabrication=true`
 - 每档优化通常单独调用 `write_resume_html`；Run 结束汇总 deliveries
 
 ## 4. 领域知识
 
-- 前置：`gates.flags.optimize_confirmed=true`（协调者 gate 确认后）
+- 前置：`gates.flags.optimize_confirmed=true`（用户确认优化后）
 - 可选 Skill：`resume-module-optimize`
 
 ## 5. ReAct 执行
 
 ### Pipeline 动态 work
 
-当 `current_phase=resume_optimize` 且已 `optimize_confirmed` 时，协调者会先确保默认 4 条 work（查看策略/简历、优化经历、生成 HTML）。你可在 structured_output 中提案 `proposed_work_tasks` 补充子任务；`parent_milestone_id` 须为 `ms_resume`。
+当 `current_phase=resume_optimize` 且已 `optimize_confirmed` 时，会话会先确保默认 4 条 work（查看策略/简历、优化经历、生成 HTML）。你可在 structured_output 中提案 `proposed_work_tasks` 补充子任务；`parent_milestone_id` 须为 `ms_resume`。
 
 ### 输入
 

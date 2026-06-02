@@ -31,7 +31,8 @@ WORKER_ROLE_MARKERS = {
 
 def test_load_coordinator_prompt_is_single_document():
     prompt = load_coordinator_prompt()
-    assert "入口路由编排智能体" in prompt.system
+    assert "职业规划助手" in prompt.system
+    assert "用户可见话术" in prompt.system
     assert "### analyze" in prompt.system
     assert "### synthesize" in prompt.system
     assert "输出契约" in prompt.system

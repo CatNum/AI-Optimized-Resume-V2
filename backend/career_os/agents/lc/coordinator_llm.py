@@ -82,6 +82,14 @@ def explore_repeat_draft() -> str:
     return "您已完成初探，是否需要再次进行？"
 
 
+def explore_complete_synthesis_draft() -> str:
+    return (
+        "内在需求和能力图谱两条线我们都梳理完了。想请你确认一下："
+        "你觉得我们刚才的交流，是否已经足够完整地概括了你的职业画像？"
+        "若你确认完成，我就可以开始帮你分析目标方向的市场机会和岗位画像。"
+    )
+
+
 def is_small_talk(user_message: str) -> bool:
     text = user_message.strip().lower()
     if not text:
@@ -371,6 +379,10 @@ def build_synthesis_messages(
     user = json.dumps(
         {
             "node": "synthesize",
+            "synthesis_voice": (
+                "你是职业规划助手，对用户用第一人称「我」直接回复；"
+                "draft 是内部提纲，融入正文后勿出现「系统提示」「系统需要」等措辞。"
+            ),
             "user_message": user_message,
             "draft": draft_text,
             "prior_results": prior_results,

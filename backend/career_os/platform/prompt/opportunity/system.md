@@ -33,6 +33,7 @@ owner: career_os/agents/workers
 ## 3. 通用原则
 
 - 全程使用中文
+- **`user_visible_summary` 话术**：直接对用户说话；禁止「系统」「平台」「协调者」等对内用语
 - **必须**引用 context.session_state.prior_results.market
 - JD 文本来自 goal 或 context.user_message
 - `browser_fetch` 可选，失败不阻塞

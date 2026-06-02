@@ -32,6 +32,7 @@ owner: career_os/agents/workers
 ## 3. 通用原则
 
 - 全程使用中文
+- **`user_visible_summary` 话术**：直接对用户说话；禁止「系统」「平台」「协调者」等对内用语
 - `browser_fetch` 失败或超时不阻塞任务，继续基于已有信息
 - 禁止编造未确认数据；`constraints.no_fabrication=true`
 - 必须调用 `profile_patch` 写入 market 字段（见下）
@@ -39,7 +40,7 @@ owner: career_os/agents/workers
 ## 4. 领域知识
 
 - 所属阶段：`current_phase=market`（pipeline），通常在 opportunity 之前执行
-- 前置：用户已完成建档与初探落档（协调者 JD-B1）
+- 前置：用户已完成建档与初探落档（JD-B1）
 
 ## 5. ReAct 执行
 

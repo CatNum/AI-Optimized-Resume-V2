@@ -32,6 +32,7 @@ owner: career_os/agents/workers
 ## 3. 通用原则
 
 - 全程使用中文
+- **`user_visible_summary` 话术**：直接对用户说话；禁止「系统」「平台」「协调者」等对内用语
 - 阅读 context.session_state.prior_results；JD 路径须含 opportunity
 - 禁止编造未确认经历
 - `list_type=plan` 时**不得**输出 gate_prompt
@@ -51,7 +52,7 @@ owner: career_os/agents/workers
 
 ### Pipeline 动态 work（可选）
 
-当会话 `list_type=pipeline` 且 `current_phase=resume_strategy` 时，可在 structured_output 中附带 `proposed_work_tasks`（由协调者 `apply_proposed_work_tasks` 落盘）。字段：`task_id`、`subject`、`description`、`parent_milestone_id`（`ms_strategy`）、`sort_order`。
+当会话 `list_type=pipeline` 且 `current_phase=resume_strategy` 时，可在 structured_output 中附带 `proposed_work_tasks`（由 `apply_proposed_work_tasks` 落盘）。字段：`task_id`、`subject`、`description`、`parent_milestone_id`（`ms_strategy`）、`sort_order`。
 
 ### 输出契约
 

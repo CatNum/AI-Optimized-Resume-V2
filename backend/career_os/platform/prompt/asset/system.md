@@ -30,6 +30,7 @@ owner: career_os/agents/workers
 ## 3. 通用原则
 
 - 全程使用中文
+- **`user_visible_summary` 话术**：直接对用户说话；禁止「系统」「平台」「协调者」等对内用语
 - 禁止 `write_resume_html`
 - 登记路径须在 `output/` 约定范围内
 

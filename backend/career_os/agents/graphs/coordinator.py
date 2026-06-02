@@ -6,6 +6,7 @@ from career_os.agents.lc.coordinator_llm import (
     analyze_workers,
     chat_only_synthesis_draft,
     explore_intake_draft,
+    explore_complete_synthesis_draft,
     explore_repeat_draft,
     fallback_analyze_workers,
     is_small_talk,
@@ -345,26 +346,24 @@ def build_coordinator_graph(
             and offer_explore
             and can_set_explore_gate_pending(session_state.get("explore_closure"))
         ):
-            text = append_gate_reply_hint(
-                "初探两线已完成，请确认是否完成初探？", "explore_complete"
-            )
+            explore_prompt = explore_complete_synthesis_draft()
+            text = append_gate_reply_hint(explore_prompt, "explore_complete")
             gates = dict(session_state.get("gates") or {})
             gates["pending"] = {
                 "name": "explore_complete",
-                "prompt": "初探两线已完成，请确认是否完成初探？",
+                "prompt": explore_prompt,
             }
             session_state["gates"] = gates
             explore = dict(session_state.get("explore_closure") or {})
             explore["gate_pending"] = True
             session_state["explore_closure"] = explore
         elif can_set_explore_gate_pending(session_state.get("explore_closure")):
-            text = append_gate_reply_hint(
-                "初探两线已完成，请确认是否完成初探？", "explore_complete"
-            )
+            explore_prompt = explore_complete_synthesis_draft()
+            text = append_gate_reply_hint(explore_prompt, "explore_complete")
             gates = dict(session_state.get("gates") or {})
             gates["pending"] = {
                 "name": "explore_complete",
-                "prompt": "初探两线已完成，请确认是否完成初探？",
+                "prompt": explore_prompt,
             }
             session_state["gates"] = gates
             explore = dict(session_state.get("explore_closure") or {})
