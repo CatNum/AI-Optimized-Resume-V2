@@ -15,10 +15,8 @@ from career_os.agents.lc.coordinator_llm import (
 from career_os.agents.state.coordinator import CoordinatorState
 from career_os.config import settings
 from career_os.harness.chat_history_scope import select_worker_chat_history
-from career_os.harness.profile_memory import (
-    attach_profile_memory_to_context,
-    build_profile_aware_chat_draft,
-)
+from career_os.agents.lc.coordinator_llm import build_phase_synthesis_draft
+from career_os.harness.profile_memory import attach_profile_memory_to_context
 from career_os.platform.store.session import slice_chat_rounds
 from career_os.harness.pipeline_phase_transition import (
     apply_list_phase,
@@ -440,7 +438,7 @@ def build_coordinator_graph(
                 if explore_flow_active(session_state):
                     text = explore_continue_synthesis_draft(session_state)
                 else:
-                    text = build_profile_aware_chat_draft(
+                    text = build_phase_synthesis_draft(
                         state.get("user_message", ""), session_state
                     )
             elif worker_id := (last.get("worker_id") or state.get("current_worker_id")):
@@ -452,7 +450,7 @@ def build_coordinator_graph(
                 text = structured.get("user_visible_summary") or "已完成本轮处理。"
 
         if text is None:
-            text = build_profile_aware_chat_draft(
+            text = build_phase_synthesis_draft(
                 state.get("user_message", ""), session_state
             )
 

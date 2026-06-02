@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from career_os.harness.jd_prerequisites import is_jd_intent
+
 _RULE_CONFIDENCE = 0.95
 
 _HISTORY_SCOPE_PHRASES = (
@@ -112,3 +114,97 @@ def match_profile_memory_rules(user_message: str) -> set[str]:
     if re.search(r"有没有|是否已有|档案", text):
         sections.update({"resume", "basic_intent", "exploration"})
     return sections
+
+
+_INTENT_MARKET_PHRASES = (
+    "市场",
+    "趋势",
+    "岗位族",
+    "行业分析",
+    "市场分析",
+)
+
+_INTENT_JD_EVAL_PHRASES = (
+    "评估 jd",
+    "评估jd",
+    "匹配度",
+    "投这个岗",
+    "分析岗位",
+    "岗位评估",
+    "jd 分析",
+    "jd分析",
+)
+
+_INTENT_RESUME_STRATEGY_PHRASES = (
+    "简历策略",
+    "优化策略",
+    "怎么改简历",
+    "如何改简历",
+    "简历优化策略",
+    "按这份",
+    "按照这个",
+    "按这个 jd",
+    "按这个jd",
+    "优化方案",
+)
+
+_INTENT_RESUME_OPTIMIZE_PHRASES = (
+    "开始优化简历",
+    "改工作经历",
+    "生成 html",
+    "生成简历",
+    "优化简历",
+)
+
+# 用户声明已有在做的 Agent 项目（未必含「策略/简历」字样）
+_INTENT_DECLARE_AGENT_PROJECT_PHRASES = (
+    "正在做",
+    "我在做",
+    "我做的是",
+    "我做的是",
+    "正在开发",
+    "在开发",
+    "用正在做",
+    "直接用",
+    "职业规划",
+    "职业 agent",
+    "career",
+)
+
+
+def _declares_agent_project(text: str, lower: str) -> bool:
+    has_agent = "agent" in lower or "智能体" in text or "agen" in lower
+    if not has_agent and "职业规划" not in text:
+        return False
+    if any(p in text for p in _INTENT_DECLARE_AGENT_PROJECT_PHRASES):
+        return True
+    if "项目" in text and has_agent:
+        return True
+    return False
+
+
+def match_pipeline_intent_rule_ids(user_message: str) -> list[str]:
+    """Return matched intent rule ids in priority order (highest phase first)."""
+    text = (user_message or "").strip()
+    if not text:
+        return []
+    lower = text.lower()
+    matched: list[str] = []
+    if any(p in text for p in _INTENT_RESUME_OPTIMIZE_PHRASES) or (
+        "优化" in text and "简历" in text and "策略" not in text
+    ):
+        matched.append("intent_resume_optimize")
+    if any(p in text or p in lower for p in _INTENT_RESUME_STRATEGY_PHRASES):
+        matched.append("intent_resume_strategy")
+    if "策略" in text and ("简历" in text or "jd" in lower):
+        if "intent_resume_strategy" not in matched:
+            matched.append("intent_resume_strategy")
+    if any(p in text or p in lower for p in _INTENT_JD_EVAL_PHRASES) or is_jd_intent(
+        text
+    ):
+        matched.append("intent_jd_eval")
+    if any(p in text for p in _INTENT_MARKET_PHRASES):
+        matched.append("intent_market")
+    if _declares_agent_project(text, lower):
+        matched.append("intent_declare_agent_project")
+    return matched

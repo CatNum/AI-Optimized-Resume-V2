@@ -45,3 +45,9 @@ def test_phase_after_worker_segment_complete():
     )
     assert phase_after_worker_segment_complete("identity", {"phase_status": PHASE_SEGMENT_COMPLETE}) is None
     assert phase_after_worker_segment_complete("market", {"phase_status": "in_progress"}) is None
+    assert (
+        phase_after_worker_segment_complete(
+            "strategy", {"phase_status": PHASE_SEGMENT_COMPLETE}
+        )
+        == "resume_strategy"
+    )

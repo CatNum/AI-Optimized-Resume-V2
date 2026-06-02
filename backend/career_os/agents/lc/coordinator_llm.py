@@ -18,6 +18,7 @@ from career_os.harness.explore_depth import can_offer_explore_complete
 from career_os.harness.pipeline_routing import (
     as_pipeline_analyze_result,
     enforce_pipeline_phase_rules,
+    get_current_phase,
     infer_pipeline_phase_from_workers,
     is_pipeline_session,
     pipeline_analyze_payload,
@@ -30,6 +31,7 @@ from career_os.harness.explore_guidance import (
 )
 from career_os.harness.explore_intake import enforce_explore_intake, explore_intake_payload
 from career_os.harness.profile_memory import (
+    format_profile_memory_for_draft,
     materialize_profile_memory,
     resolve_profile_memory_sections,
 )
@@ -37,6 +39,9 @@ from career_os.platform.prompt.loader import load_coordinator_prompt
 
 EXPLORE_WORKERS = frozenset({"identity", "capability"})
 JD_WORKERS = frozenset({"market", "opportunity", "strategy", "resume", "asset"})
+DEEP_PIPELINE_PHASES = frozenset(
+    {"market", "jd_analysis", "resume_strategy", "resume_optimize"}
+)
 
 _SMALL_TALK_PHRASES = frozenset(
     {
@@ -105,6 +110,114 @@ def explore_complete_synthesis_draft() -> str:
         "内在需求和能力图谱两条线我们都梳理完了。想请你确认一下："
         "你觉得我们刚才的交流，是否已经足够完整地概括了你的职业画像？"
         "若你确认完成，我就可以开始帮你分析目标方向的市场机会和岗位画像。"
+    )
+
+
+def _market_continue_draft(session_state: dict[str, Any]) -> str:
+    from career_os.harness.session_activity import build_session_activity
+
+    headline = (build_session_activity(session_state).get("headline") or "")
+    return (
+        f"【pipeline 阶段 SSOT】current_phase=market；{headline}。\n"
+        "用户可能在续聊市场趋势或准备提交 JD。请直接回应其问题；"
+        "若需 JD 全文可邀请粘贴；不要套用寒暄模板。"
+    )
+
+
+def _jd_analysis_continue_draft(
+    user_message: str,
+    session_state: dict[str, Any],
+) -> str:
+    from career_os.harness.session_activity import build_session_activity
+
+    headline = (build_session_activity(session_state).get("headline") or "")
+    lines = [
+        f"【pipeline 阶段 SSOT】current_phase=jd_analysis；{headline}。",
+        "用户可能在续聊 JD 匹配评估。若其问的是简历策略或如何改简历，"
+        "应基于已有评估结论作答，而非重复初探引导。",
+    ]
+    if "策略" in user_message or "优化" in user_message:
+        lines.append("本轮语义偏策略：优先回答如何优化，勿强行挂「不推荐投递」闸门。")
+    if "agent" in user_message.lower() or "智能体" in user_message or "职业规划" in user_message:
+        lines.append(
+            "用户可能在说明已有 Agent 实战：承认该项目即可，勿推荐另选智能客服/代码审查模板。"
+        )
+    return "\n".join(lines)
+
+
+def _resume_strategy_continue_draft(
+    user_message: str,
+    session_state: dict[str, Any],
+) -> str:
+    pending = (session_state.get("gates") or {}).get("pending") or {}
+    pending_name = pending.get("name") or ""
+    prior = session_state.get("prior_results") or {}
+    strategy = prior.get("strategy") or {}
+    opportunity = prior.get("opportunity") or {}
+    lines = [
+        "【pipeline 阶段 SSOT】current_phase=resume_strategy。",
+        "用户本轮关注简历优化策略或如何用现有项目/经历写简历；须直接回答问题。",
+    ]
+    if pending_name == "jd_continue_despite_not_recommended":
+        lines.append("存在待确认 JD 闸门时可简短确认，但以回答策略与写法为主。")
+    else:
+        lines.append(
+            "禁止复读「暂不推荐投递」二选一闸门，除非用户明确要求重新做匹配评估。"
+        )
+    summary = strategy.get("user_visible_summary")
+    if summary:
+        lines.append(f"已有 strategy 产物，可融入要点：{str(summary)[:900]}")
+    elif opportunity.get("user_visible_summary"):
+        lines.append(
+            "可参考 prior opportunity 摘要中的策略建议段落；"
+            "用户若称已有 Agent 项目，应帮助其写入简历而非要求先补项目。"
+        )
+    if "项目" in user_message or "agent" in user_message.lower() or "职业规划" in user_message:
+        lines.append(
+            "用户已说明在做的 Agent/项目（如职业规划 Agent）：不得再追问「选智能客服还是代码审查」；"
+            "应基于用户所述项目类型，直接协助写进简历或给 STAR/技术栈表述建议。"
+        )
+    memory_sections = resolve_profile_memory_sections(user_message, session_state)
+    memory = materialize_profile_memory(memory_sections, full_resume_text=False)
+    facts = format_profile_memory_for_draft(memory)
+    lines.append(f"【本回合档案事实 — 回答须与此一致】\n{facts}")
+    return "\n".join(lines)
+
+
+def _resume_optimize_continue_draft(session_state: dict[str, Any]) -> str:
+    from career_os.harness.session_activity import build_session_activity
+
+    headline = (build_session_activity(session_state).get("headline") or "")
+    return (
+        f"【pipeline 阶段 SSOT】current_phase=resume_optimize；{headline}。\n"
+        "用户处于简历优化执行阶段；回应其关于改写、模块或交付物的具体问题。"
+    )
+
+
+def build_phase_synthesis_draft(
+    user_message: str,
+    session_state: dict[str, Any],
+) -> str:
+    """Phase-aware synthesis draft; deep phases avoid chat_only 寒暄模板."""
+    from career_os.harness.profile_memory import build_profile_aware_chat_draft
+
+    phase = get_current_phase(session_state) or "explore"
+    if not is_pipeline_session(session_state) or phase not in DEEP_PIPELINE_PHASES:
+        return build_profile_aware_chat_draft(user_message, session_state)
+    if phase == "market":
+        base = _market_continue_draft(session_state)
+    elif phase == "jd_analysis":
+        base = _jd_analysis_continue_draft(user_message, session_state)
+    elif phase == "resume_strategy":
+        return _resume_strategy_continue_draft(user_message, session_state)
+    else:
+        base = _resume_optimize_continue_draft(session_state)
+    memory_sections = resolve_profile_memory_sections(user_message, session_state)
+    memory = materialize_profile_memory(memory_sections, full_resume_text=False)
+    facts = format_profile_memory_for_draft(memory)
+    return (
+        f"{base}\n\n【本回合档案事实】\n{facts}\n"
+        "若 resume_on_file 为真，不得声称没有用户简历。"
     )
 
 
@@ -268,16 +381,38 @@ def fallback_analyze_workers(
                 session_state,
             )
             return enforce_explore_intake(result, session_state)
+        from career_os.harness.micro_classifier_rules import (
+            match_pipeline_intent_rule_ids,
+        )
+
+        rule_ids = match_pipeline_intent_rule_ids(user_message)
+        if rule_ids & {"intent_resume_strategy", "intent_declare_agent_project"}:
+            result = enforce_pipeline_phase_rules(
+                {
+                    "workers": ["strategy"],
+                    "pipeline_phase": "resume_strategy",
+                    "list_type": "pipeline",
+                },
+                session_state,
+                user_message,
+            )
+            return enforce_explore_intake(result, session_state)
         if (
             "market" in prior
             and "opportunity" in prior
             and "strategy" not in prior
             and any(k in user_message for k in ("策略", "继续", "下一步", "制定"))
         ):
-            return as_pipeline_analyze_result(
-                {"workers": ["strategy"], "pipeline_phase": "resume_strategy"},
+            result = enforce_pipeline_phase_rules(
+                {
+                    "workers": ["strategy"],
+                    "pipeline_phase": "resume_strategy",
+                    "list_type": "pipeline",
+                },
                 session_state,
+                user_message,
             )
+            return enforce_explore_intake(result, session_state)
         if flags.get("optimize_confirmed"):
             if ("优化" in user_message or "resume" in text) and "resume" not in prior:
                 return as_pipeline_analyze_result(
@@ -366,7 +501,9 @@ def analyze_workers(
             memory_sections, full_resume_text=False
         )
     if session_state.get("list_type") == "pipeline":
-        analyze_payload.update(pipeline_analyze_payload(session_state))
+        analyze_payload.update(
+            pipeline_analyze_payload(session_state, user_message)
+        )
     user = json.dumps(analyze_payload, ensure_ascii=False)
     try:
         data = lc_client.invoke_json(_coordinator_system(), user, role=LLMRole.COORDINATOR)
@@ -440,7 +577,7 @@ def build_synthesis_messages(
     if session_state.get("list_type") == "pipeline":
         from career_os.harness.session_activity import build_session_activity
 
-        payload["pipeline"] = pipeline_analyze_payload(session_state)
+        payload["pipeline"] = pipeline_analyze_payload(session_state, user_message)
         payload["session_activity"] = build_session_activity(session_state)
     user = json.dumps(payload, ensure_ascii=False)
     return _coordinator_system(), user

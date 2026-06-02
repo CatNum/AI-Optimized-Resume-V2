@@ -138,7 +138,15 @@ Harness 在 `delegate_worker` 层对 **market / opportunity / strategy** 硬拦�
 | explore_gate_confirmed | session 是否已确认离开初探 |
 | can_offer_explore_complete | 是否可挂 explore_complete 问句 |
 
-**任务**：根据输入决定本轮派哪些 Worker，并给出 list_type（若适用）。`list_type=pipeline` 时 **只派** `allowed_workers` 中的 worker。
+**任务**：根据输入决定本轮派哪些 Worker，并给出 list_type（若适用）。
+
+**pipeline 阶段（重要）**：
+
+- `pipeline_phase` 表示 **用户本轮想进入的阶段**，不必等于 `current_phase`；若用户意图更靠后且门槛满足，应填写 **更靠后的** `pipeline_phase`（如已在谈简历策略或说明在做的 Agent 项目 → `resume_strategy`）。
+- 填写 forward 的 `pipeline_phase` 后，**workers 须与该阶段主 Worker 一致**（如 `resume_strategy` → `["strategy"]`）。**禁止** `current_phase=jd_analysis` 时只派 `strategy` 而不把 `pipeline_phase` 设为 `resume_strategy`。
+- 过滤时以推进后的阶段为准；`allowed_workers` 输入反映 **推进前** 的列表，若你已 forward phase，按目标阶段选 worker。
+
+`list_type=pipeline` 时 workers 必须属于目标阶段允许集合。
 
 **输出契约**（analyze 专用）：
 
@@ -149,7 +157,9 @@ Harness 在 `delegate_worker` 层对 **market / opportunity / strategy** 硬拦�
 | ---------- | --------------- | ---- | --------------------------------------- |
 | workers    | string[]        | 是   | 本轮派工列表；无派工时为 `[]`           |
 | list_type       | `"pipeline"` \| null | 是 | pipeline 会话固定为 `"pipeline"`；无派工可为 `null` |
-| pipeline_phase  | string               | pipeline 会话建议填写 | 与 `current_phase` 对齐，如 `explore`、`market`、`jd_analysis` |
+| pipeline_phase  | string               | pipeline 会话 **建议必填** | **本轮用户意图的目标阶段**（可 forward 于 `current_phase`）；系统会先推进阶段再过滤 workers |
+| has_jd_context  | boolean              | 会话是否已有 JD/评估上下文 | |
+| phase_advance_policy | string          | 阶段推进说明（只读） | 见输入 JSON |
 
 - **禁止**：额外字段、自然语言说明、workers 含 worker_index 外的 id；**禁止** 输出 `list_type` 为 `explore` 或 `jd`
 
@@ -158,7 +168,9 @@ Harness 在 `delegate_worker` 层对 **market / opportunity / strategy** 硬拦�
 1. 纯问候、寒暄、无明确职业意图（如「你好」「在吗」）→ `{"workers": [], "list_type": null}`（不派工；由 synthesize 节点引导用户说明职业诉求）
 2. `current_phase=explore`（或初探意图）→ workers 只能含 identity、capability；`list_type":"pipeline"`, `pipeline_phase":"explore"`
 3. JD/岗位评估意图 → 仅当 `jd_prerequisites_met=true` 且 `explore_gate_confirmed=true` 才可派 market、opportunity 等；`list_type":"pipeline"`，`pipeline_phase` 为 `market` 或 `jd_analysis`；否则 `workers=[]`
-4. 有派工时 **必须** `list_type":"pipeline"`，并按 `allowed_workers` 选 worker
+4. 有派工时 **必须** `list_type":"pipeline"`，workers 与 `pipeline_phase` 一致
+5. 用户说明 **正在做的 Agent/职业规划类项目**、或问 **如何按 JD 写简历/策略** → `pipeline_phase":"resume_strategy"`, `workers":["strategy"]`（须 `has_jd_context=true`）
+6. 含糊的「下一步」「继续」且无策略/JD/优化语义 → **不要** forward phase；`workers:[]` 或维持当前阶段
 
 **示例**：
 

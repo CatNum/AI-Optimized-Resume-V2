@@ -6,7 +6,7 @@
 | 版本 | **0.2.0** |
 | 日期 | 2026-06-02 |
 | 触发 | Demo 会话「失忆」根因分析之二：历史注入无法单独修复阶段/初探语义错乱 |
-| 关联 | [task-system-pipeline-upgrade](./2026-06-01-task-system-pipeline-upgrade-design.md)、[coordinator-full-chat-history](./2026-06-02-coordinator-full-chat-history-design.md)、[profile-long-term-memory](./2026-06-02-profile-long-term-memory-design.md)、[10-会话闸门与state](../../architecture/10-会话闸门与state.md) |
+| 关联 | [task-system-pipeline-upgrade](./2026-06-01-task-system-pipeline-upgrade-design.md)、[coordinator-full-chat-history](./2026-06-02-coordinator-full-chat-history-design.md)、[profile-long-term-memory](./2026-06-02-profile-long-term-memory-design.md)、[pipeline-intent-phase-transitions](./2026-06-02-pipeline-intent-phase-transitions-design.md)（**已实现**，扩展 §5 流转）、[10-会话闸门与state](../../architecture/10-会话闸门与state.md) |
 | 实现计划 | [2026-06-02-pipeline-phase-explore-state.md](../plans/2026-06-02-pipeline-phase-explore-state.md) |
 
 ---

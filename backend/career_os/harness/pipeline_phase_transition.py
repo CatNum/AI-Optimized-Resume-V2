@@ -11,6 +11,7 @@ from career_os.platform.store.task import TaskStore, TaskStoreError
 WORKER_SEGMENT_PHASE: dict[str, str] = {
     "market": "market",
     "opportunity": "jd_analysis",
+    "strategy": "resume_strategy",
 }
 
 

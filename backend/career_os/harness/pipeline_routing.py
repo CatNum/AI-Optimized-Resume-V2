@@ -92,7 +92,12 @@ def is_pipeline_explore_phase(session_state: dict[str, Any]) -> bool:
     )
 
 
-def pipeline_analyze_payload(session_state: dict[str, Any]) -> dict[str, Any]:
+def pipeline_analyze_payload(
+    session_state: dict[str, Any],
+    user_message: str = "",
+) -> dict[str, Any]:
+    from career_os.harness.pipeline_jd_context import has_jd_context
+
     phase = get_current_phase(session_state) or "explore"
     flags = (session_state.get("gates") or {}).get("flags") or {}
     allowed = sorted(PHASE_PRIMARY_WORKERS.get(phase, frozenset()))
@@ -104,6 +109,14 @@ def pipeline_analyze_payload(session_state: dict[str, Any]) -> dict[str, Any]:
         "strategy_complete": bool(flags.get("strategy_complete")),
         "optimize_confirmed": bool(flags.get("optimize_confirmed")),
         "milestone_id": PHASE_TO_MILESTONE_ID.get(phase),
+        "has_jd_context": has_jd_context(session_state, user_message),
+        "phase_advance_policy": (
+            "pipeline_phase 表示本轮用户意图对应的目标阶段，可 forward 于 current_phase；"
+            "填写后系统会先推进阶段再按该阶段过滤 workers。"
+            "用户询问简历策略、说明在做的 Agent 项目、或要求按 JD 改简历时，"
+            "若 current_phase 为 jd_analysis，应设 pipeline_phase=resume_strategy、workers=[\"strategy\"]。"
+            "workers 与 pipeline_phase 须一致，勿在 jd_analysis 阶段单独派 strategy 而不改 phase。"
+        ),
     }
 
 
@@ -136,13 +149,22 @@ def enforce_pipeline_phase_rules(
 ) -> dict[str, Any]:
     if session_state.get("list_type") != "pipeline":
         return result
-    current_phase = get_current_phase(session_state) or "explore"
+    from career_os.harness.pipeline_phase_advance import (
+        PHASE_RANK,
+        maybe_advance_phase_from_analyze,
+    )
+
+    current_phase = maybe_advance_phase_from_analyze(
+        result, session_state, user_message
+    )
     inferred_phase = result.get("pipeline_phase") or infer_pipeline_phase_from_workers(
         result.get("workers") or [], session_state
     )
     pipeline_phase = (
         inferred_phase if inferred_phase in PIPELINE_PHASES else current_phase
     )
+    if PHASE_RANK.get(pipeline_phase, -1) < PHASE_RANK.get(current_phase, 0):
+        pipeline_phase = current_phase
     requested_workers = list(result.get("workers") or [])
     workers = filter_workers_for_pipeline(
         requested_workers, session_state, phase=current_phase
@@ -195,6 +217,11 @@ def pipeline_fallback_workers(
 ) -> dict[str, Any] | None:
     if session_state.get("list_type") != "pipeline":
         return None
+    suggested = session_state.pop("intent_suggested_workers", None)
+    if suggested:
+        return enforce_pipeline_phase_rules(
+            {"workers": list(suggested)}, session_state, user_message
+        )
     phase = get_current_phase(session_state) or "explore"
     text = user_message.lower()
     prior = session_state.get("prior_results") or {}
@@ -218,7 +245,8 @@ def pipeline_fallback_workers(
             {"workers": w}, session_state, user_message
         )
     if phase == "resume_strategy" and any(
-        k in user_message for k in ("策略", "继续", "下一步", "制定")
+        k in user_message
+        for k in ("策略", "继续", "下一步", "制定", "优化", "改简历", "项目", "agent")
     ):
         return enforce_pipeline_phase_rules(
             {"workers": ["strategy"]}, session_state, user_message

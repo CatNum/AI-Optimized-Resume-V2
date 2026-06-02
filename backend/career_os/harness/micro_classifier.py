@@ -12,12 +12,16 @@ from career_os.config import settings
 from career_os.harness.gate_rules import is_rule_clear_hit, match_gate_intent_rules
 from career_os.harness.micro_classifier_rules import (
     match_history_scope_rules,
+    match_pipeline_intent_rule_ids,
     match_profile_memory_rules,
 )
+from career_os.platform.pipeline_constants import PIPELINE_PHASES
 from career_os.platform.prompt.loader import load_gate_intent_prompt, load_micro_classifier_prompt
 
 _LLM_TIMEOUT_S = 3.0
-_TASKS = frozenset({"gate_intent", "history_scope", "profile_memory_scope"})
+_TASKS = frozenset(
+    {"gate_intent", "history_scope", "profile_memory_scope", "pipeline_phase_intent"}
+)
 
 
 def classify(
@@ -32,7 +36,9 @@ def classify(
         return _classify_gate_intent(user_message, context)
     if task == "history_scope":
         return _classify_history_scope(user_message)
-    return _classify_profile_memory_scope(user_message, context)
+    if task == "profile_memory_scope":
+        return _classify_profile_memory_scope(user_message, context)
+    return _classify_pipeline_phase_intent(user_message, context)
 
 
 def _classify_gate_intent(user_message: str, context: dict[str, Any]) -> dict[str, Any]:
@@ -171,6 +177,49 @@ def _classify_profile_memory_scope(
         sections = []
     return {
         "sections": sections,
+        "confidence": confidence,
+        "source": "llm",
+        "reason": (data.get("reason") or "")[:120] or None,
+    }
+
+
+def _classify_pipeline_phase_intent(
+    user_message: str,
+    context: dict[str, Any],
+) -> dict[str, Any]:
+    rule_ids = match_pipeline_intent_rule_ids(user_message)
+    if rule_ids:
+        return {
+            "target_phase": None,
+            "confidence": 0.95,
+            "source": "rule",
+            "reason": f"rules:{','.join(rule_ids)}",
+        }
+    if not llm_enabled():
+        return {"target_phase": None, "confidence": 0.0, "source": "none"}
+    payload = {
+        "user_message": user_message,
+        "current_phase": context.get("current_phase"),
+        "prior_workers": context.get("prior_workers") or [],
+        "has_jd_context": context.get("has_jd_context"),
+        "gates_pending": context.get("gates_pending"),
+    }
+    data = _invoke_task(
+        "pipeline_phase_intent",
+        load_micro_classifier_prompt("pipeline_phase_intent"),
+        payload,
+    )
+    if not data:
+        return {"target_phase": None, "confidence": 0.0, "source": "llm"}
+    target = data.get("target_phase")
+    if target is not None and target not in PIPELINE_PHASES:
+        target = None
+    confidence = float(data.get("confidence") or 0.0)
+    threshold = settings.history_scope_llm_accept_threshold
+    if confidence < threshold:
+        target = None
+    return {
+        "target_phase": target,
         "confidence": confidence,
         "source": "llm",
         "reason": (data.get("reason") or "")[:120] or None,
