@@ -136,11 +136,11 @@ uv run pytest tests/eval/ -m llm -v
 - [ ] 如果要同时生成多种档位的 html 简历优化，应该按照保守、标准、进取的顺序进行生成，在创建细分多任务列表时，注意哪些信息可以复用（PRD 已定义多选多份与语义后缀 [B06](docs/prd/B06.%20流程-简历优化%20PRD.md)；生成顺序与 work 复用待实现）
   - [ ] 这里应该引入一个 skill
 - [ ] 如何区分任务是否需要拆分为多任务列表？
-- [ ] 引入简历模板 Skill：在创建简历 HTML 时，根据用户选择的预置风格，调用 Skill 中不同的部分，生成对应的最终简历
 - [ ] 记忆系统（主要指长期记忆）
   - [ ] 文件数多了之后，进行去重、合并、剪枝
   - [ ] 加索引，索引常驻 System Prompt，按需加载
     - [ ] 通过 side-query 将索引文件发给 llm，让 llm 选择；side-query 失败（API 错误、JSON 解析失败），降级到关键词匹配 name + description
+- [ ] 当前任务过于固定，改为动态生成
 
 ## todo
 
@@ -149,9 +149,11 @@ uv run pytest tests/eval/ -m llm -v
 - [ ] 加入监测、可审计、过程日志记录，帮助升级 Harness（trace JSONL 已有基础，待产品化）
 - [ ] 引入 offer 对比、选择：规划 AI Agent 引入外包、正编、五险一金等 offer 对比功能，使用 skill 引入
 - [ ] 就业城市选择、大学城市、专业选择、定居城市选择等等（要不要做呢？有点大而全了）：AI Agent 的项目其实还可以做更多东西，比如说城市选择、未来结婚的时间点、行业与城市供应链选择；从大学刚毕业或高考之后选专业、大学城市，再选行业与所在城市，以及跟对象的定居城市、长期发展城市等
-- [ ] 引入模板解析 Agent：用户上传简历模板，做一个模板解析 agent，解析成对应的 html，解析出对应的模板简历风格，补充到用户自定义的简历模板 Skill 中
 - [ ] 上下文压缩：session memory 关注同一会话内的连续性；compact 之后，当前会话还需要保留哪些上下文。两者配合使用：Memory 管长期知识，session memory 管当前会话的压缩续接
 - [x] Skill 管理：Python `career_os` Harness（见 [docs/architecture/02-平台服务.md](docs/architecture/02-平台服务.md)）
+- [ ] 加入评测 Agent
+- [ ] 引入简历模板 Skill：在创建简历 HTML 时，根据用户选择的预置风格，调用 Skill 中不同的部分，生成对应的最终简历
+  - [ ] 引入模板解析 Agent：用户上传简历模板，做一个模板解析 agent，解析成对应的 html，解析出对应的模板简历风格，补充到用户自定义的简历模板 Skill 中 
 
 ## 核心
 
