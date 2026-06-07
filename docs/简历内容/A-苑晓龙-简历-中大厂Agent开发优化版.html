@@ -301,24 +301,6 @@
       <article class="item project-focus">
         <div class="item-head">
           <div>
-            <div class="item-title">BAS（突破与攻击模拟系统）</div>
-          </div>
-          <div class="time">2024.05 – 2026.03</div>
-        </div>
-        <ul>
-          <li>负责 BAS 多场景需求评审、技术方案设计与核心开发，覆盖邮件安全、WAF、终端安全、数据保护、容器安全与 <span class="emphasis">LLM 安全</span> 等攻击模拟场景。</li>
-          <li>将 Claude Code、Cursor、OpenSpec、OpenSkill、Superpowers 引入需求拆解、方案设计、代码实现、结果校验与迭代闭环，形成面向复杂需求的 <span class="emphasis">AI 编程 / Agentic Coding 工作流</span>，提升研发效率与交付一致性。</li>
-          <li>设计并落地 <span class="emphasis">实时表 + 快照表 + 版本管理</span> 方案，解决标签频繁变更场景下快照数据难追溯、难维护的问题，提升历史结果可复现性与数据一致性，支撑审计与统计场景长期演进。</li>
-          <li>设计并实现数据防泄漏模块，支持 <span class="emphasis">HTTP/HTTPS/SMTP/FTP/Git 等直连外传</span> 与 <span class="emphasis">SOCKS5 over WebSocket / DNS / ICMP 隐蔽通道</span> 两类泄露路径模拟，并通过 <span class="emphasis">目标端文件回查与 Hash 校验</span> 建立泄露验证闭环，提升复杂外传场景的可验证性与覆盖深度。</li>
-          <li>将全量取再生成报表的链路重构为基于 <span class="emphasis">rpc stream、sql.Rows 与 Go channel</span> 的流式生成方案，解耦 <span class="emphasis">Excel、Word、PDF</span> 的数据获取与文件生成逻辑，降低大报表导出场景下的 <span class="emphasis">内存峰值与 OOM 风险</span>，提升 <span class="emphasis">生成效率与系统稳定性</span>。</li>
-          <li>优化千万级数据统计 JOIN 查询，通过 EXPLAIN 分析、索引设计与 SQL 重写，将 <span class="emphasis">10 秒级慢查询</span> 降至 <span class="emphasis">0.5–1 秒</span>，支撑统计页面稳定访问。</li>
-          <li>系统性治理多表 JOIN、协程泄漏与字符串处理低效等性能问题，结合 pprof、日志与执行计划持续优化系统性能与资源开销。</li>
-        </ul>
-      </article>
-
-      <article class="item project-focus">
-        <div class="item-head">
-          <div>
             <div class="item-title">db-migrate｜PostgreSQL 数据库迁移治理 CLI</div>
           </div>
         </div>
@@ -333,6 +315,24 @@
           <li>实现“<span class="emphasis">源表主键上界 + 目标断点主键（<code>dest_pk ≤ source_max</code>）</span>”续跑算法，支持中断后从断点恢复。</li>
           <li>基于 <code>pg_class.reltuples</code> 与 <code>pg_stats.histogram_bounds</code> 输出<span class="emphasis">迁移进度与剩余时间日志</span>，增强迁移过程可观测性与执行预期管理。</li>
           <li><strong>结果：</strong>支撑 changelog <span class="emphasis">700+</span> 迁移脚本按序执行与审计，使发布流程由人工执行转为<span class="emphasis">可控、可追踪、可恢复</span>的标准化流程。</li>
+        </ul>
+      </article>
+
+      <article class="item project-focus">
+        <div class="item-head">
+          <div>
+            <div class="item-title">BAS（突破与攻击模拟系统）</div>
+          </div>
+          <div class="time">2024.05 – 2026.03</div>
+        </div>
+        <ul>
+          <li>负责 BAS 多场景需求评审、技术方案设计与核心开发，覆盖邮件安全、WAF、终端安全、数据保护、容器安全与 <span class="emphasis">LLM 安全</span> 等攻击模拟场景。</li>
+          <li>将 Claude Code、Cursor、OpenSpec、OpenSkill、Superpowers 引入需求拆解、方案设计、代码实现、结果校验与迭代闭环，形成面向复杂需求的 <span class="emphasis">AI 编程 / Agentic Coding 工作流</span>，提升研发效率与交付一致性。</li>
+          <li>设计并落地 <span class="emphasis">实时表 + 快照表 + 版本管理</span> 方案，解决标签频繁变更场景下快照数据难追溯、难维护的问题，提升历史结果可复现性与数据一致性，支撑审计与统计场景长期演进。</li>
+          <li>设计并实现数据防泄漏模块，支持 <span class="emphasis">HTTP/HTTPS/SMTP/FTP/Git 等直连外传</span> 与 <span class="emphasis">SOCKS5 over WebSocket / DNS / ICMP 隐蔽通道</span> 两类泄露路径模拟，并通过 <span class="emphasis">目标端文件回查与 Hash 校验</span> 建立泄露验证闭环，提升复杂外传场景的可验证性与覆盖深度。</li>
+          <li>将全量取再生成报表的链路重构为基于 <span class="emphasis">rpc stream、sql.Rows 与 Go channel</span> 的流式生成方案，解耦 <span class="emphasis">Excel、Word、PDF</span> 的数据获取与文件生成逻辑，降低大报表导出场景下的 <span class="emphasis">内存峰值与 OOM 风险</span>，提升 <span class="emphasis">生成效率与系统稳定性</span>。</li>
+          <li>优化千万级数据统计 JOIN 查询，通过 EXPLAIN 分析、索引设计与 SQL 重写，将 <span class="emphasis">10 秒级慢查询</span> 降至 <span class="emphasis">0.5–1 秒</span>，支撑统计页面稳定访问。</li>
+          <li>系统性治理多表 JOIN、协程泄漏与字符串处理低效等性能问题，结合 pprof、日志与执行计划持续优化系统性能与资源开销。</li>
         </ul>
       </article>
 
