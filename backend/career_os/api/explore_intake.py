@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import BaseModel, field_validator
 
 from career_os.harness.explore_intake import explore_intake_submitted
+from career_os.harness.explore_intake import resolve_explore_intake
 from career_os.harness.explore_intake_fields import (
     merge_intake_field_values,
     profile_patches_from_resolved,
@@ -74,7 +75,12 @@ def submit_explore_intake(body: ExploreIntakeRequest) -> dict[str, Any]:
         raise ValueError("session_not_found")
     profile_store = ProfileStore()
     intake, profile_patches = build_explore_intake_patches(body)
-    profile_store.patch(profile_patches)
+    profile_store.patch(
+        [
+            *profile_patches,
+            {"path": "exploration.intake", "value": intake, "op": "set"},
+        ]
+    )
     state = session_store.get_state(body.session_id)
     state["intake_status"] = intake
     session_store.update_state(body.session_id, state)
@@ -100,10 +106,9 @@ def get_explore_intake_status(session_id: str | None = None) -> dict[str, Any]:
     intake: dict[str, Any] = {}
     if session_id:
         session = SessionStore().get_state(session_id)
-        intake = session.get("intake_status") or {}
+        intake = resolve_explore_intake(session)
     else:
-        profile = ProfileStore().get(["exploration"])
-        intake = (profile.get("exploration") or {}).get("intake") or {}
+        intake = resolve_explore_intake({})
     return {
         "submitted": explore_intake_submitted({"intake_status": intake}),
         "intake": intake,

@@ -15,8 +15,15 @@ from career_os.harness.orchestrator import ChatOrchestrator
 from career_os.harness.session_activity import build_session_activity
 from career_os.platform.store.profile import ProfileStore
 from career_os.platform.store.session import SessionStore
-from career_os.harness.pipeline_gates import compute_hard_pass
-from career_os.platform.pipeline_template import instantiate_pipeline_for_session
+from career_os.harness.pipeline_gates import (
+    compute_hard_pass,
+    jump_to_phase,
+)
+from career_os.platform.pipeline_template import (
+    hydrate_explore_completion_from_sessions,
+    seed_session_explore_completion_from_profile,
+    instantiate_pipeline_for_session,
+)
 from career_os.platform.store.task import TaskStore, TaskStoreError
 
 router = APIRouter(prefix="/v1")
@@ -329,8 +336,30 @@ def get_tasks(session_id: str | None = Query(default=None)):
     _validate_session_id_for_tasks(session_id)
     store = TaskStore()
     session_store = SessionStore()
+    hydrate_explore_completion_from_sessions()
     if not session_store.session_exists(session_id):
         raise _task_error(404, "session_not_found", "Session not found")
+    state = session_store.get_state(session_id)
+    state["session_id"] = session_id
+    profile = ProfileStore().get(["exploration", "intent"])
+    if seed_session_explore_completion_from_profile(state, profile):
+        session_store.update_state(session_id, state)
+    closure = state.get("explore_closure") or {}
+    flags = (state.get("gates") or {}).get("flags") or {}
+    if (
+        state.get("list_type") == "pipeline"
+        and (store.get_list_meta(state.get("list_id") or "") or {}).get("current_phase")
+        == "explore"
+        and not flags.get("explore_return_requested")
+        and not flags.get("explore_continue_requested")
+        and (profile.get("exploration") or {}).get("completed_at")
+    ):
+        list_id = state.get("list_id")
+        if list_id:
+            promoted = jump_to_phase(session_id, list_id, "market", state)
+            if not hasattr(promoted, "code"):
+                state = session_store.get_state(session_id)
+                session_store.update_state(session_id, state)
     raw_lists = store.list_lists_for_session(session_id)
     lists = [_format_task_list_row(store, row) for row in raw_lists]
     active_list_id = store.get_active_list_id_for_session(session_id)

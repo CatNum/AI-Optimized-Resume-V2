@@ -14,6 +14,14 @@ const PHASE_LABELS: Record<string, string> = {
   resume_optimize: "简历优化",
 };
 
+const PHASE_ORDER = [
+  "explore",
+  "market",
+  "jd_analysis",
+  "resume_strategy",
+  "resume_optimize",
+];
+
 function pickPipelineList(body: SessionTasksResponse): TaskListRow | null {
   const active = body.lists.find(
     (l) => l.status === "active" && l.list_type === "pipeline",
@@ -22,18 +30,19 @@ function pickPipelineList(body: SessionTasksResponse): TaskListRow | null {
   return body.lists.find((l) => l.list_type === "pipeline") ?? null;
 }
 
-function milestoneDisabled(
+function phaseIndex(phase: string): number {
+  return PHASE_ORDER.indexOf(phase);
+}
+
+function milestoneState(
   ms: MilestoneRow,
   list: TaskListRow,
-  body: SessionTasksResponse,
-): boolean {
-  const phase = ms.pipeline_phase;
-  if (phase === "explore") return false;
-  if (!body.explore_gate_confirmed) return true;
-  if (phase === "resume_optimize" && list.current_phase !== "resume_optimize") {
-    return true;
-  }
-  return false;
+): "other" | "current" | "disabled" {
+  const currentIndex = phaseIndex(list.current_phase ?? "explore");
+  const index = phaseIndex(ms.pipeline_phase);
+  if (index === currentIndex) return "current";
+  if (index >= 0 && currentIndex >= 0 && index < currentIndex) return "other";
+  return "disabled";
 }
 
 export function TaskProgress({
@@ -68,7 +77,6 @@ export function TaskProgress({
   const list = pickPipelineList(payload);
   if (!list?.milestones?.length) return null;
 
-  const current = list.current_phase ?? "explore";
   const weak = payload.ui_mode === "weak";
 
   return (
@@ -81,22 +89,27 @@ export function TaskProgress({
       ) : null}
       <ol className="task-progress__milestones">
         {list.milestones.map((ms) => {
-          const isCurrent = ms.pipeline_phase === current;
-          const disabled = milestoneDisabled(ms, list, payload);
+          const state = milestoneState(ms, list);
+          const isCurrent = state === "current";
           const hasWorks = isCurrent && ms.works.length > 0;
           return (
             <li
               key={ms.task_id}
               className={[
                 "task-progress__milestone",
-                isCurrent ? "task-progress__milestone--current" : "",
-                disabled ? "task-progress__milestone--disabled" : "",
+                `task-progress__milestone--${state}`,
               ]
                 .filter(Boolean)
                 .join(" ")}
+              aria-current={isCurrent ? "step" : undefined}
             >
-              <div className="task-progress__milestone-title">
-                {PHASE_LABELS[ms.pipeline_phase] ?? ms.subject}
+              <div className="task-progress__milestone-title-row">
+                <div className="task-progress__milestone-title">
+                  {PHASE_LABELS[ms.pipeline_phase] ?? ms.subject}
+                </div>
+                {isCurrent ? (
+                  <span className="task-progress__milestone-chip">进行中</span>
+                ) : null}
               </div>
               {hasWorks ? (
                 <ul className="task-progress__works">

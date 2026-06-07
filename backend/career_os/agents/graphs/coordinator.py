@@ -17,6 +17,7 @@ from career_os.config import settings
 from career_os.harness.chat_history_scope import select_worker_chat_history
 from career_os.agents.lc.coordinator_llm import build_phase_synthesis_draft
 from career_os.harness.profile_memory import attach_profile_memory_to_context
+from career_os.harness.pipeline_gates import compute_needs_full_explore
 from career_os.platform.store.session import slice_chat_rounds
 from career_os.harness.pipeline_phase_transition import (
     apply_list_phase,
@@ -47,7 +48,9 @@ from career_os.harness.explore_guidance import (
 )
 from career_os.harness.errors import HarnessError
 from career_os.harness.jd_prerequisites import parse_jd_b1_block_reason
+from career_os.harness.pipeline_intent_transition import apply_intent_phase_transition
 from career_os.platform.worker.registry import WorkerRegistry
+from career_os.platform.store.profile import ProfileStore
 from career_os.platform.store.session import SessionStore
 
 WorkerRunner = Callable[[str, str, dict[str, Any], dict[str, Any]], dict[str, Any]]
@@ -154,6 +157,18 @@ def build_coordinator_graph(
                 "stop_delegate": True,
             }
 
+        history_analyze = slice_chat_rounds(
+            state.get("messages") or [],
+            max_rounds=settings.coordinator_analyze_max_rounds,
+        )
+        intent_transition = apply_intent_phase_transition(
+            state.get("user_message", ""),
+            session_state,
+            chat_history=history_analyze,
+        )
+        if intent_transition.get("applied"):
+            state = {**state, "session_state": session_state}
+
         analysis: dict[str, Any] | None = None
         source: str | None = None
 
@@ -183,10 +198,6 @@ def build_coordinator_graph(
             source = "fallback"
             pending = []
         else:
-            history_analyze = slice_chat_rounds(
-                state.get("messages") or [],
-                max_rounds=settings.coordinator_analyze_max_rounds,
-            )
             analysis = analyze_workers(
                 state.get("user_message", ""),
                 session_state,
@@ -473,7 +484,9 @@ def build_coordinator_graph(
             gates["pending"] = {"name": "explore_repeat", "prompt": prompt}
             session_state["gates"] = gates
             session_state.pop("explore_repeat_blocked", None)
-        elif session_state.get("explore_intake_blocked"):
+        elif session_state.get("explore_intake_blocked") and compute_needs_full_explore(
+            ProfileStore().get(["exploration", "intent"]), session_state
+        ):
             text = explore_intake_draft()
         elif session_state.pop("explore_guidance_reveal_pending", False):
             text = format_revealed_options(session_state.get("explore_guidance") or {})

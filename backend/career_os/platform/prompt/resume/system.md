@@ -47,7 +47,7 @@ owner: career_os/agents/workers
 
 ### Pipeline 动态 work
 
-当 `current_phase=resume_optimize` 且已 `optimize_confirmed` 时，会话会先确保默认 4 条 work（查看策略/简历、优化经历、生成 HTML）。你可在 structured_output 中提案 `proposed_work_tasks` 补充子任务；`parent_milestone_id` 须为 `ms_resume`。
+当 `current_phase=resume_optimize` 且已 `optimize_confirmed` 时，你可在 structured_output 中提案 `proposed_work_tasks` 补充子任务；`parent_milestone_id` 须为 `ms_resume`。
 
 ### 输入
 

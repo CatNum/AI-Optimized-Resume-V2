@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from career_os.platform.pipeline_constants import PHASE_TO_MILESTONE_ID
 from career_os.harness.explore_closure import init_explore_closure
+from career_os.platform.store.profile import ProfileStore
 from career_os.platform.store.session import SessionStore
 from career_os.platform.store.task import TaskStore, TaskStoreError
 
@@ -20,6 +22,95 @@ def load_pipeline_milestones() -> list[dict[str, Any]]:
         return json.load(f)
 
 
+def hydrate_explore_completion_from_sessions(
+    profile_store: ProfileStore | None = None,
+    session_store: SessionStore | None = None,
+) -> bool:
+    profile_store = profile_store or ProfileStore()
+    session_store = session_store or SessionStore()
+    profile = profile_store.get(["exploration"])
+    exploration = profile.get("exploration") or {}
+    if exploration.get("completed_at"):
+        return False
+
+    index = session_store.load_index()
+    rows = sorted(
+        index.get("sessions", []),
+        key=lambda row: row.get("last_activity_at") or "",
+        reverse=True,
+    )
+    for row in rows:
+        session_id = row.get("session_id")
+        if not session_id or not session_store.session_exists(session_id):
+            continue
+        state = session_store.get_state(session_id)
+        completed_at = state.get("explore_completed_at")
+        if not completed_at:
+            closure = state.get("explore_closure") or {}
+            flags = (state.get("gates") or {}).get("flags") or {}
+            if closure.get("completed") and (
+                state.get("explore_gate_confirmed") or flags.get("explore_gate_confirmed")
+            ):
+                completed_at = state.get("last_activity_at") or datetime.now(UTC).isoformat()
+        if not completed_at:
+            continue
+
+        patches: list[dict[str, Any]] = [
+            {"path": "exploration.completed_at", "value": completed_at, "op": "set"},
+        ]
+        intake = exploration.get("intake") or {}
+        if intake:
+            patches.append(
+                {"path": "exploration.intake_baseline", "value": intake, "op": "set"}
+            )
+        profile_store.patch(patches)
+        return True
+
+    return False
+
+
+def seed_session_explore_completion_from_profile(
+    session_state: dict[str, Any],
+    profile: dict[str, Any],
+) -> bool:
+    exploration = profile.get("exploration") or {}
+    completed_at = exploration.get("completed_at")
+    if not completed_at:
+        return False
+
+    flags = (session_state.get("gates") or {}).get("flags") or {}
+    if flags.get("explore_return_requested") or flags.get("explore_continue_requested"):
+        return False
+
+    if session_state.get("explore_completed_at") == completed_at and (
+        session_state.get("explore_gate_confirmed")
+        and (session_state.get("explore_closure") or {}).get("completed")
+    ):
+        return False
+
+    closure = dict(session_state.get("explore_closure") or init_explore_closure())
+    required = closure.get("required_workers") or ["identity", "capability"]
+    worker_done = dict(closure.get("worker_done") or {})
+    for worker_id in required:
+        worker_done[worker_id] = True
+    closure["worker_done"] = worker_done
+    closure["gate_pending"] = False
+    closure["completed"] = True
+    session_state["explore_closure"] = closure
+    session_state["explore_completed_at"] = completed_at
+
+    from career_os.harness.pipeline_gates import set_explore_gate_confirmed
+
+    set_explore_gate_confirmed(session_state, True)
+    gates = dict(session_state.get("gates") or {})
+    flags = dict(gates.get("flags") or {})
+    flags["explore_gate_confirmed"] = True
+    flags["fresh_pass"] = True
+    gates["flags"] = flags
+    session_state["gates"] = gates
+    return True
+
+
 def instantiate_pipeline_for_session(session_id: str) -> str | TaskStoreError:
     store = TaskStore()
     existing = store.get_active_list_id_for_session(session_id)
@@ -28,11 +119,18 @@ def instantiate_pipeline_for_session(session_id: str) -> str | TaskStoreError:
         if meta and meta.get("list_type") == "pipeline":
             return existing
 
+    hydrate_explore_completion_from_sessions()
+    profile = ProfileStore().get(["exploration", "intent"])
+    start_phase = "explore"
+    exploration = profile.get("exploration") or {}
+    if exploration.get("completed_at"):
+        start_phase = "market"
+
     result = store.create_task_list(
         session_id,
         list_type="pipeline",
         status="active",
-        current_phase="explore",
+        current_phase=start_phase,
     )
     if isinstance(result, TaskStoreError):
         return result
@@ -61,9 +159,9 @@ def instantiate_pipeline_for_session(session_id: str) -> str | TaskStoreError:
         {
             "list_id": list_id,
             "list_type": "pipeline",
-            "explore_gate_confirmed": False,
             "explore_closure": init_explore_closure(),
         }
     )
+    seed_session_explore_completion_from_profile(state, profile)
     session_store.update_state(session_id, state)
     return list_id

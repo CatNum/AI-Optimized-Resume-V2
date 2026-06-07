@@ -105,6 +105,8 @@ def match_gate_intent(
     pending_name = (pending_gate or {}).get("name")
     if not pending_name:
         return rule_result
+    if pending_name == "explore_complete":
+        return rule_result
 
     llm_result = classify_gate_intent_llm(
         user_message,

@@ -7,6 +7,8 @@ from career_os.harness.explore_closure import (
     is_closure_ready,
 )
 from career_os.harness.explore_intake import explore_intake_submitted
+from career_os.harness.pipeline_gates import compute_needs_full_explore
+from career_os.platform.store.profile import ProfileStore
 
 EXPLORE_WORKER_TITLES = {
     "identity": "内心探索",
@@ -25,6 +27,9 @@ def explore_flow_active(session_state: dict[str, Any]) -> bool:
     from career_os.harness.pipeline_gates import is_explore_gate_confirmed
     from career_os.harness.pipeline_routing import is_pipeline_explore_phase
 
+    profile = ProfileStore().get(["exploration", "intent"])
+    if not compute_needs_full_explore(profile, session_state):
+        return False
     if not is_pipeline_explore_phase(session_state):
         return False
     if session_state.get("explore_intake_blocked"):
@@ -67,11 +72,15 @@ def build_session_activity(session_state: dict[str, Any]) -> dict[str, Any]:
     items: list[dict[str, str]] = []
 
     from career_os.harness.pipeline_routing import get_current_phase, is_pipeline_session
+    profile = ProfileStore().get(["exploration", "intent"])
+    needs_full_explore = compute_needs_full_explore(profile, session_state)
 
-    if session_state.get("explore_intake_blocked") or (
+    if needs_full_explore and (
+        session_state.get("explore_intake_blocked") or (
         is_pipeline_session(session_state)
         and get_current_phase(session_state) == "explore"
         and not explore_intake_submitted(session_state)
+        )
     ):
         items.append(
             {
@@ -119,7 +128,9 @@ def _activity_headline(
     items: list[dict[str, str]],
 ) -> str | None:
     list_type = session_state.get("list_type")
-    if session_state.get("explore_intake_blocked"):
+    profile = ProfileStore().get(["exploration", "intent"])
+    needs_full_explore = compute_needs_full_explore(profile, session_state)
+    if session_state.get("explore_intake_blocked") and needs_full_explore:
         return "当前：请先填写初探信息表"
     from career_os.harness.pipeline_routing import get_current_phase, is_pipeline_session
 

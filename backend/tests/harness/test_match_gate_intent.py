@@ -46,3 +46,33 @@ def test_explore_complete_with_next_step_pending(monkeypatch):
     )
     assert result["matched"] is True
     assert result["intent"] == "confirm"
+
+
+def test_explore_complete_question_does_not_fallback_to_llm_confirm(monkeypatch):
+    def fake_llm(*args, **kwargs):
+        return {
+            "matched": True,
+            "intent": "confirm",
+            "gate_name": "explore_complete",
+            "source": "llm",
+        }
+
+    monkeypatch.setattr("career_os.harness.gate.classify_gate_intent_llm", fake_llm)
+    result = match_gate_intent(
+        "素材线，也就是能力图谱线我们完成了探索？",
+        pending_gate={"name": "explore_complete", "prompt": "请确认完成初探"},
+    )
+
+    assert result["matched"] is False
+    assert result["intent"] == "unknown"
+    assert result["source"] == "none"
+
+
+def test_explore_complete_continue_more_is_reject():
+    result = match_gate_intent(
+        "还要继续聊聊",
+        pending_gate={"name": "explore_complete", "prompt": "请确认完成初探"},
+    )
+
+    assert result["matched"] is True
+    assert result["intent"] == "reject"

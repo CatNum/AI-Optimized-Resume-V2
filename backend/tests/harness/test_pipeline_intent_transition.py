@@ -3,6 +3,7 @@ import json
 
 import pytest
 
+import career_os.harness.micro_classifier as classifier_mod
 from career_os.harness.pipeline_jd_context import has_jd_context
 from career_os.harness.pipeline_intent_transition import (
     apply_intent_phase_transition,
@@ -49,6 +50,19 @@ def _session_state(list_id: str, phase: str, **extra) -> dict:
     }
     task_mod.TaskStore().set_current_phase(list_id, phase)
     return state
+
+
+def _mock_classifier(monkeypatch, target_phase: str):
+    monkeypatch.setattr(classifier_mod, "llm_enabled", lambda: True)
+    monkeypatch.setattr(
+        classifier_mod,
+        "invoke_json",
+        lambda system, user, role, temperature=0.1: {
+            "target_phase": target_phase,
+            "confidence": 0.95,
+            "reason": f"test:{target_phase}",
+        },
+    )
 
 
 def test_has_jd_context_from_prior(pipeline_env):
@@ -132,3 +146,100 @@ def test_build_phase_draft_resume_strategy_no_chat_only(pipeline_env):
     assert "resume_strategy" in draft
     assert "禁止复读" in draft
     assert "寒暄" not in draft
+
+
+def test_nl_jump_to_explore_from_market(pipeline_env, monkeypatch):
+    _mock_classifier(monkeypatch, "explore")
+    session_id = "sess_jump_explore"
+    list_id = instantiate_pipeline_for_session(session_id)
+    state = _session_state(list_id, "market")
+
+    msg = "转换到初探流程，继续聊身份与价值观"
+    resolved = resolve_intent_phase_transition(msg, state)
+    assert resolved["to_phase"] == "explore"
+    assert resolved["source"] == "classifier"
+
+    result = apply_intent_phase_transition(msg, state)
+    assert result["applied"] is True
+    meta = task_mod.TaskStore().get_list_meta(list_id)
+    assert meta["current_phase"] == "explore"
+    assert state["intent_suggested_workers"] == ["identity", "capability"]
+
+
+def test_nl_jump_to_market_from_jd_analysis(pipeline_env, monkeypatch):
+    _mock_classifier(monkeypatch, "market")
+    session_id = "sess_jump_market"
+    list_id = instantiate_pipeline_for_session(session_id)
+    state = _session_state(list_id, "jd_analysis")
+
+    msg = "把关注重点切到外部机会，继续往前看"
+    resolved = resolve_intent_phase_transition(msg, state)
+    assert resolved["to_phase"] == "market"
+    assert resolved["source"] == "classifier"
+
+    result = apply_intent_phase_transition(msg, state)
+    assert result["applied"] is True
+    meta = task_mod.TaskStore().get_list_meta(list_id)
+    assert meta["current_phase"] == "market"
+    assert state["intent_suggested_workers"] == ["market"]
+
+
+def test_nl_jump_to_explore_ignores_explore_gate(pipeline_env, monkeypatch):
+    _mock_classifier(monkeypatch, "explore")
+    session_id = "sess_jump_explore_no_gate"
+    list_id = instantiate_pipeline_for_session(session_id)
+    state = _session_state(
+        list_id,
+        "market",
+        explore_gate_confirmed=False,
+        explore_closure={"completed": False},
+        gates={"flags": {}},
+    )
+
+    result = apply_intent_phase_transition("转换到初探流程", state)
+    assert result["applied"] is True
+    meta = task_mod.TaskStore().get_list_meta(list_id)
+    assert meta["current_phase"] == "explore"
+
+
+def test_nl_jump_to_market_requires_explore_complete(pipeline_env, monkeypatch):
+    _mock_classifier(monkeypatch, "market")
+    session_id = "sess_jump_market_blocked"
+    list_id = instantiate_pipeline_for_session(session_id)
+    state = _session_state(
+        list_id,
+        "jd_analysis",
+        explore_gate_confirmed=False,
+        explore_closure={"completed": False},
+        gates={"flags": {}},
+    )
+
+    result = apply_intent_phase_transition("把关注重点切到外部机会，继续往前看", state)
+    assert result["applied"] is False
+    assert result.get("error_code") == "explore_gate_required"
+    meta = task_mod.TaskStore().get_list_meta(list_id)
+    assert meta["current_phase"] == "jd_analysis"
+
+
+def test_nl_jump_blocks_gate_pending(pipeline_env, monkeypatch):
+    _mock_classifier(monkeypatch, "explore")
+    session_id = "sess_jump_gate"
+    list_id = instantiate_pipeline_for_session(session_id)
+    state = _session_state(
+        list_id,
+        "market",
+        gates={"pending": {"name": "explore_complete", "prompt": "?"}, "flags": {}},
+    )
+
+    resolved = resolve_intent_phase_transition("转换到初探流程", state)
+    assert resolved["to_phase"] is None
+
+
+def test_vague_followup_does_not_transition_to_any_jump_phase(pipeline_env, monkeypatch):
+    _mock_classifier(monkeypatch, "market")
+    session_id = "sess_jump_vague"
+    list_id = instantiate_pipeline_for_session(session_id)
+    state = _session_state(list_id, "market")
+
+    resolved = resolve_intent_phase_transition("继续聊聊", state)
+    assert resolved["to_phase"] is None

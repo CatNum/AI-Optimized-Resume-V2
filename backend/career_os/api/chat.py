@@ -12,14 +12,20 @@ from career_os.agents.lc.models import LLMRole
 from career_os.agents.lc.coordinator_llm import build_synthesis_messages
 from career_os.harness.executor import Harness
 from career_os.harness.explore_intake import explore_intake_submitted
+from career_os.harness.explore_intake import resolve_explore_intake
 from career_os.harness.gate import match_gate_intent
+from career_os.harness.pipeline_gates import compute_needs_full_explore
 from career_os.harness.pipeline_gates import PipelineGateError, advance_current_phase
 from career_os.harness.pipeline_phase_transition import (
     finalize_explore_path_exit,
     on_explore_complete_confirmed,
     on_explore_repeat_declined,
+    reopen_explore_after_gate_reject,
 )
 from career_os.platform.store.task import TaskStore
+from career_os.platform.pipeline_template import (
+    seed_session_explore_completion_from_profile,
+)
 from career_os.harness.chat_attachments import (
     build_request_context_from_attachments,
     enrich_user_message_with_attachments,
@@ -27,6 +33,7 @@ from career_os.harness.chat_attachments import (
 from career_os.harness.orchestrator import ChatOrchestrator
 from career_os.harness.session_activity import build_session_activity
 from career_os.platform.store.session import SessionStore
+from career_os.platform.store.profile import ProfileStore
 from career_os.runtime.sse import format_sse, stream_tokens
 
 router = APIRouter(prefix="/v1")
@@ -81,6 +88,11 @@ def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str
             }
             session_state["gates"] = gates
             return []
+        if gate_name == "jd_continue_despite_not_recommended":
+            flags["jd_continue_despite_not_recommended"] = True
+            gates["flags"] = flags
+            session_state["gates"] = gates
+            return ["opportunity"]
         if gate_name == "explore_complete":
             finalize_explore_path_exit(session_state, gates)
             list_id = session_state.get("list_id")
@@ -90,7 +102,7 @@ def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str
             return []
         if gate_name == "explore_repeat":
             flags["explore_repeat_accepted"] = True
-            intake = session_state.get("intake_status") or {}
+            intake = resolve_explore_intake(session_state)
             flags["explore_repeat_baseline_at"] = intake.get("submitted_at")
             gates["pending"] = None
             gates["flags"] = flags
@@ -103,6 +115,9 @@ def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str
 
     if match.get("matched") and match.get("intent") == "reject":
         gates["pending"] = None
+        if gate_name == "explore_complete":
+            reopen_explore_after_gate_reject(session_state, gates)
+            return []
         if gate_name == "explore_repeat":
             flags["explore_repeat_declined"] = True
             gates["flags"] = flags
@@ -131,6 +146,9 @@ async def _chat_stream(
     session_store = SessionStore()
     state = session_store.get_state(session_id)
     state["session_id"] = session_id
+    profile = ProfileStore().get(["exploration", "intent"])
+    seed_session_explore_completion_from_profile(state, profile)
+    session_store.update_state(session_id, state)
 
     yield format_sse("session", {"session_id": session_id})
 
@@ -161,7 +179,9 @@ async def _chat_stream(
     )
     session_store.update_state(session_id, result["session_state"])
 
-    if result["session_state"].get("explore_intake_blocked"):
+    if result["session_state"].get("explore_intake_blocked") and compute_needs_full_explore(
+        profile, result["session_state"]
+    ):
         yield format_sse("explore_intake", {"required": True})
 
     draft = result.get("synthesis_draft") or result.get("synthesis_text") or "已完成处理。"

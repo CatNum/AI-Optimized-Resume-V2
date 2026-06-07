@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import calendar
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from career_os.harness.explore_intake_fields import INTAKE_FIELD_KEYS
@@ -8,7 +10,6 @@ from career_os.platform.pipeline_constants import (
     JUMP_TARGET_PHASES,
     PHASE_TO_MILESTONE_ID,
     PIPELINE_PHASES,
-    RESUME_DEFAULT_WORKS,
 )
 from career_os.platform.store.profile import ProfileStore
 from career_os.platform.store.session import SessionStore
@@ -70,16 +71,59 @@ def never_explored(profile: dict[str, Any]) -> bool:
     return True
 
 
+def _parse_iso_datetime(value: Any) -> datetime | None:
+    if not value:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed
+
+
+def _add_natural_month(dt: datetime) -> datetime:
+    month_index = dt.month
+    year = dt.year + (month_index // 12)
+    month = (month_index % 12) + 1
+    last_day = calendar.monthrange(year, month)[1]
+    day = min(dt.day, last_day)
+    return dt.replace(year=year, month=month, day=day)
+
+
+def _session_has_explore_completion(session_state: dict[str, Any]) -> bool:
+    if session_state.get("explore_completed_at"):
+        return True
+    if session_state.get("explore_gate_confirmed"):
+        return True
+    flags = (session_state.get("gates") or {}).get("flags") or {}
+    if flags.get("explore_gate_confirmed"):
+        return True
+    closure = session_state.get("explore_closure") or {}
+    return bool(closure.get("completed"))
+
+
 def compute_needs_full_explore(
     profile: dict[str, Any], session_state: dict[str, Any]
 ) -> bool:
+    if _session_has_explore_completion(session_state):
+        return False
     if never_explored(profile):
         return True
     exploration = profile.get("exploration") or {}
     flags = (session_state.get("gates") or {}).get("flags") or {}
     if flags.get("fresh_pass") is True:
         return False
-    if not exploration.get("completed_at"):
+    completed_at = _parse_iso_datetime(exploration.get("completed_at"))
+    if not completed_at:
+        return True
+    if datetime.now(UTC) >= _add_natural_month(completed_at.astimezone(UTC)):
         return True
     baseline = exploration.get("intake_baseline")
     intake = exploration.get("intake") or {}
@@ -100,6 +144,7 @@ def clear_gate_flags_for_jump(target_phase: str, session_state: dict[str, Any]) 
     if target_phase == "explore":
         flags.pop("strategy_complete", None)
         flags.pop("optimize_confirmed", None)
+        flags["explore_return_requested"] = True
         set_explore_gate_confirmed(session_state, False)
         closure = dict(session_state.get("explore_closure") or {})
         closure.pop("gate_pending", None)
@@ -108,6 +153,8 @@ def clear_gate_flags_for_jump(target_phase: str, session_state: dict[str, Any]) 
     elif target_phase in {"market", "jd_analysis"}:
         flags.pop("strategy_complete", None)
         flags.pop("optimize_confirmed", None)
+        flags.pop("explore_return_requested", None)
+        flags.pop("explore_continue_requested", None)
     elif target_phase == "resume_strategy":
         flags.pop("optimize_confirmed", None)
 
@@ -211,7 +258,6 @@ def ensure_milestone_works(
         claimed = store.claim_first_work_for_phase(list_id, phase)
         return {"created": [], "claimed_work": claimed}
 
-    templates: tuple[dict[str, Any], ...]
     if phase == "resume_optimize":
         if session_state:
             flags = (session_state.get("gates") or {}).get("flags") or {}
@@ -220,16 +266,16 @@ def ensure_milestone_works(
                     "optimize_required",
                     "optimize_confirm required before resume works",
                 )
-        templates = RESUME_DEFAULT_WORKS
-    else:
-        templates = (
-            {
-                "task_id": f"work_{phase}_plan",
-                "subject": f"{phase} 执行计划",
-                "description": f"规划 {phase} 阶段子任务",
-                "sort_order": 1,
-            },
-        )
+        return {"created": [], "claimed_work": None}
+
+    templates: tuple[dict[str, Any], ...] = (
+        {
+            "task_id": f"work_{phase}_plan",
+            "subject": f"{phase} 执行计划",
+            "description": f"规划 {phase} 阶段子任务",
+            "sort_order": 1,
+        },
+    )
 
     created: list[str] = []
     for row in templates:

@@ -23,6 +23,15 @@ _TASKS = frozenset(
     {"gate_intent", "history_scope", "profile_memory_scope", "pipeline_phase_intent"}
 )
 
+_EXPLICIT_PHASE_TRANSITION_PHRASES = (
+    "转换到",
+    "切到",
+    "切回",
+    "回到",
+    "进入",
+    "转到",
+)
+
 
 def classify(
     task: str,
@@ -188,7 +197,7 @@ def _classify_pipeline_phase_intent(
     context: dict[str, Any],
 ) -> dict[str, Any]:
     rule_ids = match_pipeline_intent_rule_ids(user_message)
-    if rule_ids:
+    if rule_ids and not _looks_like_explicit_phase_transition(user_message):
         return {
             "target_phase": None,
             "confidence": 0.95,
@@ -224,6 +233,13 @@ def _classify_pipeline_phase_intent(
         "source": "llm",
         "reason": (data.get("reason") or "")[:120] or None,
     }
+
+
+def _looks_like_explicit_phase_transition(user_message: str) -> bool:
+    text = (user_message or "").strip()
+    if not text:
+        return False
+    return any(phrase in text for phrase in _EXPLICIT_PHASE_TRANSITION_PHRASES)
 
 
 def _invoke_task(task: str, system: str, payload: dict[str, Any]) -> dict[str, Any] | None:

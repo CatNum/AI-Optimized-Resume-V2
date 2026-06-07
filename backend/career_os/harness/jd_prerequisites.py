@@ -4,6 +4,7 @@ from typing import Any
 
 from career_os.harness.errors import HarnessError
 from career_os.harness.pipeline_gates import is_explore_gate_confirmed
+from career_os.harness.pipeline_gates import compute_needs_full_explore
 from career_os.platform.store.profile import ProfileStore
 
 JD_CHAIN_WORKERS = frozenset({"market", "opportunity", "strategy"})
@@ -22,7 +23,9 @@ def _onboarding_complete(profile: dict[str, Any]) -> bool:
 
 
 def _explore_completed(profile: dict[str, Any], session_state: dict[str, Any]) -> bool:
-    _ = profile
+    exploration = profile.get("exploration") or {}
+    if exploration.get("completed_at"):
+        return True
     if session_state.get("explore_completed_at"):
         return True
     if is_explore_gate_confirmed(session_state):
@@ -33,9 +36,13 @@ def _explore_completed(profile: dict[str, Any], session_state: dict[str, Any]) -
 
 def check_jd_prerequisites(session_state: dict[str, Any]) -> tuple[bool, str | None]:
     """Return (ready, block_reason). block_reason is onboarding | explore."""
-    profile = ProfileStore().get(["basic", "capability"])
+    profile = ProfileStore().get(
+        ["basic", "capability", "exploration", "intent", "resume"]
+    )
     if not _onboarding_complete(profile):
         return False, "onboarding"
+    if compute_needs_full_explore(profile, session_state):
+        return False, "explore"
     if not _explore_completed(profile, session_state):
         return False, "explore"
     return True, None
@@ -67,7 +74,7 @@ def parse_jd_b1_block_reason(message: str) -> str | None:
 
 
 def jd_prerequisites_payload(session_state: dict[str, Any]) -> dict[str, Any]:
-    profile = ProfileStore().get(["basic"])
+    profile = ProfileStore().get(["basic", "capability", "exploration", "intent", "resume"])
     ready, reason = check_jd_prerequisites(session_state)
     return {
         "jd_prerequisites_met": ready,

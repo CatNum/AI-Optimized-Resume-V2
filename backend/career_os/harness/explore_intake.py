@@ -27,13 +27,17 @@ def _intake_from_state(session_state: dict[str, Any] | None) -> dict[str, Any]:
     return {}
 
 
+def resolve_explore_intake(session_state: dict[str, Any] | None = None) -> dict[str, Any]:
+    return _intake_from_state(session_state)
+
+
 def explore_intake_submitted(session_state: dict[str, Any] | None = None) -> bool:
-    intake = _intake_from_state(session_state)
+    intake = resolve_explore_intake(session_state)
     return bool(intake.get("submitted_at"))
 
 
 def explore_intake_payload(session_state: dict[str, Any] | None = None) -> dict[str, Any]:
-    intake = _intake_from_state(session_state)
+    intake = resolve_explore_intake(session_state)
     pending = list(intake.get("pending_fields") or [])
     return {
         "explore_intake_submitted": explore_intake_submitted(session_state),
@@ -46,7 +50,7 @@ def explore_intake_payload(session_state: dict[str, Any] | None = None) -> dict[
 def worker_context_from_intake(
     session_state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    intake = _intake_from_state(session_state)
+    intake = resolve_explore_intake(session_state)
     pending = list(intake.get("pending_fields") or [])
     return {
         "explore_intake_pending_fields": pending,

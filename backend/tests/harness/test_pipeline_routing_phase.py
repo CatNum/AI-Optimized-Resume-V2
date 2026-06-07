@@ -1,3 +1,5 @@
+import importlib
+
 from career_os.harness.pipeline_routing import enforce_pipeline_phase_rules
 
 
@@ -15,7 +17,13 @@ def test_enforce_uses_disk_phase_for_jd_workers_when_gate_confirmed():
     assert "market" in result.get("workers", [])
 
 
-def test_enforce_blocks_inferred_leave_explore_without_gate():
+def test_enforce_blocks_inferred_leave_explore_without_gate(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    import career_os.config as config_mod
+    import career_os.platform.store.profile as profile_mod
+
+    importlib.reload(config_mod)
+    importlib.reload(profile_mod)
     session_state = {
         "list_type": "pipeline",
         "gates": {"flags": {}},

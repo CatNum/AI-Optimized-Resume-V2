@@ -1,5 +1,6 @@
 import importlib
 import json
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -37,15 +38,15 @@ def test_jd_blocked_without_explore(profile_env):
     assert reason == "explore"
 
 
-def test_jd_still_blocked_when_only_global_exploration_completed(profile_env):
+def test_jd_ready_when_only_global_exploration_completed(profile_env):
     profile_env.patch([{"path": "basic.name", "value": "测试", "op": "set"}])
     raw = profile_env.get(["meta", "exploration", "basic", "intent", "resume", "outputs_index", "skills", "constraints", "career", "capability", "market", "strategy", "preference_tags"])
     raw.setdefault("exploration", {})["completed_at"] = "2026-05-31T00:00:00Z"
     profile_path = profile_env._profile_path  # test-only direct write for legacy data simulation
     profile_path.write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
     ready, reason = check_jd_prerequisites({"prior_results": {}})
-    assert ready is False
-    assert reason == "explore"
+    assert ready is True
+    assert reason is None
 
 
 def test_jd_ready_with_session_explore_completed(profile_env):
@@ -54,3 +55,97 @@ def test_jd_ready_with_session_explore_completed(profile_env):
         {"prior_results": {}, "explore_closure": {"completed": True}}
     )
     assert ready is True
+
+
+def test_jd_ready_with_fresh_profile_explore_completed(profile_env):
+    profile_env.patch(
+        [
+            {"path": "basic.name", "value": "测试", "op": "set"},
+            {"path": "intent.target_role", "value": "AI 产品经理", "op": "set"},
+            {"path": "intent.current_salary", "value": "20k", "op": "set"},
+            {"path": "intent.target_salary", "value": "25k", "op": "set"},
+            {"path": "intent.years_of_experience", "value": "3", "op": "set"},
+            {"path": "resume.source_text", "value": "简历正文", "op": "set"},
+        ]
+    )
+    raw = profile_env.get(["meta", "exploration", "basic", "intent", "resume"])
+    raw.setdefault("exploration", {})["completed_at"] = (
+        datetime.now(UTC) - timedelta(days=10)
+    ).isoformat()
+    raw["exploration"]["intake"] = {
+        "submitted_at": "2026-06-01T00:00:00+00:00",
+        "resume_text": "简历正文",
+    }
+    raw["exploration"]["intake_baseline"] = {
+        "submitted_at": "2026-06-01T00:00:00+00:00",
+        "resume_text": "简历正文",
+    }
+    profile_env._profile_path.write_text(  # noqa: SLF001 - test-only legacy fixture
+        json.dumps(raw, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    ready, reason = check_jd_prerequisites({"prior_results": {}})
+    assert ready is True
+    assert reason is None
+
+
+def test_jd_blocked_when_completed_at_is_stale(profile_env):
+    profile_env.patch(
+        [
+            {"path": "basic.name", "value": "测试", "op": "set"},
+            {"path": "intent.target_role", "value": "AI 产品经理", "op": "set"},
+            {"path": "intent.current_salary", "value": "20k", "op": "set"},
+            {"path": "intent.target_salary", "value": "25k", "op": "set"},
+            {"path": "intent.years_of_experience", "value": "3", "op": "set"},
+            {"path": "resume.source_text", "value": "简历正文", "op": "set"},
+        ]
+    )
+    stale_at = (datetime.now(UTC) - timedelta(days=40)).isoformat()
+    raw = profile_env.get(
+        ["meta", "exploration", "basic", "intent", "resume"]
+    )
+    raw.setdefault("exploration", {})["completed_at"] = stale_at
+    raw["exploration"]["intake"] = {
+        "submitted_at": "2026-04-01T00:00:00+00:00",
+        "resume_text": "简历正文",
+    }
+    raw["exploration"]["intake_baseline"] = {
+        "submitted_at": "2026-04-01T00:00:00+00:00",
+        "resume_text": "简历正文",
+    }
+    profile_env._profile_path.write_text(  # noqa: SLF001 - test-only legacy fixture
+        json.dumps(raw, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    ready, reason = check_jd_prerequisites({"prior_results": {}})
+    assert ready is False
+    assert reason == "explore"
+
+
+def test_jd_ready_when_current_session_has_completed_explore(profile_env):
+    profile_env.patch(
+        [
+            {"path": "basic.name", "value": "测试", "op": "set"},
+            {"path": "intent.target_role", "value": "AI 产品经理", "op": "set"},
+            {"path": "intent.current_salary", "value": "20k", "op": "set"},
+            {"path": "intent.target_salary", "value": "25k", "op": "set"},
+            {"path": "intent.years_of_experience", "value": "3", "op": "set"},
+            {"path": "resume.source_text", "value": "简历正文", "op": "set"},
+        ]
+    )
+    raw = profile_env.get(["meta", "exploration", "basic", "intent", "resume"])
+    raw.setdefault("exploration", {})["completed_at"] = (
+        datetime.now(UTC) - timedelta(days=40)
+    ).isoformat()
+    profile_env._profile_path.write_text(  # noqa: SLF001 - test-only legacy fixture
+        json.dumps(raw, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    ready, reason = check_jd_prerequisites(
+        {"prior_results": {}, "explore_closure": {"completed": True}}
+    )
+    assert ready is True
+    assert reason is None

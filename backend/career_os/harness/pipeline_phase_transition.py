@@ -3,8 +3,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from career_os.harness.explore_closure import PHASE_SEGMENT_COMPLETE, explore_phase_status
+from career_os.harness.explore_closure import (
+    DEFAULT_REQUIRED_WORKERS,
+    PHASE_SEGMENT_COMPLETE,
+    explore_phase_status,
+)
 from career_os.harness.pipeline_gates import set_explore_gate_confirmed
+from career_os.platform.store.profile import ProfileStore
 from career_os.platform.store.session import SessionStore
 from career_os.platform.store.task import TaskStore, TaskStoreError
 
@@ -57,6 +62,8 @@ def finalize_explore_path_exit(
     flags = dict(gates.get("flags") or {})
     flags["explore_gate_confirmed"] = True
     flags["fresh_pass"] = True
+    flags.pop("explore_return_requested", None)
+    flags.pop("explore_continue_requested", None)
     gates["flags"] = flags
     session_state["gates"] = gates
 
@@ -69,6 +76,47 @@ def finalize_explore_path_exit(
                 "explore_completed_at": completed_at,
             },
         )
+    intake = {}
+    if session_id:
+        intake = (ProfileStore().get(["exploration"]).get("exploration") or {}).get(
+            "intake", {}
+        )
+    patches = [{"path": "exploration.completed_at", "value": completed_at, "op": "set"}]
+    if intake:
+        patches.append({"path": "exploration.intake_baseline", "value": intake, "op": "set"})
+    try:
+        ProfileStore().patch(patches)
+    except ValueError:
+        # Keep session completion even if profile persistence is temporarily unavailable.
+        pass
+
+
+def reopen_explore_after_gate_reject(
+    session_state: dict[str, Any], gates: dict[str, Any]
+) -> None:
+    gates["pending"] = None
+    flags = dict(gates.get("flags") or {})
+    flags.pop("fresh_pass", None)
+    flags["explore_continue_requested"] = True
+    gates["flags"] = flags
+    session_state["gates"] = gates
+    set_explore_gate_confirmed(session_state, False)
+
+    explore = dict(session_state.get("explore_closure") or {})
+    required = explore.get("required_workers") or DEFAULT_REQUIRED_WORKERS
+    explore["required_workers"] = required
+    explore["gate_pending"] = False
+    explore["completed"] = False
+    worker_done = dict(explore.get("worker_done") or {})
+    for worker_id in required:
+        worker_done[worker_id] = False
+    explore["worker_done"] = worker_done
+    session_state["explore_closure"] = explore
+
+    list_id = session_state.get("list_id")
+    if list_id:
+        apply_list_phase(list_id, "explore")
+        session_state["pipeline_phase"] = "explore"
 
 
 def on_explore_complete_confirmed(list_id: str) -> str:

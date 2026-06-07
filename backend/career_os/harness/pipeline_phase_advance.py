@@ -9,6 +9,7 @@ from career_os.harness.pipeline_gates import is_explore_gate_confirmed
 from career_os.harness.pipeline_jd_context import has_jd_context
 from career_os.harness.pipeline_phase_transition import apply_list_phase
 from career_os.platform.pipeline_constants import PIPELINE_PHASES
+from career_os.platform.store.profile import ProfileStore
 
 PHASE_RANK: dict[str, int] = {phase: index for index, phase in enumerate(PIPELINE_PHASES)}
 
@@ -27,9 +28,11 @@ def can_enter_pipeline_phase(
         ready, _ = check_jd_prerequisites(session_state)
         if not ready:
             return False
+        profile = ProfileStore().get(["exploration"])
+        exploration = profile.get("exploration") or {}
         if not is_explore_gate_confirmed(session_state):
             closure = session_state.get("explore_closure") or {}
-            if not closure.get("completed"):
+            if not closure.get("completed") and not exploration.get("completed_at"):
                 return False
         if target_phase == "resume_strategy":
             return has_jd_context(session_state, user_message)

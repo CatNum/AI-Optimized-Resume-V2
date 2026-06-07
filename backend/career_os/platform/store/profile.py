@@ -7,7 +7,18 @@ from typing import Any
 from career_os.config import settings
 
 _lock = threading.Lock()
-_FORBIDDEN_PREFIXES = ("exploration.", "market.", "strategy.", "career.jd_override")
+_FORBIDDEN_PREFIXES = ("market.", "strategy.", "career.jd_override")
+_ALLOWED_EXPLORATION_FIELDS = {
+    "completed_at",
+    "inner_needs",
+    "desires",
+    "career_needs",
+    "priorities_now",
+    "current_problems",
+    "summary",
+    "intake_baseline",
+    "intake",
+}
 _ALLOWED_PREFIXES = (
     "basic.",
     "skills.",
@@ -120,6 +131,10 @@ class ProfileStore:
 def _validate_patch_path(path: str, value: Any) -> None:
     if path == "outputs_index":
         _validate_outputs_index(value)
+        return
+    if path == "exploration.intake" or path in {
+        f"exploration.{field}" for field in _ALLOWED_EXPLORATION_FIELDS
+    }:
         return
     if path.startswith(_FORBIDDEN_PREFIXES):
         raise ValueError(f"profile_path_forbidden:{path}")

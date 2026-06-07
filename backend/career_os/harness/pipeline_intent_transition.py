@@ -10,11 +10,12 @@ import re
 from career_os.harness.jd_prerequisites import check_jd_prerequisites, is_jd_intent
 from career_os.harness.micro_classifier import classify
 from career_os.harness.micro_classifier_rules import match_pipeline_intent_rule_ids
-from career_os.harness.pipeline_gates import is_explore_gate_confirmed
-from career_os.harness.pipeline_phase_transition import apply_list_phase
+from career_os.harness.pipeline_gates import PipelineGateError, is_explore_gate_confirmed
+from career_os.harness.pipeline_gates import jump_to_phase
 from career_os.harness.pipeline_jd_context import has_jd_context
 from career_os.harness.pipeline_routing import get_current_phase, is_pipeline_session
-from career_os.platform.pipeline_constants import PIPELINE_PHASES
+from career_os.harness.pipeline_phase_transition import apply_list_phase
+from career_os.platform.pipeline_constants import JUMP_TARGET_PHASES, PIPELINE_PHASES
 
 PHASE_RANK: dict[str, int] = {phase: index for index, phase in enumerate(PIPELINE_PHASES)}
 
@@ -34,6 +35,15 @@ _SMALL_TALK_PHRASES = frozenset(
         "嗨",
     }
 )
+
+
+_JUMP_TARGET_WORKERS: dict[str, tuple[str, ...]] = {
+    "explore": ("identity", "capability"),
+    "market": ("market",),
+    "jd_analysis": ("opportunity",),
+    "resume_strategy": ("strategy",),
+}
+
 
 def _is_small_talk(user_message: str) -> bool:
     text = user_message.strip().lower()
@@ -189,7 +199,25 @@ def _resolve_via_classifier(
     target = data.get("target_phase")
     if not target or target not in PIPELINE_PHASES:
         return None
-    if PHASE_RANK.get(target, -1) <= PHASE_RANK.get(current_phase, -1):
+    if target in JUMP_TARGET_PHASES:
+        if target == current_phase:
+            return None
+        for transition in INTENT_TRANSITIONS:
+            if transition.to_phase != target:
+                continue
+            if current_phase not in transition.from_phases:
+                continue
+            if not _preconditions_met(transition, session_state, user_message):
+                continue
+            return transition
+        return IntentTransition(
+            frozenset({current_phase}),
+            target,
+            f"intent_jump_{target}",
+            frozenset(),
+            _JUMP_TARGET_WORKERS.get(target, tuple()),
+        )
+    if target == "resume_optimize":
         return None
     for transition in INTENT_TRANSITIONS:
         if transition.to_phase != target:
@@ -237,6 +265,15 @@ def resolve_intent_phase_transition(
         return empty
 
     target = transition.to_phase
+    if target in JUMP_TARGET_PHASES:
+        return {
+            "applied": False,
+            "from_phase": current,
+            "to_phase": target,
+            "rule_id": transition.rule_id,
+            "suggested_workers": list(transition.suggested_workers),
+            "source": source,
+        }
     if PHASE_RANK.get(target, -1) <= PHASE_RANK.get(current, -1):
         return empty
 
@@ -270,7 +307,20 @@ def apply_intent_phase_transition(
 
     list_id = session_state.get("list_id")
     if list_id:
-        apply_list_phase(list_id, target)
+        if target in JUMP_TARGET_PHASES:
+            jump_result = jump_to_phase(
+                session_state.get("session_id") or "",
+                list_id,
+                target,
+                session_state,
+            )
+            if isinstance(jump_result, PipelineGateError):
+                resolved["applied"] = False
+                resolved["error_code"] = jump_result.code
+                resolved["error_message"] = jump_result.message
+                return resolved
+        else:
+            apply_list_phase(list_id, target)
 
     session_state["intent_suggested_workers"] = resolved.get("suggested_workers") or []
     session_state["last_phase_transition"] = {

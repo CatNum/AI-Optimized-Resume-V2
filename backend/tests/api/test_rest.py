@@ -188,6 +188,41 @@ def test_explore_intake_submit(client):
     assert status["intake"]["resolved_fields"]["current_salary"] == "25K"
 
 
+def test_explore_intake_status_falls_back_to_global_profile_for_new_session(client):
+    sid_a = client.post("/v1/sessions/new").json()["session_id"]
+    sid_b = client.post("/v1/sessions/new").json()["session_id"]
+    payload = {
+        "session_id": sid_a,
+        "resume_text": (
+            "李四\n3年工作经验\n当前薪资：25k\n期望岗位：Java开发\n期望薪资：30k\n"
+            "项目：订单系统重构"
+        ),
+        "years_of_experience": "6年",
+    }
+    r = client.post("/v1/profile/explore-intake", json=payload)
+    assert r.status_code == 200
+
+    status = client.get("/v1/profile/explore-intake/status", params={"session_id": sid_b}).json()
+    assert status["submitted"] is True
+    assert status["intake"]["resolved_fields"]["years_of_experience"] == "6年"
+    assert status["intake"]["resume_text"].startswith("李四")
+
+
+def test_explore_intake_submit_persists_global_intake_to_profile(client):
+    sid = client.post("/v1/sessions/new").json()["session_id"]
+    payload = {
+        "session_id": sid,
+        "resume_text": "张三\n3年经验\n期望岗位：后端开发\n项目：订单系统",
+        "years_of_experience": "3年",
+    }
+    r = client.post("/v1/profile/explore-intake", json=payload)
+    assert r.status_code == 200
+
+    profile = client.get("/v1/profile").json()
+    assert profile["exploration"]["intake"]["submitted_at"]
+    assert profile["exploration"]["intake"]["resume_text"].startswith("张三")
+
+
 def test_new_session_creates_pipeline_list(client):
     sid = client.post("/v1/sessions/new").json()["session_id"]
     body = client.get("/v1/tasks", params={"session_id": sid}).json()
@@ -196,6 +231,62 @@ def test_new_session_creates_pipeline_list(client):
     assert body["lists"][0]["current_phase"] == "explore"
     assert len(body["lists"][0]["milestones"]) == 5
     assert body["all_tasks_completed"] is False
+
+
+def test_get_tasks_auto_promotes_fresh_profile_from_explore_to_market(client):
+    from career_os.platform.store.profile import ProfileStore
+    from career_os.platform.store.task import TaskStore
+
+    sid = client.post("/v1/sessions/new").json()["session_id"]
+    profile = ProfileStore()
+    profile.patch(
+        [
+            {
+                "path": "exploration.completed_at",
+                "value": "2026-06-07T12:39:05.787050+00:00",
+                "op": "set",
+            }
+        ]
+    )
+    tasks = TaskStore()
+    list_id = tasks.get_active_list_id_for_session(sid)
+    assert list_id is not None
+    tasks.set_current_phase(list_id, "explore")
+
+    body = client.get("/v1/tasks", params={"session_id": sid}).json()
+    pipeline = [lst for lst in body["lists"] if lst["list_type"] == "pipeline"]
+    assert pipeline[0]["current_phase"] == "market"
+
+
+def test_get_tasks_keeps_explicit_explore_jump_from_auto_promoting(client):
+    from career_os.harness.pipeline_gates import jump_to_phase
+    from career_os.platform.store.profile import ProfileStore
+    from career_os.platform.store.session import SessionStore
+    from career_os.platform.store.task import TaskStore
+
+    sid = client.post("/v1/sessions/new").json()["session_id"]
+    profile = ProfileStore()
+    profile.patch(
+        [
+            {
+                "path": "exploration.completed_at",
+                "value": "2026-06-07T12:39:05.787050+00:00",
+                "op": "set",
+            }
+        ]
+    )
+    session_store = SessionStore()
+    state = session_store.get_state(sid)
+    tasks = TaskStore()
+    list_id = tasks.get_active_list_id_for_session(sid)
+    assert list_id is not None
+    tasks.set_current_phase(list_id, "market")
+    result = jump_to_phase(sid, list_id, "explore", state)
+    assert not hasattr(result, "code")
+
+    body = client.get("/v1/tasks", params={"session_id": sid}).json()
+    pipeline = [lst for lst in body["lists"] if lst["list_type"] == "pipeline"]
+    assert pipeline[0]["current_phase"] == "explore"
 
 
 def test_explore_intake_submit_keeps_single_pipeline_list(client):
