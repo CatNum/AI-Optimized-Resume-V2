@@ -55,11 +55,43 @@ def test_enforce_explore_intake_repeat_gate_when_already_submitted(tmp_path, mon
     session_state = {
         "list_type": "pipeline",
         "intake_status": {"submitted_at": "2026-05-31T00:00:00Z"},
+        "explore_closure": {"completed": True},
     }
     result = enforce_explore_intake(original, session_state)
     assert result["explore_repeat_blocked"] is True
     assert result["workers"] == []
     assert explore_intake_submitted(session_state)
+
+
+def test_enforce_explore_intake_allows_submitted_intake_before_deep_explore_complete(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    import importlib
+
+    import career_os.config as config_mod
+    import career_os.platform.store.profile as profile_mod
+
+    importlib.reload(config_mod)
+    importlib.reload(profile_mod)
+
+    original = {
+        "workers": ["identity"],
+        "list_type": "pipeline",
+        "pipeline_phase": "explore",
+    }
+    session_state = {
+        "list_type": "pipeline",
+        "intake_status": {"submitted_at": "2026-05-31T00:00:00Z"},
+        "explore_closure": {
+            "required_workers": ["identity", "capability"],
+            "worker_done": {"identity": False, "capability": False},
+        },
+    }
+    result = enforce_explore_intake(original, session_state)
+    assert result["workers"] == original["workers"]
+    assert "explore_repeat_blocked" not in result
+    assert "explore_intake_blocked" not in result
 
 
 def test_enforce_explore_intake_allows_after_repeat_accepted_and_resubmit(

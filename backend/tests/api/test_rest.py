@@ -234,7 +234,7 @@ def test_chat_explore_intake_event(client):
     assert "初探信息表" in body
 
 
-def test_explore_repeat_gate_when_intake_already_submitted(client):
+def test_chat_continues_explore_after_current_session_intake_submitted(client):
     sid = client.post("/v1/sessions/new").json()["session_id"]
     payload = {
         "session_id": sid,
@@ -255,7 +255,8 @@ def test_explore_repeat_gate_when_intake_already_submitted(client):
         body = "".join(response.iter_text())
 
     assert "event: explore_intake" not in body
-    assert "再次" in body or "explore_repeat" in body
+    assert "再次" not in body
+    assert "内心探索" in body or "职业相关" in body
 
 
 def test_chat_jd_gate_chain(client):

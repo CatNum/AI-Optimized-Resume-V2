@@ -70,7 +70,23 @@ def _gate_flags(session_state: dict[str, Any]) -> dict[str, Any]:
     return (session_state.get("gates") or {}).get("flags") or {}
 
 
+def _deep_explore_completed(session_state: dict[str, Any]) -> bool:
+    if session_state.get("explore_completed_at"):
+        return True
+    closure = session_state.get("explore_closure") or {}
+    if closure.get("completed"):
+        return True
+    flags = _gate_flags(session_state)
+    if flags.get("explore_gate_confirmed"):
+        return True
+    profile = ProfileStore().get(["exploration"])
+    exploration = profile.get("exploration") or {}
+    return bool(exploration.get("completed_at"))
+
+
 def needs_repeat_intake(session_state: dict[str, Any]) -> bool:
+    if not _deep_explore_completed(session_state):
+        return False
     flags = _gate_flags(session_state)
     if not flags.get("explore_repeat_accepted"):
         return False
@@ -104,6 +120,9 @@ def enforce_explore_intake(
             "workers": [],
             "explore_intake_blocked": True,
         }
+
+    if not _deep_explore_completed(session_state):
+        return pipeline_result
 
     if flags.get("explore_repeat_accepted"):
         if needs_repeat_intake(session_state):
