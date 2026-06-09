@@ -229,11 +229,13 @@ def test_new_session_creates_pipeline_list(client):
     assert len(body["lists"]) == 1
     assert body["lists"][0]["list_type"] == "pipeline"
     assert body["lists"][0]["current_phase"] == "explore"
+    assert body["lists"][0]["status"] == "ready"
     assert len(body["lists"][0]["milestones"]) == 5
+    assert body["active_list_id"] is None
     assert body["all_tasks_completed"] is False
 
 
-def test_get_tasks_auto_promotes_fresh_profile_from_explore_to_market(client):
+def test_get_tasks_auto_promotes_started_pipeline_from_explore_to_market(client):
     from career_os.platform.store.profile import ProfileStore
     from career_os.platform.store.task import TaskStore
 
@@ -246,11 +248,13 @@ def test_get_tasks_auto_promotes_fresh_profile_from_explore_to_market(client):
                 "value": "2026-06-07T12:39:05.787050+00:00",
                 "op": "set",
             }
-        ]
+    ]
     )
     tasks = TaskStore()
     list_id = tasks.get_active_list_id_for_session(sid)
     assert list_id is not None
+    start_err = tasks.start_task_list(list_id)
+    assert start_err is None
     tasks.set_current_phase(list_id, "explore")
 
     body = client.get("/v1/tasks", params={"session_id": sid}).json()
@@ -450,8 +454,26 @@ def test_get_tasks_by_session_id(client):
     assert len(body["lists"]) == 1
     assert body["lists"][0]["list_type"] == "pipeline"
     assert body["lists"][0]["current_phase"] == "explore"
+    assert body["lists"][0]["status"] == "ready"
     assert len(body["lists"][0]["milestones"]) == 5
+    assert body["active_list_id"] is None
     assert body["all_tasks_completed"] is False
+
+
+def test_get_tasks_normalizes_ready_pipeline_phase_to_explore(client):
+    from career_os.platform.store.task import TaskStore
+
+    sid = client.post("/v1/sessions/new").json()["session_id"]
+    store = TaskStore()
+    list_id = store.get_active_list_id_for_session(sid)
+    assert list_id is not None
+    store.set_current_phase(list_id, "market")
+
+    body = client.get("/v1/tasks", params={"session_id": sid}).json()
+    pipeline = [lst for lst in body["lists"] if lst["list_type"] == "pipeline"]
+    assert pipeline[0]["status"] == "ready"
+    assert pipeline[0]["current_phase"] == "explore"
+    assert body["active_list_id"] is None
 
 
 def test_get_tasks_by_session_id_all_completed(client):

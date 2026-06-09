@@ -220,6 +220,10 @@ def jump_to_phase(
 
     clear_gate_flags_for_jump(target_phase, session_state)
 
+    start_err = store.start_task_list(list_id)
+    if start_err and start_err.code != "list_not_ready":
+        return PipelineGateError(start_err.code, start_err.message)
+
     phase_err = store.set_current_phase(list_id, target_phase)
     if phase_err:
         return PipelineGateError(phase_err.code, phase_err.message)
@@ -248,6 +252,10 @@ def ensure_milestone_works(
             "phase_mismatch",
             f"Can only ensure works for current phase ({current})",
         )
+
+    start_err = store.start_task_list(list_id)
+    if start_err and start_err.code != "list_not_ready":
+        return PipelineGateError(start_err.code, start_err.message)
 
     milestone_id = PHASE_TO_MILESTONE_ID.get(phase)
     if not milestone_id:
@@ -331,6 +339,10 @@ def advance_current_phase(
     if clear_err:
         return PipelineGateError(clear_err.code, clear_err.message)
 
+    start_err = store.start_task_list(list_id)
+    if start_err and start_err.code != "list_not_ready":
+        return PipelineGateError(start_err.code, start_err.message)
+
     phase_err = store.set_current_phase(list_id, "resume_optimize")
     if phase_err:
         return PipelineGateError(phase_err.code, phase_err.message)
@@ -362,6 +374,9 @@ def apply_proposed_work_tasks(
 
     current = meta.get("current_phase") or "explore"
     allowed_parent = PHASE_TO_MILESTONE_ID.get(current)
+    start_err = store.start_task_list(list_id)
+    if start_err and start_err.code != "list_not_ready":
+        return PipelineGateError(start_err.code, start_err.message)
     created: list[str] = []
     for prop in proposals:
         parent = prop.get("parent_milestone_id")

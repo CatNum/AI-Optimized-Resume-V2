@@ -10,6 +10,7 @@ from career_os.harness.pipeline_jd_context import has_jd_context
 from career_os.harness.pipeline_phase_transition import apply_list_phase
 from career_os.platform.pipeline_constants import PIPELINE_PHASES
 from career_os.platform.store.profile import ProfileStore
+from career_os.platform.store.task import TaskStore
 
 PHASE_RANK: dict[str, int] = {phase: index for index, phase in enumerate(PIPELINE_PHASES)}
 
@@ -89,6 +90,10 @@ def maybe_advance_phase_from_analyze(
         return current
     gates = session_state.get("gates") or {}
     if gates.get("pending"):
+        return current
+
+    meta = TaskStore().get_list_meta(session_state.get("list_id") or "")
+    if meta and meta.get("status") == "ready" and current == "explore":
         return current
 
     target = resolve_analyze_target_phase(result, session_state)

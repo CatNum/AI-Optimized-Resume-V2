@@ -98,6 +98,20 @@ def test_no_intent_when_gate_pending(pipeline_env):
     assert resolved["to_phase"] is None
 
 
+def test_chat_only_intent_does_not_transition(pipeline_env):
+    session_id = "sess_intent_chat_only"
+    list_id = instantiate_pipeline_for_session(session_id)
+    state = _session_state(
+        list_id,
+        "jd_analysis",
+        gates={"flags": {"explore_gate_confirmed": True}},
+    )
+    resolved = resolve_intent_phase_transition(
+        "进入随便聊聊状态，不分配任何工作", state
+    )
+    assert resolved["to_phase"] is None
+
+
 def test_intent_suggested_workers_fallback(pipeline_env):
     session_id = "sess_intent03"
     list_id = instantiate_pipeline_for_session(session_id)

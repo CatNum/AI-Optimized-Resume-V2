@@ -12,6 +12,7 @@ from career_os.agents.lc.coordinator_llm import (
     is_small_talk,
     jd_prerequisites_draft,
 )
+from career_os.harness.micro_classifier import is_chat_only_intent
 from career_os.agents.state.coordinator import CoordinatorState
 from career_os.config import settings
 from career_os.harness.chat_history_scope import select_worker_chat_history
@@ -146,6 +147,17 @@ def build_coordinator_graph(
         if not needs_repeat_intake(session_state):
             session_state.pop("explore_intake_blocked", None)
         session_state.pop("explore_guidance_reveal_pending", None)
+
+        if is_chat_only_intent(state.get("user_message", "")):
+            session_state["chat_only_requested"] = True
+            session_state.pop("gate_clarify_pending", None)
+            return {
+                **state,
+                "session_state": session_state,
+                "current_worker_id": None,
+                "pending_workers": [],
+                "stop_delegate": True,
+            }
 
         if should_reveal_explore_guidance(state.get("user_message", ""), session_state):
             mark_explore_guidance_revealed(session_state)
@@ -422,6 +434,16 @@ def build_coordinator_graph(
             pending_gate = (session_state.get("gates") or {}).get("pending") or {}
             text = build_gate_clarify_text(pending_gate)
             session_state.pop("gate_clarify_pending", None)
+            return {
+                **state,
+                "session_state": session_state,
+                "synthesis_text": text,
+                "synthesis_draft": text,
+                "last_worker_result": last or state.get("last_worker_result"),
+            }
+
+        if session_state.pop("chat_only_requested", False):
+            text = chat_only_synthesis_draft(session_state)
             return {
                 **state,
                 "session_state": session_state,

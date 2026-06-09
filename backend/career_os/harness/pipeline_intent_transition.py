@@ -9,6 +9,7 @@ import re
 
 from career_os.harness.jd_prerequisites import check_jd_prerequisites, is_jd_intent
 from career_os.harness.micro_classifier import classify
+from career_os.harness.micro_classifier import is_chat_only_intent
 from career_os.harness.micro_classifier_rules import match_pipeline_intent_rule_ids
 from career_os.harness.pipeline_gates import PipelineGateError, is_explore_gate_confirmed
 from career_os.harness.pipeline_gates import jump_to_phase
@@ -250,6 +251,8 @@ def resolve_intent_phase_transition(
         return empty
     gates = session_state.get("gates") or {}
     if gates.get("pending"):
+        return empty
+    if is_chat_only_intent(user_message):
         return empty
     if _is_small_talk(user_message):
         return empty

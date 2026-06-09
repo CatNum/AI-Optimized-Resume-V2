@@ -16,6 +16,7 @@ from career_os.platform.store.profile import ProfileStore
 from career_os.platform.store.session import SessionStore
 from career_os.platform.pipeline_template import instantiate_pipeline_for_session
 from career_os.platform.store.task import TaskStoreError
+from career_os.platform.store.task import TaskStore
 
 _SESSION_ID_RE = re.compile(r"^sess_[0-9a-f]{32}$")
 
@@ -94,6 +95,9 @@ def submit_explore_intake(body: ExploreIntakeRequest) -> dict[str, Any]:
         if isinstance(created, TaskStoreError):
             raise RuntimeError(created.message)
         list_id = created
+    start_err = TaskStore().start_task_list(list_id)
+    if start_err and start_err.code != "list_not_ready":
+        raise RuntimeError(start_err.message)
     return {
         "ok": True,
         "submitted": True,

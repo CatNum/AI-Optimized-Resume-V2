@@ -14,6 +14,7 @@ from career_os.harness.executor import Harness
 from career_os.harness.explore_intake import explore_intake_submitted
 from career_os.harness.explore_intake import resolve_explore_intake
 from career_os.harness.gate import match_gate_intent
+from career_os.harness.micro_classifier import is_chat_only_intent
 from career_os.harness.pipeline_gates import compute_needs_full_explore
 from career_os.harness.pipeline_gates import PipelineGateError, advance_current_phase
 from career_os.harness.pipeline_phase_transition import (
@@ -53,6 +54,11 @@ def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str
     pending = gates.get("pending")
     if not pending:
         return None
+
+    if is_chat_only_intent(message):
+        session_state["chat_only_requested"] = True
+        session_state["gates"] = gates
+        return []
 
     match = match_gate_intent(
         message,

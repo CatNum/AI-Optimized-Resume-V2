@@ -31,3 +31,32 @@ def test_synthesize_gate_clarify_pending():
     assert "没完全理解" in draft
     assert "请回复" in draft
     assert not state["session_state"].get("gate_clarify_pending")
+
+
+def test_chat_only_request_skips_gate_clarify():
+    harness = Harness()
+
+    def runner(worker_id, goal, session_state, context):
+        return {"worker_id": worker_id, "status": "completed", "structured_output": {}}
+
+    state = run_coordinator_turn(
+        harness,
+        session_id="sess_chat_only",
+        session_state={
+            "prior_results": {},
+            "gates": {
+                "pending": {
+                    "name": "optimize_confirm",
+                    "prompt": "是否确认优化？",
+                }
+            },
+            "list_type": "pipeline",
+        },
+        user_message="进入随便聊聊状态，不分配任何工作，直接给出打招呼话术",
+        pending_workers=[],
+        worker_runner=runner,
+    )
+    draft = state.get("synthesis_draft") or ""
+    assert "职业初探" in draft or "简历优化" in draft or "JD/岗位评估" in draft
+    assert not state["session_state"].get("gate_clarify_pending")
+    assert state["session_state"].get("chat_only_requested") is not True

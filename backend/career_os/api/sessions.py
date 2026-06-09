@@ -346,10 +346,12 @@ def get_tasks(session_id: str | None = Query(default=None)):
         session_store.update_state(session_id, state)
     closure = state.get("explore_closure") or {}
     flags = (state.get("gates") or {}).get("flags") or {}
+    current_list_meta = store.get_list_meta(state.get("list_id") or "")
     if (
         state.get("list_type") == "pipeline"
-        and (store.get_list_meta(state.get("list_id") or "") or {}).get("current_phase")
-        == "explore"
+        and current_list_meta
+        and current_list_meta.get("status") == "active"
+        and current_list_meta.get("current_phase") == "explore"
         and not flags.get("explore_return_requested")
         and not flags.get("explore_continue_requested")
         and (profile.get("exploration") or {}).get("completed_at")
@@ -362,7 +364,10 @@ def get_tasks(session_id: str | None = Query(default=None)):
                 session_store.update_state(session_id, state)
     raw_lists = store.list_lists_for_session(session_id)
     lists = [_format_task_list_row(store, row) for row in raw_lists]
-    active_list_id = store.get_active_list_id_for_session(session_id)
+    active_list_id = next(
+        (row["list_id"] for row in raw_lists if row.get("status") == "active"),
+        None,
+    )
     has_pipeline = any(item.get("list_type") == "pipeline" for item in lists)
     if has_pipeline:
         all_tasks_completed = False

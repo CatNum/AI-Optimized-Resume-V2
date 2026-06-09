@@ -76,3 +76,22 @@ def test_analyze_advance_infers_phase_when_only_workers(pipeline_env):
     )
     assert phase == "resume_strategy"
     assert task_mod.TaskStore().get_list_meta(list_id)["current_phase"] == "resume_strategy"
+
+
+def test_analyze_does_not_auto_advance_ready_pipeline(pipeline_env):
+    session_id = "sess_adv03"
+    list_id = instantiate_pipeline_for_session(session_id)
+    state = {
+        "list_type": "pipeline",
+        "list_id": list_id,
+        "explore_gate_confirmed": True,
+        "gates": {"flags": {}},
+        "prior_results": {"market": {}},
+    }
+    phase = maybe_advance_phase_from_analyze(
+        {"workers": ["market"], "pipeline_phase": "market"},
+        state,
+        "帮我看看这个岗位",
+    )
+    assert phase == "explore"
+    assert task_mod.TaskStore().get_list_meta(list_id)["current_phase"] == "explore"

@@ -121,16 +121,12 @@ def instantiate_pipeline_for_session(session_id: str) -> str | TaskStoreError:
 
     hydrate_explore_completion_from_sessions()
     profile = ProfileStore().get(["exploration", "intent"])
-    start_phase = "explore"
-    exploration = profile.get("exploration") or {}
-    if exploration.get("completed_at"):
-        start_phase = "market"
 
     result = store.create_task_list(
         session_id,
         list_type="pipeline",
-        status="active",
-        current_phase=start_phase,
+        status="ready",
+        current_phase="explore",
     )
     if isinstance(result, TaskStoreError):
         return result

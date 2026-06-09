@@ -75,6 +75,18 @@ _PROFILE_BASIC_PHRASES = (
     "基本信息",
 )
 
+_CHAT_ONLY_PHRASES = (
+    "随便聊聊",
+    "闲聊",
+    "先聊聊",
+    "先闲聊",
+    "不分配任何工作",
+    "不要分配任何工作",
+    "不要进入任何任务",
+    "不进入任何任务",
+    "直接给出打招呼话术",
+)
+
 
 def match_history_scope_rules(user_message: str) -> dict[str, Any] | None:
     text = (user_message or "").strip()
@@ -114,6 +126,20 @@ def match_profile_memory_rules(user_message: str) -> set[str]:
     if re.search(r"有没有|是否已有|档案", text):
         sections.update({"resume", "basic_intent", "exploration"})
     return sections
+
+
+def match_chat_only_intent_rules(user_message: str) -> dict[str, Any] | None:
+    text = (user_message or "").strip()
+    if not text:
+        return None
+    if any(phrase in text for phrase in _CHAT_ONLY_PHRASES):
+        return {
+            "chat_only": True,
+            "confidence": _RULE_CONFIDENCE,
+            "source": "rule",
+            "reason": "matched_chat_only_phrase",
+        }
+    return None
 
 
 _INTENT_MARKET_PHRASES = (

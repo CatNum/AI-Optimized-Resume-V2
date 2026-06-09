@@ -25,6 +25,7 @@ def test_build_synthesis_includes_pipeline_phase(monkeypatch, tmp_path):
     session_id = session_mod.SessionStore().create_session()
     list_id = pipeline_mod.instantiate_pipeline_for_session(session_id)
     assert isinstance(list_id, str)
+    task_mod.TaskStore().start_task_list(list_id)
     task_mod.TaskStore().set_current_phase(list_id, "jd_analysis")
 
     session_state = {
@@ -66,6 +67,7 @@ def test_chat_only_draft_mentions_jd_when_phase_migrated(monkeypatch, tmp_path):
     session_id = session_mod.SessionStore().create_session()
     list_id = pipeline_mod.instantiate_pipeline_for_session(session_id)
     assert isinstance(list_id, str)
+    task_mod.TaskStore().start_task_list(list_id)
     task_mod.TaskStore().set_current_phase(list_id, "jd_analysis")
 
     session_state = {

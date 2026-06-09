@@ -24,6 +24,7 @@ from career_os.harness.pipeline_routing import (
     pipeline_analyze_payload,
     pipeline_fallback_workers,
 )
+from career_os.harness.micro_classifier import is_chat_only_intent
 from career_os.platform.store.profile import ProfileStore
 from career_os.harness.explore_guidance import (
     sanitize_prior_results_for_synthesis,
@@ -68,6 +69,14 @@ def _coordinator_system() -> str:
 def chat_only_synthesis_draft(session_state: dict[str, Any] | None = None) -> str:
     base = load_coordinator_prompt().chat_only_draft
     if not session_state or session_state.get("list_type") != "pipeline":
+        return base
+    from career_os.platform.store.task import TaskStore
+
+    list_id = session_state.get("list_id")
+    if not list_id:
+        return base
+    meta = TaskStore().get_list_meta(list_id) or {}
+    if meta.get("status") != "active":
         return base
     from career_os.harness.session_activity import build_session_activity
 
@@ -336,6 +345,8 @@ def fallback_analyze_workers(
     user_message: str,
     session_state: dict[str, Any],
 ) -> dict[str, Any] | None:
+    if is_chat_only_intent(user_message):
+        return {"workers": []}
     if is_small_talk(user_message):
         return {"workers": []}
 
@@ -474,6 +485,8 @@ def analyze_workers(
             }
         )
 
+    if is_chat_only_intent(user_message):
+        return normalize_analyze_result({"workers": []}, allowed_workers, session_state)
     if is_small_talk(user_message):
         return normalize_analyze_result({"workers": []}, allowed_workers, session_state)
 

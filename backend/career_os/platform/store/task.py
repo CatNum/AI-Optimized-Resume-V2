@@ -184,14 +184,11 @@ class TaskStore:
 
     def complete_task(self, list_id: str, task_id: str) -> TaskStoreError | None:
         with _lock:
-            err = self._ensure_mutable_list(list_id)
-            if err:
-                return err
             task_path = self._task_path(list_id, task_id)
             if not task_path.exists():
                 return TaskStoreError("task_not_found", f"Task {task_id} not found")
-            meta = self._read_json(self._meta_path(list_id))
             task = self._read_json(task_path)
+            meta = self._read_json(self._meta_path(list_id))
             if meta.get("list_type") == "pipeline" and (
                 task.get("kind") == "milestone" or task_id.startswith("ms_")
             ):
@@ -199,6 +196,9 @@ class TaskStore:
                     "milestone_complete_forbidden",
                     "Pipeline milestones cannot be completed",
                 )
+            err = self._ensure_mutable_list(list_id)
+            if err:
+                return err
             task_path.unlink()
             return None
 
@@ -280,6 +280,8 @@ class TaskStore:
             if meta.get("list_type") != "pipeline":
                 return None
             current_phase = meta.get("current_phase") or "explore"
+            if meta.get("status") == "ready":
+                current_phase = "explore"
             current_ms = PHASE_TO_MILESTONE_ID.get(current_phase, "ms_explore")
             all_tasks = self._list_tasks_unlocked(list_id)
             milestones = sorted(
@@ -371,7 +373,24 @@ class TaskStore:
             self.normalize_multi_active_for_session_unlocked(session_id)
             actives = self._find_active_metas_for_session_unlocked(session_id)
             if not actives:
-                return None
+                ready_pipeline_ids: list[str] = []
+                if self._tasks_dir.exists():
+                    for list_dir in self._tasks_dir.iterdir():
+                        if not list_dir.is_dir():
+                            continue
+                        meta_path = list_dir / "meta.json"
+                        if not meta_path.exists():
+                            continue
+                        meta = self._read_json(meta_path)
+                        if (
+                            meta.get("session_id") == session_id
+                            and meta.get("list_type") == "pipeline"
+                            and meta.get("status") == "ready"
+                        ):
+                            ready_pipeline_ids.append(meta["list_id"])
+                if not ready_pipeline_ids:
+                    return None
+                return ready_pipeline_ids[-1]
             if len(actives) == 1:
                 return actives[0]["list_id"]
             newest = max(actives, key=lambda m: m.get("created_at") or "")

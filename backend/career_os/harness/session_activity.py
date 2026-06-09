@@ -70,6 +70,12 @@ def _explore_worker_status(
 def build_session_activity(session_state: dict[str, Any]) -> dict[str, Any]:
     list_type = session_state.get("list_type")
     items: list[dict[str, str]] = []
+    list_id = session_state.get("list_id")
+    list_meta = None
+    if list_type == "pipeline" and list_id:
+        from career_os.platform.store.task import TaskStore
+
+        list_meta = TaskStore().get_list_meta(list_id)
 
     from career_os.harness.pipeline_routing import get_current_phase, is_pipeline_session
     profile = ProfileStore().get(["exploration", "intent"])
@@ -89,7 +95,11 @@ def build_session_activity(session_state: dict[str, Any]) -> dict[str, Any]:
                 "status": "in_progress",
             }
         )
-    elif is_pipeline_session(session_state) and get_current_phase(session_state) == "explore":
+    elif (
+        is_pipeline_session(session_state)
+        and get_current_phase(session_state) == "explore"
+        and (list_meta or {}).get("status") != "ready"
+    ):
         closure = session_state.get("explore_closure") or {}
         required = closure.get("required_workers") or DEFAULT_REQUIRED_WORKERS
         for worker_id in required:
@@ -100,12 +110,16 @@ def build_session_activity(session_state: dict[str, Any]) -> dict[str, Any]:
                     "status": _explore_worker_status(worker_id, session_state),
                 }
             )
-    elif is_pipeline_session(session_state) and get_current_phase(session_state) in {
-        "market",
-        "jd_analysis",
-        "resume_strategy",
-        "resume_optimize",
-    }:
+    elif (
+        is_pipeline_session(session_state)
+        and (list_meta or {}).get("status") != "ready"
+        and get_current_phase(session_state) in {
+            "market",
+            "jd_analysis",
+            "resume_strategy",
+            "resume_optimize",
+        }
+    ):
         phase = get_current_phase(session_state) or ""
         items.append(
             {
@@ -128,6 +142,12 @@ def _activity_headline(
     items: list[dict[str, str]],
 ) -> str | None:
     list_type = session_state.get("list_type")
+    list_id = session_state.get("list_id")
+    list_meta = None
+    if list_type == "pipeline" and list_id:
+        from career_os.platform.store.task import TaskStore
+
+        list_meta = TaskStore().get_list_meta(list_id)
     profile = ProfileStore().get(["exploration", "intent"])
     needs_full_explore = compute_needs_full_explore(profile, session_state)
     if session_state.get("explore_intake_blocked") and needs_full_explore:
@@ -137,6 +157,9 @@ def _activity_headline(
     if is_pipeline_session(session_state):
         phase = get_current_phase(session_state) or "explore"
         label = LIST_TYPE_LABELS.get("pipeline", "职业路径")
+        status = (list_meta or {}).get("status")
+        if status == "ready":
+            return f"当前：{label} · 待开始"
         phase_labels = {
             "explore": "职业初探",
             "market": "市场分析",
