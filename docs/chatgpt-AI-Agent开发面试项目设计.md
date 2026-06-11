@@ -300,6 +300,22 @@ Harness 负责：
 
 ## 6. 状态与数据设计
 
+### 6.0 五类核心数据
+
+先从全局看，项目里真正长期有价值的数据不只是一份聊天记录，而是分成五类对象：
+
+| 对象 | 中文含义 | 生命周期 | 作用 |
+|------|----------|----------|------|
+| `Session（会话工作区）` | 当前会话正在发生什么 | 当前 session 内有效 | 保存 `state.json`、`messages.json`、`artifacts.json` 等会话现场 |
+| `Profile（长期档案）` | 用户长期职业事实 | 跨 session 保留 | 保存经历、能力、偏好、策略、简历索引等长期事实 |
+| `Task（任务状态机）` | 当前流程走到哪一步 | 绑定当前 session | 保存 `pipeline`、`milestone`、`work` 等任务结构 |
+| `Output（交付产物）` | 生成出来的文件 | 跨 session 保留 | 保存 HTML 简历、产物索引等用户可见结果 |
+| `Trace（运行审计）` | Agent 运行轨迹 | 按天追加 | 保存派工、工具调用、闸门、错误和耗时，便于排查和 Eval |
+
+面试里可以这样说：
+
+> 我没有把聊天历史直接当成整个系统的记忆，而是把会话现场、长期档案、任务状态、交付产物和运行审计拆开。这样短期流程不会污染长期事实，长期事实又可以跨会话复用。
+
 ### 6.1 状态分层
 
 项目里容易混淆的是 `session_state（会话运行态）` 和 `state.json（会话状态文件）`。
@@ -494,6 +510,62 @@ list_id = list_xxx
 
 `profile.json` 是长期事实，不是临时对话缓存。临时闸门和本轮派工状态放 `state.json`，跨会话仍要保留的用户事实才写入 `profile.json`。
 
+#### 6.4.1 为什么不把全量聊天历史当长期记忆
+
+全量聊天历史适合作为“短期上下文”，但不适合作为长期记忆，原因是：
+
+- 对话里有探索、犹豫、误解和临时想法，不一定都是确认后的事实。
+- 随着会话变长，直接塞全量历史会带来明显 token 成本。
+- 后续简历生成需要可追溯事实，不能只依赖临时聊天片段。
+- Worker 只需要当前阶段相关材料，读取全量历史反而会引入噪声。
+
+所以项目采用分层记忆：
+
+- `messages.json（对话历史文件）`：保存完整聊天记录，供短期上下文裁剪使用。
+- `messages_meta（对话元信息）`：记录上下文使用比例、消息数量等。
+- `session_state.prior_results（已完成 Worker 结果摘要）`：保存本 session 内前序 Worker 的结构化摘要。
+- `profile.json（用户长期画像文件）`：保存跨 session 复用的确认事实。
+
+面试里可以这样说：
+
+> 聊天历史不是长期记忆本身，它只是原始材料。真正能被后续流程稳定复用的，应该是经过结构化和确认后的 Profile、Worker 摘要和产物索引。
+
+### 6.5 `WorkerState` 核心字段
+
+`WorkerState（Worker 状态）` 定义在 `backend/career_os/agents/state/worker.py`，用于描述单个 Worker 在一次 ReAct 运行中的状态。
+
+```python
+class WorkerState(TypedDict, total=False):
+    # 身份与目标层：说明当前是哪个 Worker，在执行什么任务
+    worker_id: str                         # Worker ID：当前领域 Worker 的标识，例如 identity / resume / asset
+    goal: str                              # 任务目标：Coordinator 派给 Worker 的本轮目标
+
+    # 输入上下文层：说明 Worker 执行时可参考哪些会话、档案、前序结果和能力材料
+    context: dict[str, Any]                # 上下文：Coordinator 和 Harness 注入的聊天历史、Profile 片段、前序结果、能力索引
+    session_state: dict[str, Any]          # 会话状态：当前 Worker 可读取的会话现场，例如 phase、gate、prior_results
+
+    # ReAct 过程层：说明 Worker 与模型、工具交互过程中的临时状态
+    messages: list[dict[str, Any]]         # 模型消息：Worker 与 LLM 的 system / user / assistant / tool 消息列表
+    iteration: int                         # 当前迭代次数：ReAct 循环当前执行到第几轮
+    max_iterations: int                    # 最大迭代次数：防止 Worker 无限 tool call
+
+    # 结果输出层：说明 Worker 最终交付给 Coordinator 的结构化结果
+    structured_output: dict[str, Any]      # 结构化输出：Worker 最终返回给 Coordinator 的 JSON 结果
+
+    # 状态与异常层：说明 Worker 当前执行状态和失败原因
+    status: str                            # 运行状态：running / completed / failed 等
+    error: str | None                      # 错误信息：Worker 失败时的原因
+```
+
+`WorkerState` 和 `CoordinatorState` 的区别是：
+
+- `CoordinatorState（协调者状态）` 描述一轮用户消息如何被分析、派工和合成。
+- `WorkerState（Worker 状态）` 描述某个 Worker 被派工后，如何在 ReAct 循环里调工具、接收工具结果并输出结构化 JSON。
+
+一句话理解：
+
+> `CoordinatorState` 管“这一轮怎么编排”，`WorkerState` 管“某个 Worker 具体怎么执行”。
+
 ## 7. 闸门与安全边界设计
 
 ### 7.1 闸门分层机制
@@ -550,7 +622,7 @@ list_id = list_xxx
 这个例子的价值：
 
 - 确认不是直接靠模型生成一句话。
-- 真正改变流[chatgpt-AI-Agent开发面试项目设计.md](chatgpt-AI-Agent%E5%BC%80%E5%8F%91%E9%9D%A2%E8%AF%95%E9%A1%B9%E7%9B%AE%E8%AE%BE%E8%AE%A1.md)程的是 `state.json.gates.flags.optimize_confirmed（优化确认标记）`。
+- 真正改变流程的是 `state.json.gates.flags.optimize_confirmed（优化确认标记）`。
 - resume Worker 是否能执行，还会被 `check_delegate_rules（检查派工规则）` 再校验一次。
 
 面试可以这样说：
@@ -570,6 +642,44 @@ list_id = list_xxx
 - 所有业务 Worker：可以按白名单调用 `profile_patch（写入用户画像）`。
 
 如果 actor 调用不属于自己的工具，`execute_tool（执行工具）` 返回 `tool_not_allowed（工具不允许）`。
+
+#### 7.3.1 `ToolRegistry（工具注册表）` 的作用
+
+`ToolRegistry（工具注册表）` 定义在 `backend/career_os/platform/tool/registry.py`。它不是普通函数列表，而是带权限约束的工具注册中心。
+
+它记录三类信息：
+
+- `name（工具名称）`：例如 `profile_patch`、`write_resume_html`、`browser_fetch`。
+- `actors（可调用者集合）`：哪些 actor 可以调用这个工具。
+- `handler（处理函数）`：真正执行工具逻辑的 Python 函数。
+
+核心函数：
+
+- `register（注册工具）`：把工具名称、处理函数和可调用 actor 写入注册表。
+- `is_allowed（判断是否允许）`：判断某个 actor 是否可以调用某个工具。
+- `execute（执行工具）`：执行工具前再次检查 actor 权限，不允许则抛出权限错误。
+
+面试里可以这样说：
+
+> `ToolRegistry` 类似带权限表的服务注册中心。LLM 可能产生 tool call，但能不能执行，最终要看 ToolRegistry 和 Harness 的确定性权限校验。
+
+#### 7.3.2 Tool Calling 从 LLM 到 Harness 的执行链路
+
+Worker 侧的 Tool Calling 不是“模型直接执行工具”，而是一个受控链路：
+
+1. `run_worker_react（运行 Worker ReAct 循环）` 构造 Worker 的 system prompt 和 user prompt。
+2. `get_litellm_tools_for_worker（获取 Worker 可见工具）` 根据 `worker_id（Worker ID）` 生成当前 Worker 可用的 tool schema。
+3. LiteLLM 调用模型，模型返回 `tool_calls（工具调用请求）`。
+4. Worker runner 解析 `tool_name（工具名称）` 和参数。
+5. Worker runner 调用 `harness.execute_tool（Harness 执行工具）`。
+6. Harness 检查 actor 与 tool 权限，通过后执行真实工具。
+7. 工具结果以 `role=tool（工具消息）` 回填到 Worker 的 `messages（模型消息）`。
+8. 模型继续推理，直到输出合法 JSON。
+9. `finalize_worker_result（收束 Worker 结果）` 把模型 JSON 规范化为 WorkerResult。
+
+这条链路的关键点是：
+
+> 模型只能“提出”工具调用，Harness 才决定这个工具调用能不能真正执行。
 
 ### 7.4 Profile 写入白名单
 
@@ -672,6 +782,31 @@ Trace 由 `TraceWriter（轨迹写入器）` 写入 JSONL 文件。关键事件�
 - `backend/career_os/harness/gate.py`
 - `docs/architecture/12-评测与可观测.md`
 
+### 8.4 异常与降级
+
+Agent 系统的工程化不只看正常链路，也要看失败后是否能被结构化处理、可解释返回、可追踪定位。
+
+当前项目里比较重要的异常和降级包括：
+
+| 场景 | 处理方式 | 价值 |
+|------|----------|------|
+| `LLM_API_KEY（LLM API Key）` 未配置 | Worker runner 返回 failed result | 无 Key 环境下不会伪装成真实推理 |
+| LiteLLM 调用失败 | 返回结构化错误，例如 `LiteLLM completion failed` | 避免异常散落到调用栈 |
+| Worker 未输出合法 JSON | 返回 `No valid JSON object found in worker response` | 强制 Worker 结果结构化 |
+| ReAct 超过最大迭代次数 | 返回 `Reached max iterations` | 防止工具调用无限循环 |
+| 工具越权 | Harness 返回 `tool_not_allowed` | 防止模型越权调用工具 |
+| JD 前置条件不足 | delegate 层返回 `delegate_blocked` 或 JD-B1 原因 | 阻止未建档、未初探时硬进 JD 链路 |
+| 简历优化未确认 | delegate 层返回 `gate_blocked` | 防止未确认就生成用户可见 HTML |
+
+这些错误不应该被简单吞掉，而应该进入两条链路：
+
+- 对用户：Coordinator 在 `synthesize（合成节点）` 中转成自然语言解释和下一步建议。
+- 对工程：Trace 记录 `event（事件类型）`、`status（执行状态）`、`detail.code（错误码）` 和 `detail.message（错误信息）`，方便回放和定位。
+
+面试里可以这样说：
+
+> 我会把 Agent 的失败也当成系统契约的一部分。模型失败、工具越权、前置条件不满足，都应该结构化返回并进入 Trace，而不是让异常散落在 Worker 内部。
+
 ## 9. 技术选型与取舍
 
 ### 9.1 FastAPI + SSE
@@ -735,6 +870,23 @@ Harness 是为了把 Agent 能力产品化。它把工具、Skill、权限、闸
 取舍：
 
 Harness 会增加架构复杂度，但这是从“能跑的 Agent Demo”升级到“可控的 Agent 系统”的关键。
+
+### 9.6 从 Go 后端视角理解 Agent 项目
+
+如果用 Go 后端工程视角理解这个项目，可以这样类比：
+
+| Python / Agent 概念 | Go 后端类比 | 在本项目中的意义 |
+|------|------|------|
+| `TypedDict（类型字典）` | 轻量 struct 字段约束 | 描述状态对象有哪些字段，但运行时比 Go struct 更宽松 |
+| `StateGraph（状态图）` | 有限状态机 / 工作流引擎 | 把一次用户消息拆成 analyze、delegate、synthesize 等节点 |
+| `ToolRegistry（工具注册表）` | 服务注册中心 + 权限表 | 记录哪个 actor 可以调用哪个工具 |
+| `Harness（运行时控制平面）` | 平台层 / 中间件控制面 | 统一处理工具、权限、任务、闸门、存储和 Trace |
+| `profile_patch（画像补丁）` | 受控 repository update | Worker 只能按白名单提交结构化写入 |
+| `TraceWriter（轨迹写入器）` | 结构化日志 writer | 把关键运行事件写成 JSONL，方便排查和 Eval |
+
+面试里可以这样说：
+
+> 我会把 LangGraph 看成状态机，把 ToolRegistry 看成服务注册和权限表，把 Harness 看成运行时控制平面。这样讲，比单纯说“用了 Agent 框架”更能体现工程边界。
 
 ## 10. 后续演进方向
 
@@ -858,6 +1010,18 @@ Harness 会增加架构复杂度，但这是从“能跑的 Agent Demo”升级�
 
 > 我会先保留 Coordinator、Worker、Harness 的边界，然后把本地 JSON 存储迁移到数据库，把 Trace 接入可观测平台，把 Harness 规则配置化，再把外部工具调用做沙箱、超时、重试和权限隔离。等这些边界稳定后，再考虑把 Worker 执行拆成异步任务或独立服务。
 
+### 11.7 这个项目里 LangGraph 的核心价值是什么
+
+答法：
+
+> 当前 LangGraph 的核心价值不是堆复杂多图，而是把 Coordinator 的单轮运行变成清晰状态机：先 `analyze` 判断意图和阶段，再 `delegate` 通过 Harness 受控派工，最后 `synthesize` 合成用户可见回复。条件边控制是否继续派工或收束，这让 Agent 行为更容易解释和测试。
+
+### 11.8 如果面试官质疑这是 Demo，不是工程系统，怎么回答
+
+答法：
+
+> 我会承认它是本地优先的 v0.1 项目，不是生产级 SaaS，但它不是只靠 Prompt 的 Demo。它已经把 Agent 工程里最容易失控的部分抽出来了：状态机、工具权限、Profile 写入边界、Gate/HITL、HTML 产物、Trace 和 Eval。它的价值不是规模，而是把长流程 Agent 如何可控落地讲清楚。
+
 ## 12. 复习路线
 
 建议按这个顺序复习：
@@ -878,3 +1042,25 @@ Harness 会增加架构复杂度，但这是从“能跑的 Agent Demo”升级�
 - Gate 如何从硬规则到 LLM fallback
 - Eval 如何验证 Agent 长流程
 - 生产化如何演进
+
+### 12.1 建议阅读代码顺序
+
+如果要从代码层面复习，建议按这个顺序看：
+
+1. 先看架构入口
+   - `docs/architecture/00-架构总览.md（架构总览文档）`：理解一主多从、Python 单体、REST + SSE。
+   - `backend/career_os/agents/graphs/coordinator.py（协调者图编排）`：理解 Coordinator 的 LangGraph 状态机。
+   - `backend/career_os/agents/state/coordinator.py（协调者状态结构）`：理解 `CoordinatorState（协调者状态）`。
+
+2. 再看运行时控制
+   - `backend/career_os/harness/executor.py（Harness 执行器）`：理解 `Harness（运行时控制平面）`、`execute_tool（执行工具）` 和工具注册。
+   - `backend/career_os/platform/tool/registry.py（工具注册表）`：理解 actor 与 tool 权限表。
+   - `backend/career_os/harness/delegate.py（派工规则）`：理解 Worker 派发前置规则。
+   - `backend/career_os/harness/jd_prerequisites.py（JD 前置条件）`：理解 JD 链路前置拦截。
+
+3. 最后看 Worker 与评测
+   - `backend/career_os/agents/graphs/workers/react_runner.py（Worker ReAct 运行器）`：理解 ReAct 循环和 LiteLLM tool calling。
+   - `backend/career_os/agents/state/worker.py（Worker 状态结构）`：理解 `WorkerState（Worker 状态）`。
+   - `config/workers.registry.json（Worker 注册表配置）`：理解 7 类 Worker 的职责、工具和 gate。
+   - `docs/architecture/12-评测与可观测.md（评测与可观测文档）`：理解 Eval 分层和 Trace 设计。
+   - `backend/tests/（测试目录）`：对照测试理解权限、派工、gate、trace、产物交付。
