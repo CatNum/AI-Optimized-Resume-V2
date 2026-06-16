@@ -264,7 +264,7 @@
       <article class="item">
         <div class="item-head">
           <div>
-            <div class="item-title">河北经贸大学 <span class="muted">｜软件工程｜本科一批</span></div>
+            <div class="item-title">河北经贸大学｜软件工程｜本科一批</div>
           </div>
           <div class="time">2018.09 – 2022.06</div>
         </div>
@@ -295,6 +295,24 @@
           <li>封装 LiteLLM 模型接入层，按任务类型预留<span class="emphasis">模型路由、超时控制、降级策略与 token 成本记录</span>口径，便于后续模型替换与成本治理。</li>
           <li>为 Agent 执行链路补充 <span class="emphasis">JSONL trace</span>，记录<span class="emphasis">Coordinator 决策、Worker 派发、Tool 调用状态 / 耗时、Gate 拦截与失败原因</span>；模型耗时与 token 成本已在 LiteLLM 接入层预留扩展口径。</li>
           <li>沉淀 <span class="emphasis">L1 组件、L2 派工链、L3 E2E</span> 分层评估用例，覆盖<span class="emphasis">意图路由、阶段推进、Tool 权限、HITL 拦截、简历生成前置确认与 HTML 交付契约</span>，用于 Agent 行为回归验证。</li>
+        </ul>
+      </article>
+
+      <article class="item project-focus">
+        <div class="item-head">
+          <div>
+            <div class="item-title">Fork-skills｜Agent Skills 工作流与面试训练技能库</div>
+          </div>
+        </div>
+        <div class="item-sub">开源 Agent Skill 二次开发｜流程规范 + 上下文工程 + 面试训练自动化</div>
+        <div class="tech-stack"><strong>技术栈：</strong>Markdown、OpenSkills、Claude Code Plugin、Agent Skills、Mermaid、项目文档工程</div>
+        <ul>
+          <li class="no-bullet"><strong>背景：</strong>基于 Anthropic Agent Skills 示例仓库进行 fork 与二次开发，面向个人高频 AI 协作、面试训练和文档沉淀场景，补齐原始示例中<span class="emphasis">中文工作流、项目面试、转写复盘与 skill 维护治理</span>不足的问题。</li>
+          <li>新增并维护 <span class="emphasis">md-formatting、interview-transcript-review、project-mock-interview、skill-update-assistant、transcript-refine</span> 等自定义 skill，覆盖 Markdown 规范化、真实面试转写复盘、P7 后端项目深挖、skill 变更审核和课程转写精炼。</li>
+          <li>为每个 skill 设计<span class="emphasis">触发边界、输入材料、启动询问、核心流程、质量自检与输出契约</span>，将一次性提示词沉淀为可复用、可审查、可迭代的 Agent 工作流资产。</li>
+          <li>在 <span class="emphasis">project-mock-interview</span> 中约束“一次只面一个项目、一轮只问一题、只基于材料出题”，并沉淀 P7 后端项目深挖的备课、追问、点评和 debrief 流程，降低模拟面试中的泛化提问和材料幻觉风险。</li>
+          <li>在 <span class="emphasis">interview-transcript-review</span> 中拆分原稿可读化清洗与复盘新文件输出边界，固定“面试官考点、回答评分、项目经验方向、技术扩展方向、短板卡片”等字段，支撑面试后复盘的结构化沉淀。</li>
+          <li>同步维护中英文 README、AGENTS 技能清单与 OpenSkills 使用入口，形成从 skill 设计、文档注册到插件消费的闭环，使个人 AI 协作能力具备<span class="emphasis">可安装、可迁移、可复用</span>的工程化形态。</li>
         </ul>
       </article>
 
