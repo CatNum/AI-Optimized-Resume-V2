@@ -8,6 +8,11 @@ from career_os.platform.trace.writer import TraceWriter
 
 @pytest.fixture
 def traced_harness(tmp_path, monkeypatch):
+    """traced_harness（traced harness）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.profile as profile_mod
@@ -19,6 +24,11 @@ def traced_harness(tmp_path, monkeypatch):
 
 
 def test_execute_tool_writes_tool_call_event(traced_harness):
+    """test_execute_tool_writes_tool_call_event（测试 execute tool writes tool call event）的函数说明。
+
+    traced_harness（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     harness, writer = traced_harness
     harness.execute_tool(
         "identity",
@@ -41,6 +51,11 @@ def test_execute_tool_writes_tool_call_event(traced_harness):
 
 
 def test_trace_zh_summary_for_skill_load(traced_harness):
+    """test_trace_zh_summary_for_skill_load（测试 trace zh summary for skill load）的函数说明。
+
+    traced_harness（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     _, writer = traced_harness
     writer.emit(
         "skill.load",
@@ -59,6 +74,11 @@ def test_trace_zh_summary_for_skill_load(traced_harness):
 
 
 def test_delegate_worker_writes_agent_run_start(traced_harness, jd_ready_profile):
+    """test_delegate_worker_writes_agent_run_start（测试 delegate worker writes agent run start）的函数说明。
+
+    traced_harness（参数）、jd_ready_profile（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     harness, writer = traced_harness
     harness.delegate_worker(
         "coordinator",

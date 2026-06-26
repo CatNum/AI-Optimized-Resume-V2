@@ -13,6 +13,11 @@ from tests.conftest import seed_jd_ready_profile
 
 @pytest.fixture
 def harness(tmp_path, monkeypatch):
+    """harness（harness）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     monkeypatch.setenv("OUTPUT_DIR", str(tmp_path / "output"))
     import career_os.config as config_mod
@@ -24,6 +29,11 @@ def harness(tmp_path, monkeypatch):
 
 
 def test_jd_chain_market_then_opportunity(harness):
+    """test_jd_chain_market_then_opportunity（测试 jd chain market then opportunity）的函数说明。
+
+    harness（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     seed_jd_ready_profile(ProfileStore())
     runner = build_harness_worker_runner(harness)
     state = run_coordinator_turn(
@@ -46,6 +56,11 @@ def test_jd_chain_market_then_opportunity(harness):
 
 
 def test_market_before_opportunity_order(harness):
+    """test_market_before_opportunity_order（测试 market before opportunity order）的函数说明。
+
+    harness（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     seed_jd_ready_profile(ProfileStore())
     runner = build_harness_worker_runner(harness)
     calls: list[str] = []
@@ -53,6 +68,11 @@ def test_market_before_opportunity_order(harness):
     original = runner
 
     def tracking_runner(worker_id, goal, session_state, context):
+        """tracking_runner（tracking runner）的函数说明。
+
+        worker_id（参数）、goal（参数）、session_state（参数）、context（参数）用于向该函数传入运行所需的数据。
+
+        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
         calls.append(worker_id)
         return original(worker_id, goal, session_state, context)
 

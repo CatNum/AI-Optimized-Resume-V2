@@ -5,6 +5,9 @@ from career_os.harness.explore_intake_fields import (
 
 
 def test_extract_fields_from_resume():
+    """test_extract_fields_from_resume（测试 extract fields from resume）的函数说明。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     resume = """
     张三
     5年工作经验
@@ -20,6 +23,9 @@ def test_extract_fields_from_resume():
 
 
 def test_merge_prefers_user_values_over_extraction():
+    """test_merge_prefers_user_values_over_extraction（测试 merge prefers user values over extraction）的函数说明。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     resume = "期望岗位：后端工程师\n3年工作经验"
     resolved, extracted, pending = merge_intake_field_values(
         resume_text=resume,
@@ -37,6 +43,9 @@ def test_merge_prefers_user_values_over_extraction():
 
 
 def test_merge_pending_when_missing_everywhere():
+    """test_merge_pending_when_missing_everywhere（测试 merge pending when missing everywhere）的函数说明。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     resolved, _, pending = merge_intake_field_values(
         resume_text="只有项目经历描述，没有结构化字段",
         user_values={

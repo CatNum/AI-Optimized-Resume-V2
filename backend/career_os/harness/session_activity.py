@@ -24,6 +24,11 @@ LIST_TYPE_LABELS = {
 
 
 def explore_flow_active(session_state: dict[str, Any]) -> bool:
+    """判断当前是否仍处于活跃的职业初探流程。
+
+    session_state（会话状态）提供 pipeline 阶段、intake 阻断、门禁和 explore_closure。
+    返回值为 True 表示 Coordinator 应继续初探，而不是切到其他流程。
+    """
     from career_os.harness.pipeline_gates import is_explore_gate_confirmed
     from career_os.harness.pipeline_routing import is_pipeline_explore_phase
 
@@ -51,6 +56,11 @@ def _explore_worker_status(
     worker_id: str,
     session_state: dict[str, Any],
 ) -> str:
+    """_explore_worker_status（内部函数 explore worker status）的函数说明。
+
+    worker_id（参数）、session_state（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     closure = session_state.get("explore_closure") or {}
     worker_done = closure.get("worker_done") or {}
     if worker_done.get(worker_id):
@@ -68,6 +78,12 @@ def _explore_worker_status(
 
 
 def build_session_activity(session_state: dict[str, Any]) -> dict[str, Any]:
+    """构建当前会话活动摘要。
+
+    session_state（会话状态）提供 list_type、list_id、当前阶段和探索闭环。
+    返回值包含 list_type（列表类型）、headline（当前阶段标题）和 items（阶段任务项），
+    用于 Coordinator 合成“当前在什么阶段”的回复。
+    """
     list_type = session_state.get("list_type")
     items: list[dict[str, str]] = []
     list_id = session_state.get("list_id")
@@ -141,6 +157,11 @@ def _activity_headline(
     session_state: dict[str, Any],
     items: list[dict[str, str]],
 ) -> str | None:
+    """_activity_headline（内部函数 activity headline）的函数说明。
+
+    session_state（参数）、items（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     list_type = session_state.get("list_type")
     list_id = session_state.get("list_id")
     list_meta = None
@@ -178,6 +199,11 @@ def _activity_headline(
 
 
 def explore_continue_synthesis_draft(session_state: dict[str, Any]) -> str:
+    """生成继续职业初探的合成草稿。
+
+    session_state（会话状态）提供 prior_results，尤其是 identity 的上一轮摘要。
+    返回值用于提醒用户当前仍在初探流程中，并引导其继续回答。
+    """
     prior = session_state.get("prior_results") or {}
     identity = prior.get("identity") or {}
     if identity.get("user_visible_summary"):

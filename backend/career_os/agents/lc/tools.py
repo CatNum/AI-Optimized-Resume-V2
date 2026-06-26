@@ -79,9 +79,16 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         "required": ["path"],
     },
 }
+"""TOOL_SCHEMAS（工具参数结构）定义暴露给 LLM 的函数调用参数 schema。"""
 
 
 def get_litellm_tools_for_worker(worker_id: str) -> list[dict[str, Any]]:
+    """获取某个 Worker 可见的 LiteLLM 工具列表。
+
+    worker_id（工作者标识）用于查找该 Worker 的业务工具白名单；
+    元工具 WORKER_META_TOOLS 会对所有 Worker 开放。返回值是 LiteLLM tools 格式，
+    模型只能看到这里返回的工具 schema，真实执行仍由 Harness 权限层校验。
+    """
     allowed = set(WORKER_META_TOOLS) | WORKER_BUSINESS_TOOLS.get(worker_id, set())
     tools: list[dict[str, Any]] = []
     for name in sorted(allowed):

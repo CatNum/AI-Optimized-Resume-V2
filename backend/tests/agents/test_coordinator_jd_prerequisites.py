@@ -10,6 +10,11 @@ from career_os.platform.store.profile import ProfileStore
 
 @pytest.fixture
 def env(tmp_path, monkeypatch):
+    """env（env）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.profile as profile_mod
@@ -22,10 +27,20 @@ def env(tmp_path, monkeypatch):
 
 
 def _seed_jd_ready(profile: ProfileStore) -> None:
+    """_seed_jd_ready（内部函数 seed jd ready）的函数说明。
+
+    profile（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     profile.patch([{"path": "basic.name", "value": "测试", "op": "set"}])
 
 
 def test_jd_request_blocked_without_prerequisites(env, monkeypatch):
+    """test_jd_request_blocked_without_prerequisites（测试 jd request blocked without prerequisites）的函数说明。
+
+    env（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     harness = Harness()
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(
@@ -37,6 +52,11 @@ def test_jd_request_blocked_without_prerequisites(env, monkeypatch):
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
+        """runner（runner）的函数说明。
+
+        worker_id（参数）、goal（参数）、session_state（参数）、context（参数）用于向该函数传入运行所需的数据。
+
+        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
         calls.append(worker_id)
         return {"worker_id": worker_id, "status": "completed", "structured_output": {}}
 
@@ -55,6 +75,11 @@ def test_jd_request_blocked_without_prerequisites(env, monkeypatch):
 
 
 def test_jd_request_allowed_when_prerequisites_met(env, monkeypatch):
+    """test_jd_request_allowed_when_prerequisites_met（测试 jd request allowed when prerequisites met）的函数说明。
+
+    env（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     _seed_jd_ready(ProfileStore())
     harness = Harness()
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
@@ -67,6 +92,11 @@ def test_jd_request_allowed_when_prerequisites_met(env, monkeypatch):
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
+        """runner（runner）的函数说明。
+
+        worker_id（参数）、goal（参数）、session_state（参数）、context（参数）用于向该函数传入运行所需的数据。
+
+        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
         calls.append(worker_id)
         return {
             "worker_id": worker_id,
@@ -95,9 +125,19 @@ def test_jd_request_allowed_when_prerequisites_met(env, monkeypatch):
 
 
 def test_preset_queue_blocked_at_harness_delegate(env, monkeypatch):
+    """test_preset_queue_blocked_at_harness_delegate（测试 preset queue blocked at harness delegate）的函数说明。
+
+    env（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     harness = Harness()
 
     def runner(worker_id, goal, session_state, context):
+        """runner（runner）的函数说明。
+
+        worker_id（参数）、goal（参数）、session_state（参数）、context（参数）用于向该函数传入运行所需的数据。
+
+        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
         return {"worker_id": worker_id, "status": "completed", "structured_output": {}}
 
     state = run_coordinator_turn(

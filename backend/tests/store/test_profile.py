@@ -1,4 +1,9 @@
 def test_profile_created_empty_on_first_access(tmp_path, monkeypatch):
+    """test_profile_created_empty_on_first_access（测试 profile created empty on first access）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -18,6 +23,11 @@ def test_profile_created_empty_on_first_access(tmp_path, monkeypatch):
 
 
 def test_profile_patch_set(tmp_path, monkeypatch):
+    """test_profile_patch_set（测试 profile patch set）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -32,6 +42,11 @@ def test_profile_patch_set(tmp_path, monkeypatch):
 
 
 def test_profile_patch_rejects_session_scoped_path(tmp_path, monkeypatch):
+    """test_profile_patch_rejects_session_scoped_path（测试 profile patch rejects session scoped path）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -49,6 +64,11 @@ def test_profile_patch_rejects_session_scoped_path(tmp_path, monkeypatch):
 
 
 def test_outputs_index_requires_session_id(tmp_path, monkeypatch):
+    """test_outputs_index_requires_session_id（测试 outputs index requires session id）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 

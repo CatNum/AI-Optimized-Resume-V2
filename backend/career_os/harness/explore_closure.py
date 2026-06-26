@@ -13,6 +13,11 @@ def init_explore_closure(
     gate_name: str = "explore_complete",
     required_workers: list[str] | None = None,
 ) -> dict[str, Any]:
+    """init_explore_closure（init explore closure）的函数说明。
+
+    gate_name（参数）、required_workers（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     required = required_workers or DEFAULT_REQUIRED_WORKERS
     worker_done = {
         worker_id: worker_id not in required for worker_id in DEFAULT_REQUIRED_WORKERS
@@ -28,6 +33,12 @@ def init_explore_closure(
 
 
 def explore_phase_status(structured_output: dict[str, Any] | None) -> str:
+    """读取探索 Worker 的阶段状态。
+
+    structured_output（结构化输出）是 identity/capability Worker 返回的结果。
+    返回值是 PHASE_IN_PROGRESS（进行中）或 PHASE_SEGMENT_COMPLETE（阶段完成），
+    用于 Coordinator 判断是否继续分发探索 Worker。
+    """
     if not structured_output:
         return PHASE_IN_PROGRESS
     status = structured_output.get("phase_status")
@@ -39,12 +50,23 @@ def explore_phase_status(structured_output: dict[str, Any] | None) -> str:
 def is_explore_segment_complete(
     worker_id: str, structured_output: dict[str, Any] | None
 ) -> bool:
+    """判断某个探索 Worker 的当前片段是否完成。
+
+    worker_id（工作者标识）用于区分 identity、capability 等 Worker；
+    structured_output（结构化输出）提供 phase_status（阶段状态）。
+    返回值为 True 表示该 Worker 可以从待执行队列移除。
+    """
     if worker_id not in EXPLORE_WORKERS:
         return True
     return explore_phase_status(structured_output) == PHASE_SEGMENT_COMPLETE
 
 
 def incomplete_explore_workers(session_state: dict[str, Any]) -> list[str]:
+    """incomplete_explore_workers（incomplete explore workers）的函数说明。
+
+    session_state（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     closure = session_state.get("explore_closure")
     if not closure:
         return list(EXPLORE_DISPATCH_ORDER)
@@ -57,6 +79,12 @@ def plan_explore_worker_dispatch(
     workers: list[str],
     session_state: dict[str, Any],
 ) -> list[str]:
+    """规划探索 Worker 的分发顺序。
+
+    workers（工作者列表）是当前候选 Worker；session_state（会话状态）保存
+    explore_closure（探索闭环）进度。返回值通常只包含下一个应执行的探索 Worker，
+    保证 identity 和 capability 按闭环顺序逐段推进。
+    """
     if not any(worker_id in EXPLORE_WORKERS for worker_id in workers):
         return workers
     incomplete = incomplete_explore_workers(session_state)
@@ -67,6 +95,11 @@ def plan_explore_worker_dispatch(
 
 
 def explore_continuation_analyze(session_state: dict[str, Any]) -> dict[str, Any] | None:
+    """分析是否需要继续未完成的探索流程。
+
+    session_state（会话状态）提供 pipeline 阶段、门禁 flags 和 explore_closure。
+    返回值是继续调度 identity/capability 的分析结果；如果不需要继续则返回 None。
+    """
     from career_os.harness.pipeline_gates import is_explore_gate_confirmed
     from career_os.harness.pipeline_routing import get_current_phase, is_pipeline_explore_phase
 
@@ -96,6 +129,12 @@ def mark_worker_done(
     *,
     structured_output: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """标记探索 Worker 完成状态。
+
+    explore_closure（探索闭环状态）记录 required_workers 和 worker_done；
+    worker_id（工作者标识）是刚执行完的 Worker；structured_output（结构化输出）
+    提供 phase_status。返回值是更新后的 explore_closure。
+    """
     state = dict(explore_closure or init_explore_closure())
     required = state.get("required_workers") or DEFAULT_REQUIRED_WORKERS
     worker_done = dict(state.get("worker_done") or {})
@@ -109,6 +148,11 @@ def mark_worker_done(
 
 
 def is_closure_ready(explore_closure: dict[str, Any] | None) -> bool:
+    """is_closure_ready（is closure ready）的函数说明。
+
+    explore_closure（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     if not explore_closure:
         return False
     required = explore_closure.get("required_workers") or DEFAULT_REQUIRED_WORKERS
@@ -117,6 +161,11 @@ def is_closure_ready(explore_closure: dict[str, Any] | None) -> bool:
 
 
 def can_set_explore_gate_pending(explore_closure: dict[str, Any] | None) -> bool:
+    """判断是否可以设置探索完成门禁。
+
+    explore_closure（探索闭环状态）记录 Worker 是否完成、门禁是否已 pending。
+    返回值为 True 表示 identity/capability 都已完成，且可以向用户发出完成确认门禁。
+    """
     if not explore_closure:
         return False
     if explore_closure.get("completed"):
@@ -129,6 +178,12 @@ def can_set_explore_gate_pending(explore_closure: dict[str, Any] | None) -> bool
 def validate_worker_structured_output(
     worker_id: str, structured_output: dict[str, Any]
 ) -> str | None:
+    """校验 Worker 结构化输出是否违反探索门禁规则。
+
+    worker_id（工作者标识）用于判断是否是探索 Worker；
+    structured_output（结构化输出）可能包含 gate_prompt（门禁提示）。
+    返回值为错误文案或 None；探索 Worker 不允许自己直接发出探索完成门禁。
+    """
     gate_prompt = structured_output.get("gate_prompt")
     if not gate_prompt:
         return None

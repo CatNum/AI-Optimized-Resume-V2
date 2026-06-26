@@ -4,6 +4,9 @@ from pathlib import Path
 
 
 def _load_module():
+    """_load_module（内部函数 load module）的函数说明。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     script = Path(__file__).resolve().parents[2] / "scripts" / "migrate_profile_session_boundary.py"
     spec = importlib.util.spec_from_file_location("migrate_profile_session_boundary", script)
     assert spec and spec.loader
@@ -13,6 +16,11 @@ def _load_module():
 
 
 def test_migrate_profile_into_single_session(tmp_path):
+    """test_migrate_profile_into_single_session（测试 migrate profile into single session）的函数说明。
+
+    tmp_path（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     data = tmp_path
     (data / "sessions" / "sess_1").mkdir(parents=True)
     (data / "sessions" / "sess_1" / "state.json").write_text(
@@ -56,6 +64,11 @@ def test_migrate_profile_into_single_session(tmp_path):
 
 
 def test_migrate_to_orphan_when_multi_sessions(tmp_path):
+    """test_migrate_to_orphan_when_multi_sessions（测试 migrate to orphan when multi sessions）的函数说明。
+
+    tmp_path（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     data = tmp_path
     (data / "sessions" / "sess_a").mkdir(parents=True)
     (data / "sessions" / "sess_b").mkdir(parents=True)

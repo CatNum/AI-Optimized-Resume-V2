@@ -11,11 +11,17 @@ _LEVEL_ORDER = ["保守", "标准", "进取"]
 
 @dataclass
 class OutputsToolError:
+    """OutputsToolError（OutputsToolError）的项目代码结构说明。
+
+    该类封装当前模块中的一组相关状态或行为，供业务代码、测试代码或运行时流程复用。"""
     code: str
     message: str
 
 
 def _output_root() -> Path:
+    """_output_root（内部函数 output root）的函数说明。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     return Path(settings.output_dir).resolve()
 
 
@@ -32,6 +38,11 @@ def canonical_output_prefix() -> str:
 
 
 def strip_canonical_prefix(path: str | Path) -> str:
+    """strip_canonical_prefix（strip canonical prefix）的函数说明。
+
+    path（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     posix = Path(path).as_posix().lstrip("/")
     canonical = canonical_output_prefix()
     while posix.startswith(f"{canonical}/"):
@@ -42,6 +53,11 @@ def strip_canonical_prefix(path: str | Path) -> str:
 
 
 def relative_output_path(path: str | Path) -> Path | None:
+    """relative_output_path（relative output path）的函数说明。
+
+    path（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     output_root = _output_root()
     raw = Path(path)
 
@@ -82,6 +98,11 @@ def relative_output_path(path: str | Path) -> Path | None:
 
 
 def normalize_output_path(path: str | Path) -> str:
+    """normalize_output_path（normalize output path）的函数说明。
+
+    path（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     canonical = canonical_output_prefix()
     resolved_file = resolve_output_file(path)
     if resolved_file is not None:
@@ -95,6 +116,11 @@ def normalize_output_path(path: str | Path) -> str:
 
 
 def dedupe_outputs_index(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """dedupe_outputs_index（dedupe outputs index）的函数说明。
+
+    entries（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     seen_ids: set[str] = set()
     seen_legacy: set[tuple[str, str, str]] = set()
     deduped: list[dict[str, Any]] = []
@@ -131,6 +157,11 @@ def dedupe_outputs_index(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def resolve_output_file(path: str | Path) -> Path | None:
+    """resolve_output_file（resolve output file）的函数说明。
+
+    path（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     output_root = _output_root()
     raw = Path(path)
     candidates: list[Path] = []
@@ -171,6 +202,11 @@ def resolve_output_file(path: str | Path) -> Path | None:
 
 
 def infer_optimization_level(filename: str) -> str | None:
+    """infer_optimization_level（infer optimization level）的函数说明。
+
+    filename（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     for level in _LEVEL_ORDER:
         if level in filename:
             return level
@@ -178,6 +214,9 @@ def infer_optimization_level(filename: str) -> str | None:
 
 
 def scan_disk_outputs() -> list[dict[str, Any]]:
+    """scan_disk_outputs（scan disk outputs）的函数说明。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     store = OutputStore()
     entries: list[dict[str, Any]] = []
     for file_path in store.list_all_files():
@@ -192,6 +231,11 @@ def scan_disk_outputs() -> list[dict[str, Any]]:
 
 
 def merge_outputs_index(indexed: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """merge_outputs_index（merge outputs index）的函数说明。
+
+    indexed（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     indexed_by_path = {
         normalize_output_path(entry["path"]): entry
         for entry in dedupe_outputs_index(indexed)
@@ -222,6 +266,11 @@ def merge_outputs_index(indexed: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def register_outputs_index(
     actor: str, args: dict[str, Any]
 ) -> OutputsToolError | dict[str, Any]:
+    """register_outputs_index（register outputs index）的函数说明。
+
+    actor（参数）、args（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     if actor != "asset":
         return OutputsToolError("tool_not_allowed", "register_outputs_index is asset-only")
     deliveries = args.get("deliveries") or []
@@ -273,6 +322,11 @@ def register_outputs_index(
 
 
 def delete_output(actor: str, args: dict[str, Any]) -> OutputsToolError | dict[str, Any]:
+    """delete_output（delete output）的函数说明。
+
+    actor（参数）、args（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     if actor != "asset":
         return OutputsToolError("tool_not_allowed", "delete_output is asset-only")
     path = Path(args["path"])

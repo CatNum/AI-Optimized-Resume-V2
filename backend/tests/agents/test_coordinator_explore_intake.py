@@ -4,6 +4,11 @@ from career_os.harness.executor import Harness
 
 
 def test_explore_intake_blocked_skips_delegate(tmp_path, monkeypatch):
+    """test_explore_intake_blocked_skips_delegate（测试 explore intake blocked skips delegate）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -17,6 +22,11 @@ def test_explore_intake_blocked_skips_delegate(tmp_path, monkeypatch):
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
+        """runner（runner）的函数说明。
+
+        worker_id（参数）、goal（参数）、session_state（参数）、context（参数）用于向该函数传入运行所需的数据。
+
+        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
         calls.append(worker_id)
         return {"worker_id": worker_id, "status": "completed", "structured_output": {}}
 
@@ -42,6 +52,11 @@ def test_explore_intake_blocked_skips_delegate(tmp_path, monkeypatch):
 def test_current_session_intake_continues_explore_even_when_repeat_flag_stale(
     tmp_path, monkeypatch
 ):
+    """test_current_session_intake_continues_explore_even_when_repeat_flag_stale（测试 current session intake continues explore even when repeat flag stale）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -56,6 +71,11 @@ def test_current_session_intake_continues_explore_even_when_repeat_flag_stale(
     submitted_at = "2026-06-07T07:46:23Z"
 
     def runner(worker_id, goal, session_state, context):
+        """runner（runner）的函数说明。
+
+        worker_id（参数）、goal（参数）、session_state（参数）、context（参数）用于向该函数传入运行所需的数据。
+
+        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
         calls.append(worker_id)
         return {
             "worker_id": worker_id,

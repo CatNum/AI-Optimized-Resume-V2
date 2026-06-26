@@ -55,11 +55,18 @@ from career_os.platform.store.profile import ProfileStore
 from career_os.platform.store.session import SessionStore
 
 WorkerRunner = Callable[[str, str, dict[str, Any], dict[str, Any]], dict[str, Any]]
+"""WorkerRunner（工作者运行函数）描述 Coordinator 调用 Worker 的统一函数签名。"""
 
 _LEGACY_SESSION_LIST_TYPES = frozenset({"explore", "jd"})
 
 
 def _compact_prior_result(worker_id: str, structured: dict[str, Any]) -> dict[str, Any]:
+    """压缩 Worker 历史结果。
+
+    worker_id（工作者标识）用于决定需要保留哪些关键字段；
+    structured（结构化输出）是 Worker 完整输出。返回值只保留后续路由和合成需要的
+    phase_status、user_visible_summary、gate_prompt 等轻量字段，避免 session_state 过大。
+    """
     if not isinstance(structured, dict):
         return {}
     keep_keys = {"phase_status", "user_visible_summary", "gate_prompt"}
@@ -76,6 +83,11 @@ def _sync_session_list_type_from_analysis(
     session_state: dict[str, Any],
     result: dict[str, Any],
 ) -> None:
+    """根据分析结果同步会话列表类型。
+
+    session_state（会话状态）会被原地更新；result（分析结果）可能包含 list_type。
+    该函数确保已有 pipeline/list_id 的会话继续保持 pipeline 类型。
+    """
     if session_state.get("list_type") == "pipeline" or session_state.get("list_id"):
         session_state["list_type"] = "pipeline"
         return
@@ -92,6 +104,12 @@ def _emit_coordinator_analyze_trace(
     workers: list[str],
     list_type: str | None,
 ) -> None:
+    """记录 Coordinator 分析阶段 trace。
+
+    harness（运行时工具门面）提供 trace.emit；session_id（会话标识）关联当前会话；
+    source（来源）说明路由来自 llm、fallback、queue 等；
+    workers（工作者列表）是本轮待调度 Worker；list_type（列表类型）标记 pipeline 等类型。
+    """
     trace = getattr(harness, "trace", None)
     if trace is None:
         return
@@ -116,6 +134,11 @@ def _default_worker_runner(
     session_state: dict[str, Any],
     context: dict[str, Any],
 ) -> dict[str, Any]:
+    """默认 Worker runner。
+
+    worker_id（工作者标识）、goal（目标）、session_state（会话状态）和 context（上下文）
+    保持真实 runner 签名兼容。返回值是一个最小 completed 结果，主要用于未注入 runner 的场景。
+    """
     return {
         "worker_id": worker_id,
         "status": "completed",
@@ -128,9 +151,20 @@ def build_coordinator_graph(
     *,
     worker_runner: WorkerRunner | None = None,
 ) -> Any:
+    """构建 Coordinator 状态图。
+
+    harness（运行时工具门面）负责委托 Worker、记录 trace 和执行权限控制；
+    worker_runner（工作者运行函数）可注入真实 ReAct runner 或测试 runner。
+    返回值是编译后的 LangGraph 图，包含 analyze、delegate、synthesize 三个节点。
+    """
     runner = worker_runner or _default_worker_runner
 
     def analyze(state: CoordinatorState) -> CoordinatorState:
+        """分析当前用户消息并决定下一步 Worker。
+
+        state（协调器状态）包含用户消息、会话状态、待执行 Worker 队列等。
+        返回值是更新后的 CoordinatorState：可能设置 current_worker_id，也可能直接进入合成。
+        """
         if state.get("stop_delegate"):
             return state
         pending = list(state.get("pending_workers") or [])
@@ -185,6 +219,12 @@ def build_coordinator_graph(
         source: str | None = None
 
         def _apply_analysis(result: dict[str, Any] | None) -> list[str]:
+            """应用一次路由分析结果。
+
+            result（分析结果）可能来自 LLM、fallback 或 continuation。
+            返回值是可执行的 workers（工作者列表）；如果命中 JD/初探阻断，会更新
+            session_state 并返回空列表。
+            """
             nonlocal session_state
             if not result:
                 return []
@@ -294,6 +334,12 @@ def build_coordinator_graph(
         }
 
     def delegate(state: CoordinatorState) -> CoordinatorState:
+        """委托当前 Worker 执行任务。
+
+        state（协调器状态）需要包含 current_worker_id。函数会选择适合 Worker 的聊天历史、
+        附加档案记忆，先经过 harness.delegate_worker 做权限/上下文处理，再调用 runner。
+        返回值会写入 last_worker_result、prior_results、pending_workers 和 stop_delegate。
+        """
         worker_id = state.get("current_worker_id")
         if not worker_id or state.get("stop_delegate"):
             return state
@@ -426,6 +472,12 @@ def build_coordinator_graph(
         }
 
     def synthesize(state: CoordinatorState) -> CoordinatorState:
+        """合成本轮最终回复。
+
+        state（协调器状态）提供 session_state、last_worker_result 和 delegate_count。
+        函数会优先处理门禁、JD 前置阻断、初探信息表、探索完成确认等确定性回复；
+        否则使用 Worker 的 user_visible_summary 或阶段感知草稿。返回值写入 synthesis_text。
+        """
         session_state = dict(state.get("session_state") or {})
         last = state.get("last_worker_result") or {}
         structured = last.get("structured_output") or {}
@@ -542,11 +594,21 @@ def build_coordinator_graph(
         }
 
     def route_after_analyze(state: CoordinatorState) -> str:
+        """决定 analyze 节点之后的路由。
+
+        state（协调器状态）如果没有 current_worker_id 或已 stop_delegate，则进入 synthesize；
+        否则进入 delegate。返回值是下一个节点名。
+        """
         if state.get("stop_delegate") or not state.get("current_worker_id"):
             return "synthesize"
         return "delegate"
 
     def route_after_delegate(state: CoordinatorState) -> str:
+        """决定 delegate 节点之后的路由。
+
+        state（协调器状态）如果停止分发或无 pending_workers，则进入 synthesize；
+        否则回到 analyze 继续选择下一个 Worker。返回值是下一个节点名。
+        """
         if state.get("stop_delegate") or not state.get("pending_workers"):
             return "synthesize"
         return "analyze"
@@ -574,6 +636,15 @@ def run_coordinator_turn(
     worker_runner: WorkerRunner | None = None,
     request_context: dict[str, Any] | None = None,
 ) -> CoordinatorState:
+    """运行一轮 Coordinator 对话。
+
+    harness（运行时工具门面）提供委托、权限和 trace 能力；
+    session_id（会话标识）关联当前会话；session_state（会话状态）保存业务状态；
+    user_message（用户消息）是本轮输入；chat_history（聊天历史）提供上下文；
+    messages_meta（消息元数据）提供上下文统计；pending_workers（待执行工作者）可预置队列；
+    worker_runner（工作者运行函数）可替换真实 Worker；request_context（请求上下文）传给 Worker。
+    返回值是图执行后的 CoordinatorState，包含 synthesis_text 和更新后的 session_state。
+    """
     worker_registry = WorkerRegistry()
     initial: CoordinatorState = {
         "messages": list(chat_history or []),

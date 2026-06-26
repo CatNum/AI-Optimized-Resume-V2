@@ -15,6 +15,11 @@ from tests.conftest import explore_repeat_cleared_gates
 
 @pytest.fixture
 def harness(tmp_path, monkeypatch, explore_intake_profile):
+    """harness（harness）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）、explore_intake_profile（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     monkeypatch.setattr(
         "career_os.agents.lc.client.llm_enabled",
@@ -27,6 +32,11 @@ def harness(tmp_path, monkeypatch, explore_intake_profile):
 
 
 def test_explore_first_turn_in_progress_no_gate(harness):
+    """test_explore_first_turn_in_progress_no_gate（测试 explore first turn in progress no gate）的函数说明。
+
+    harness（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     runner = build_harness_worker_runner(harness)
     session_state = {
         "session_id": "sess_exp",
@@ -55,6 +65,11 @@ def test_explore_first_turn_in_progress_no_gate(harness):
 
 
 def test_explore_gate_after_both_segments_complete(harness):
+    """test_explore_gate_after_both_segments_complete（测试 explore gate after both segments complete）的函数说明。
+
+    harness（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     runner = build_harness_worker_runner(harness)
     session_state = {
         "session_id": "sess_exp2",

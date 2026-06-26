@@ -35,17 +35,32 @@ SESSION_SCOPED_PROFILE_FIELDS = {
 
 
 def _read_json(path: Path, default: dict[str, Any] | None = None) -> dict[str, Any]:
+    """_read_json（内部函数 read json）的函数说明。
+
+    path（参数）、default（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     if not path.exists():
         return deepcopy(default or {})
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _write_json(path: Path, data: dict[str, Any]) -> None:
+    """_write_json（内部函数 write json）的函数说明。
+
+    path（参数）、data（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def _session_dirs(data_dir: Path) -> list[Path]:
+    """_session_dirs（内部函数 session dirs）的函数说明。
+
+    data_dir（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     root = data_dir / "sessions"
     if not root.exists():
         return []
@@ -53,6 +68,11 @@ def _session_dirs(data_dir: Path) -> list[Path]:
 
 
 def _choose_target_session(data_dir: Path) -> str | None:
+    """_choose_target_session（内部函数 choose target session）的函数说明。
+
+    data_dir（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     sessions = _session_dirs(data_dir)
     if len(sessions) == 1:
         return sessions[0].name
@@ -60,6 +80,11 @@ def _choose_target_session(data_dir: Path) -> str | None:
 
 
 def migrate(data_dir: Path, *, apply: bool) -> dict[str, Any]:
+    """migrate（migrate）的函数说明。
+
+    data_dir（参数）、apply（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     profile_path = data_dir / "profile.json"
     profile = _read_json(profile_path, default={})
     if not profile:
@@ -182,6 +207,9 @@ def migrate(data_dir: Path, *, apply: bool) -> dict[str, Any]:
 
 
 def main() -> int:
+    """main（main）的函数说明。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     parser = argparse.ArgumentParser(description="Migrate profile/session boundary")
     parser.add_argument("--data-dir", default=settings.data_dir, help="Data root directory")
     parser.add_argument("--dry-run", action="store_true", help="Print changes only")

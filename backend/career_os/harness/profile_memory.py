@@ -33,6 +33,11 @@ _ANALYZE_RESUME_SNIPPET_CHARS = 1200
 
 
 def _phase_requires_resume(session_state: dict[str, Any]) -> bool:
+    """_phase_requires_resume（内部函数 phase requires resume）的函数说明。
+
+    session_state（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     phase = get_current_phase(session_state) or "explore"
     return phase in PHASES_REQUIRE_RESUME
 
@@ -89,6 +94,11 @@ def _resume_payload(
     full_text: bool,
     intake_override: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """_resume_payload（内部函数 resume payload）的函数说明。
+
+    profile（参数）、full_text（参数）、intake_override（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     resume = profile.get("resume") or {}
     exploration = profile.get("exploration") or {}
     intake = intake_override or exploration.get("intake") or {}
@@ -119,6 +129,11 @@ def _resume_payload(
 
 
 def _session_artifact_memory(session_state: dict[str, Any] | None) -> dict[str, Any]:
+    """_session_artifact_memory（内部函数 session artifact memory）的函数说明。
+
+    session_state（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     state = session_state or {}
     prior = state.get("prior_results") or {}
     artifacts: dict[str, Any] = {}
@@ -166,6 +181,13 @@ def materialize_profile_memory(
     full_resume_text: bool = False,
     session_state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """按 section 加载本轮需要的档案记忆。
+
+    sections（档案切片列表）指定 resume、market、strategy 等逻辑区域；
+    full_resume_text（是否加载完整简历）控制简历正文是全文还是摘录；
+    session_state（会话状态）提供 session artifacts、prior_results 和 intake 覆盖信息。
+    返回值是可放入 LLM 上下文的 profile_memory（档案记忆）。
+    """
     if not sections:
         return {}
     paths: list[str] = []
@@ -211,6 +233,13 @@ def attach_profile_memory_to_context(
     *,
     worker_id: str | None = None,
 ) -> None:
+    """把本轮相关档案记忆附加到 Worker 上下文。
+
+    context（上下文字典）会被原地写入 profile_memory；
+    user_message（用户消息）用于判断需要哪些档案切片；
+    session_state（会话状态）提供当前阶段和会话产物；
+    worker_id（工作者标识）用于强制给 JD 链路 Worker 加载简历。
+    """
     sections = resolve_profile_memory_sections(
         user_message, session_state, worker_id=worker_id
     )
@@ -224,6 +253,11 @@ def attach_profile_memory_to_context(
 
 
 def format_profile_memory_for_draft(memory: dict[str, Any]) -> str:
+    """把档案记忆格式化为合成草稿中的事实说明。
+
+    memory（档案记忆）是 materialize_profile_memory 的结果。
+    返回值是简短中文事实文本，帮助合成阶段避免说“没有简历”等事实错误。
+    """
     if not memory:
         return "（本轮未加载档案切片）"
     lines: list[str] = []

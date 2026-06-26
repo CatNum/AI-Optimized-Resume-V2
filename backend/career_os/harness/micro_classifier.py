@@ -45,6 +45,11 @@ def classify(
     user_message: str,
     context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """classify（classify）的函数说明。
+
+    task（参数）、user_message（参数）、context（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     if task not in _TASKS:
         raise ValueError(f"unknown micro_classifier task: {task}")
     context = context or {}
@@ -60,6 +65,11 @@ def classify(
 
 
 def _classify_chat_only_intent(user_message: str) -> dict[str, Any]:
+    """_classify_chat_only_intent（内部函数 classify chat only intent）的函数说明。
+
+    user_message（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     rule = match_chat_only_intent_rules(user_message)
     if rule:
         return rule
@@ -97,11 +107,21 @@ def _classify_chat_only_intent(user_message: str) -> dict[str, Any]:
 
 
 def is_chat_only_intent(user_message: str, context: dict[str, Any] | None = None) -> bool:
+    """判断用户是否明确要求纯聊天。
+
+    user_message（用户消息）是当前输入；context（上下文）保留给分类器扩展使用。
+    返回值为 True 表示本轮不应分配 Worker，也不推进职业规划流程。
+    """
     data = classify("chat_only_intent", user_message, context or {})
     return bool(data.get("chat_only"))
 
 
 def _classify_gate_intent(user_message: str, context: dict[str, Any]) -> dict[str, Any]:
+    """_classify_gate_intent（内部函数 classify gate intent）的函数说明。
+
+    user_message（参数）、context（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     pending_gate = context.get("pending_gate") or {}
     pending_name = pending_gate.get("name")
     rule_result = match_gate_intent_rules(user_message, pending_gate)
@@ -116,6 +136,11 @@ def _classify_gate_intent_llm(
     user_message: str,
     pending_gate: dict[str, Any],
 ) -> dict[str, Any]:
+    """_classify_gate_intent_llm（内部函数 classify gate intent llm）的函数说明。
+
+    user_message（参数）、pending_gate（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     pending_name = pending_gate.get("name")
     if not llm_enabled():
         return {
@@ -159,6 +184,11 @@ def _classify_gate_intent_llm(
 
 
 def _classify_history_scope(user_message: str) -> dict[str, Any]:
+    """_classify_history_scope（内部函数 classify history scope）的函数说明。
+
+    user_message（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     rule = match_history_scope_rules(user_message)
     if rule:
         return rule
@@ -198,6 +228,11 @@ def _classify_profile_memory_scope(
     user_message: str,
     context: dict[str, Any],
 ) -> dict[str, Any]:
+    """_classify_profile_memory_scope（内部函数 classify profile memory scope）的函数说明。
+
+    user_message（参数）、context（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     rule_sections = match_profile_memory_rules(user_message)
     if rule_sections:
         return {
@@ -247,6 +282,11 @@ def _classify_pipeline_phase_intent(
     user_message: str,
     context: dict[str, Any],
 ) -> dict[str, Any]:
+    """_classify_pipeline_phase_intent（内部函数 classify pipeline phase intent）的函数说明。
+
+    user_message（参数）、context（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     rule_ids = match_pipeline_intent_rule_ids(user_message)
     if rule_ids and not _looks_like_explicit_phase_transition(user_message):
         return {
@@ -287,6 +327,11 @@ def _classify_pipeline_phase_intent(
 
 
 def _looks_like_explicit_phase_transition(user_message: str) -> bool:
+    """_looks_like_explicit_phase_transition（内部函数 looks like explicit phase transition）的函数说明。
+
+    user_message（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     text = (user_message or "").strip()
     if not text:
         return False
@@ -294,6 +339,11 @@ def _looks_like_explicit_phase_transition(user_message: str) -> bool:
 
 
 def _invoke_task(task: str, system: str, payload: dict[str, Any]) -> dict[str, Any] | None:
+    """_invoke_task（内部函数 invoke task）的函数说明。
+
+    task（参数）、system（参数）、payload（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     user = json.dumps(payload, ensure_ascii=False)
     started = time.perf_counter()
     try:

@@ -4,6 +4,11 @@ import pytest
 
 
 def _reload_store(tmp_path, monkeypatch, **env):
+    """_reload_store（内部函数 reload store）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）、**env（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     for k, v in env.items():
         monkeypatch.setenv(k, str(v))
@@ -16,6 +21,11 @@ def _reload_store(tmp_path, monkeypatch, **env):
 
 
 def test_slice_one_round_current_user_only(tmp_path, monkeypatch):
+    """test_slice_one_round_current_user_only（测试 slice one round current user only）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     _, session_mod = _reload_store(tmp_path, monkeypatch)
     messages = [{"role": "user", "content": "a"}]
     got = session_mod.slice_chat_rounds(messages, max_rounds=1)
@@ -23,6 +33,11 @@ def test_slice_one_round_current_user_only(tmp_path, monkeypatch):
 
 
 def test_slice_one_user_round_is_current_user_only(tmp_path, monkeypatch):
+    """test_slice_one_user_round_is_current_user_only（测试 slice one user round is current user only）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     _, session_mod = _reload_store(tmp_path, monkeypatch)
     messages = [
         {"role": "user", "content": "u1"},
@@ -34,6 +49,11 @@ def test_slice_one_user_round_is_current_user_only(tmp_path, monkeypatch):
 
 
 def test_slice_synthesize_includes_prior_assistant(tmp_path, monkeypatch):
+    """test_slice_synthesize_includes_prior_assistant（测试 slice synthesize includes prior assistant）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     _, session_mod = _reload_store(tmp_path, monkeypatch)
     messages = [
         {"role": "user", "content": "u1"},
@@ -45,6 +65,11 @@ def test_slice_synthesize_includes_prior_assistant(tmp_path, monkeypatch):
 
 
 def test_slice_six_rounds_from_tail(tmp_path, monkeypatch):
+    """test_slice_six_rounds_from_tail（测试 slice six rounds from tail）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     SessionStore, session_mod = _reload_store(tmp_path, monkeypatch)
     messages = []
     for i in range(8):

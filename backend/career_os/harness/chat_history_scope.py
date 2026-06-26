@@ -14,6 +14,13 @@ def select_worker_chat_history(
     user_message: str,
     messages_meta: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, str]], str]:
+    """选择委托给 Worker 的聊天历史窗口。
+
+    chat_history_full（完整聊天历史）是当前会话可用的全部消息；
+    user_message（用户消息）用于判断是否需要完整上下文；
+    messages_meta（消息元数据）当前仅保留签名兼容。
+    返回值是二元组：选中的消息列表，以及 scope_label（范围标签），例如 full 或 recent_10。
+    """
     _ = messages_meta
     decision = classify("history_scope", user_message, {})
     threshold = settings.history_scope_llm_accept_threshold

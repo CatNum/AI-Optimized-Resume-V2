@@ -89,6 +89,11 @@ _CHAT_ONLY_PHRASES = (
 
 
 def match_history_scope_rules(user_message: str) -> dict[str, Any] | None:
+    """match_history_scope_rules（match history scope rules）的函数说明。
+
+    user_message（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     text = (user_message or "").strip()
     if not text:
         return None
@@ -129,6 +134,11 @@ def match_profile_memory_rules(user_message: str) -> set[str]:
 
 
 def match_chat_only_intent_rules(user_message: str) -> dict[str, Any] | None:
+    """match_chat_only_intent_rules（match chat only intent rules）的函数说明。
+
+    user_message（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     text = (user_message or "").strip()
     if not text:
         return None
@@ -199,6 +209,11 @@ _INTENT_DECLARE_AGENT_PROJECT_PHRASES = (
 
 
 def _declares_agent_project(text: str, lower: str) -> bool:
+    """_declares_agent_project（内部函数 declares agent project）的函数说明。
+
+    text（参数）、lower（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     has_agent = "agent" in lower or "智能体" in text or "agen" in lower
     if not has_agent and "职业规划" not in text:
         return False

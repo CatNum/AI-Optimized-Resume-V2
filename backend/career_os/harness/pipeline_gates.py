@@ -18,11 +18,19 @@ from career_os.platform.store.task import TaskStore, TaskStoreError
 
 @dataclass
 class PipelineGateError:
+    """PipelineGateError（PipelineGateError）的项目代码结构说明。
+
+    该类封装当前模块中的一组相关状态或行为，供业务代码、测试代码或运行时流程复用。"""
     code: str
     message: str
 
 
 def is_explore_gate_confirmed(session_state: dict[str, Any]) -> bool:
+    """is_explore_gate_confirmed（is explore gate confirmed）的函数说明。
+
+    session_state（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     if session_state.get("explore_gate_confirmed"):
         return True
     flags = (session_state.get("gates") or {}).get("flags") or {}
@@ -30,6 +38,11 @@ def is_explore_gate_confirmed(session_state: dict[str, Any]) -> bool:
 
 
 def set_explore_gate_confirmed(session_state: dict[str, Any], value: bool) -> None:
+    """set_explore_gate_confirmed（set explore gate confirmed）的函数说明。
+
+    session_state（参数）、value（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     session_state["explore_gate_confirmed"] = value
     gates = dict(session_state.get("gates") or {})
     flags = dict(gates.get("flags") or {})
@@ -39,6 +52,11 @@ def set_explore_gate_confirmed(session_state: dict[str, Any], value: bool) -> No
 
 
 def compute_hard_pass(profile: dict[str, Any]) -> tuple[bool, list[str]]:
+    """compute_hard_pass（compute hard pass）的函数说明。
+
+    profile（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     reasons: list[str] = []
     exploration = profile.get("exploration") or {}
     intake = exploration.get("intake") or {}
@@ -63,6 +81,11 @@ def compute_hard_pass(profile: dict[str, Any]) -> tuple[bool, list[str]]:
 
 
 def never_explored(profile: dict[str, Any]) -> bool:
+    """never_explored（never explored）的函数说明。
+
+    profile（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     exploration = profile.get("exploration") or {}
     if exploration.get("completed_at"):
         return False
@@ -72,6 +95,11 @@ def never_explored(profile: dict[str, Any]) -> bool:
 
 
 def _parse_iso_datetime(value: Any) -> datetime | None:
+    """_parse_iso_datetime（内部函数 parse iso datetime）的函数说明。
+
+    value（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     if not value:
         return None
     text = str(value).strip()
@@ -89,6 +117,11 @@ def _parse_iso_datetime(value: Any) -> datetime | None:
 
 
 def _add_natural_month(dt: datetime) -> datetime:
+    """_add_natural_month（内部函数 add natural month）的函数说明。
+
+    dt（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     month_index = dt.month
     year = dt.year + (month_index // 12)
     month = (month_index % 12) + 1
@@ -98,6 +131,11 @@ def _add_natural_month(dt: datetime) -> datetime:
 
 
 def _session_has_explore_completion(session_state: dict[str, Any]) -> bool:
+    """_session_has_explore_completion（内部函数 session has explore completion）的函数说明。
+
+    session_state（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     if session_state.get("explore_completed_at"):
         return True
     if session_state.get("explore_gate_confirmed"):
@@ -112,6 +150,12 @@ def _session_has_explore_completion(session_state: dict[str, Any]) -> bool:
 def compute_needs_full_explore(
     profile: dict[str, Any], session_state: dict[str, Any]
 ) -> bool:
+    """判断是否需要重新走完整职业初探。
+
+    profile（用户画像）提供 exploration、resume、intent 等持久化信息；
+    session_state（会话状态）提供本会话的探索完成标记和 gates.flags。
+    返回值为 True 表示画像过旧、信息变化或从未完成初探，需要先回到 explore。
+    """
     if _session_has_explore_completion(session_state):
         return False
     if never_explored(profile):
@@ -137,6 +181,11 @@ def compute_needs_full_explore(
 
 
 def clear_gate_flags_for_jump(target_phase: str, session_state: dict[str, Any]) -> None:
+    """clear_gate_flags_for_jump（clear gate flags for jump）的函数说明。
+
+    target_phase（参数）、session_state（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     gates = dict(session_state.get("gates") or {})
     flags = dict(gates.get("flags") or {})
     pending = gates.get("pending")
@@ -180,6 +229,11 @@ def clear_gate_flags_for_jump(target_phase: str, session_state: dict[str, Any]) 
 def validate_jump_target(
     target_phase: str, session_state: dict[str, Any]
 ) -> PipelineGateError | None:
+    """validate_jump_target（validate jump target）的函数说明。
+
+    target_phase（参数）、session_state（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     if target_phase == "resume_optimize":
         return PipelineGateError(
             "jump_target_forbidden",
@@ -201,6 +255,11 @@ def jump_to_phase(
     target_phase: str,
     session_state: dict[str, Any],
 ) -> PipelineGateError | dict[str, Any]:
+    """jump_to_phase（jump to phase）的函数说明。
+
+    session_id（参数）、list_id（参数）、target_phase（参数）、session_state（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     err = validate_jump_target(target_phase, session_state)
     if err:
         return err
@@ -241,6 +300,11 @@ def jump_to_phase(
 def ensure_milestone_works(
     list_id: str, phase: str, *, session_state: dict[str, Any] | None = None
 ) -> dict[str, Any] | PipelineGateError:
+    """ensure_milestone_works（ensure milestone works）的函数说明。
+
+    list_id（参数）、phase（参数）、session_state（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     store = TaskStore()
     meta = store.get_list_meta(list_id)
     if not meta or meta.get("list_type") != "pipeline":
@@ -311,6 +375,11 @@ def advance_current_phase(
     target_phase: str,
     session_state: dict[str, Any],
 ) -> PipelineGateError | dict[str, Any]:
+    """advance_current_phase（advance current phase）的函数说明。
+
+    session_id（参数）、list_id（参数）、target_phase（参数）、session_state（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     if target_phase != "resume_optimize":
         return PipelineGateError(
             "advance_forbidden",
@@ -367,6 +436,11 @@ def apply_proposed_work_tasks(
     proposals: list[dict[str, Any]],
     session_state: dict[str, Any],
 ) -> PipelineGateError | dict[str, Any]:
+    """apply_proposed_work_tasks（apply proposed work tasks）的函数说明。
+
+    list_id（参数）、proposals（参数）、session_state（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     store = TaskStore()
     meta = store.get_list_meta(list_id)
     if not meta or meta.get("list_type") != "pipeline":

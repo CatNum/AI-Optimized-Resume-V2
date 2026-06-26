@@ -65,12 +65,20 @@ MINIMUMS = {
 @pytest.mark.no_llm
 @pytest.mark.parametrize("category", list(MINIMUMS.keys()))
 def test_eval_category_meets_minimum(category: str):
+    """test_eval_category_meets_minimum（测试 eval category meets minimum）的函数说明。
+
+    category（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     count = len(EVAL_INVENTORY[category])
     assert count >= MINIMUMS[category], f"{category}: {count} < {MINIMUMS[category]}"
 
 
 @pytest.mark.no_llm
 def test_eval_total_distinct_cases_at_least_twenty():
+    """test_eval_total_distinct_cases_at_least_twenty（测试 eval total distinct cases at least twenty）的函数说明。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     distinct = {name for cases in EVAL_INVENTORY.values() for name in cases}
     assert len(distinct) >= 20
 

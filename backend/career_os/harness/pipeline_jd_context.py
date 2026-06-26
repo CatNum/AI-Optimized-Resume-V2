@@ -26,6 +26,11 @@ def has_jd_context(
     *,
     chat_history: list[dict[str, str]] | None = None,
 ) -> bool:
+    """has_jd_context（has jd context）的函数说明。
+
+    session_state（参数）、user_message（参数）、chat_history（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     list_id = session_state.get("list_id")
     if list_id:
         meta = TaskStore().get_list_meta(list_id) or {}

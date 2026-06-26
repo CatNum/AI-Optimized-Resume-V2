@@ -22,10 +22,20 @@ _MAX_TITLE_LEN = 16
 
 
 def _first_user_message(messages: list[dict[str, str]]) -> dict[str, str] | None:
+    """_first_user_message（内部函数 first user message）的函数说明。
+
+    messages（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     return next((m for m in messages if m.get("role") == "user"), None)
 
 
 def fallback_title_from_messages(messages: list[dict[str, str]]) -> str:
+    """fallback_title_from_messages（fallback title from messages）的函数说明。
+
+    messages（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     first_user = _first_user_message(messages)
     if first_user is None:
         return _DEFAULT_TITLE
@@ -36,6 +46,11 @@ def fallback_title_from_messages(messages: list[dict[str, str]]) -> str:
 
 
 def _index_row(store: SessionStore, session_id: str) -> dict | None:
+    """_index_row（内部函数 index row）的函数说明。
+
+    store（参数）、session_id（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     index = store.load_index()
     return next(
         (r for r in index.get("sessions", []) if r.get("session_id") == session_id),
@@ -44,6 +59,11 @@ def _index_row(store: SessionStore, session_id: str) -> dict | None:
 
 
 def _normalize_llm_title(raw: str) -> str:
+    """_normalize_llm_title（内部函数 normalize llm title）的函数说明。
+
+    raw（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     text = raw.strip()
     text = re.sub(r'^[\s"\'“”‘’「」【】]+|[\s"\'“”‘’「」【】]+$', "", text)
     text = text.replace("\n", " ").strip()
@@ -53,6 +73,11 @@ def _normalize_llm_title(raw: str) -> str:
 
 
 def _generate_title_llm(user_content: str) -> str | None:
+    """_generate_title_llm（内部函数 generate title llm）的函数说明。
+
+    user_content（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     snippet = user_content[:_MAX_LLM_INPUT]
     try:
         raw = invoke_text(_TITLE_SYSTEM, snippet, role=LLMRole.WORKER, temperature=0.2)
@@ -95,7 +120,15 @@ def maybe_generate_title(
 
 
 def schedule_maybe_generate_title(session_id: str) -> None:
+    """schedule_maybe_generate_title（schedule maybe generate title）的函数说明。
+
+    session_id（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     def _run() -> None:
+        """_run（内部函数 run）的函数说明。
+
+        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
         try:
             maybe_generate_title(session_id, SessionStore(), force=False)
         except Exception:

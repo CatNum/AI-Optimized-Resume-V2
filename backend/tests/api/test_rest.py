@@ -8,6 +8,11 @@ from career_os.main import app
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
+    """client（client）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     monkeypatch.setenv("OUTPUT_DIR", str(tmp_path / "output"))
     monkeypatch.setenv("LLM_API_KEY", "")
@@ -26,18 +31,33 @@ def client(tmp_path, monkeypatch):
 
 
 def test_new_session(client):
+    """test_new_session（测试 new session）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     r = client.post("/v1/sessions/new")
     assert r.status_code == 200
     assert r.json()["session_id"].startswith("sess_")
 
 
 def test_list_sessions_empty_rebuilds(client):
+    """test_list_sessions_empty_rebuilds（测试 list sessions empty rebuilds）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     r = client.get("/v1/sessions")
     assert r.status_code == 200
     assert r.json()["sessions"] == []
 
 
 def test_new_session_does_not_delete_old(client):
+    """test_new_session_does_not_delete_old（测试 new session does not delete old）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     a = client.post("/v1/sessions/new").json()["session_id"]
     from career_os.platform.store.session import SessionStore
 
@@ -49,6 +69,11 @@ def test_new_session_does_not_delete_old(client):
 
 
 def test_get_messages_returns_history(client):
+    """test_get_messages_returns_history（测试 get messages returns history）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     from career_os.platform.store.session import SessionStore
 
@@ -65,6 +90,11 @@ def test_get_messages_returns_history(client):
 
 
 def test_generate_title_without_llm_returns_503(client):
+    """test_generate_title_without_llm_returns_503（测试 generate title without llm returns 503）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     r = client.post(f"/v1/sessions/{sid}/generate-title")
     assert r.status_code == 503
@@ -72,6 +102,11 @@ def test_generate_title_without_llm_returns_503(client):
 
 
 def test_generate_title_locked_when_user_title(client, monkeypatch):
+    """test_generate_title_locked_when_user_title（测试 generate title locked when user title）的函数说明。
+
+    client（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     import career_os.agents.lc.models as models_mod
 
@@ -85,6 +120,11 @@ def test_generate_title_locked_when_user_title(client, monkeypatch):
 
 
 def test_generate_title_force_overrides_user(client, monkeypatch):
+    """test_generate_title_force_overrides_user（测试 generate title force overrides user）的函数说明。
+
+    client（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     import career_os.agents.lc.models as models_mod
 
@@ -110,6 +150,11 @@ def test_generate_title_force_overrides_user(client, monkeypatch):
 
 
 def test_patch_title_and_archived(client):
+    """test_patch_title_and_archived（测试 patch title and archived）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     r = client.patch(
         f"/v1/sessions/{sid}",
@@ -131,6 +176,11 @@ def test_patch_title_and_archived(client):
 
 
 def test_delete_session_404_after(client):
+    """test_delete_session_404_after（测试 delete session 404 after）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     assert client.delete(f"/v1/sessions/{sid}").status_code == 200
     assert client.get(f"/v1/sessions/{sid}/messages").status_code == 404
@@ -138,6 +188,11 @@ def test_delete_session_404_after(client):
 
 
 def test_delete_session_409_when_chat_in_progress(client):
+    """test_delete_session_409_when_chat_in_progress（测试 delete session 409 when chat in progress）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     import career_os.harness.orchestrator as orch_mod
 
@@ -152,12 +207,22 @@ def test_delete_session_409_when_chat_in_progress(client):
 
 
 def test_invalid_session_id_format_400(client):
+    """test_invalid_session_id_format_400（测试 invalid session id format 400）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     r = client.get("/v1/sessions/not-a-valid-id/messages")
     assert r.status_code == 400
     assert r.json()["detail"] == "invalid_session_id"
 
 
 def test_profile_onboarding(client):
+    """test_profile_onboarding（测试 profile onboarding）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     r = client.post(
         "/v1/profile/onboarding",
         json={"basic": {"name": "测试"}, "intent": {"target_city": "上海"}},
@@ -168,6 +233,11 @@ def test_profile_onboarding(client):
 
 
 def test_explore_intake_submit(client):
+    """test_explore_intake_submit（测试 explore intake submit）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     payload = {
         "session_id": sid,
@@ -189,6 +259,11 @@ def test_explore_intake_submit(client):
 
 
 def test_explore_intake_status_falls_back_to_global_profile_for_new_session(client):
+    """test_explore_intake_status_falls_back_to_global_profile_for_new_session（测试 explore intake status falls back to global profile for new session）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     sid_a = client.post("/v1/sessions/new").json()["session_id"]
     sid_b = client.post("/v1/sessions/new").json()["session_id"]
     payload = {
@@ -209,6 +284,11 @@ def test_explore_intake_status_falls_back_to_global_profile_for_new_session(clie
 
 
 def test_explore_intake_submit_persists_global_intake_to_profile(client):
+    """test_explore_intake_submit_persists_global_intake_to_profile（测试 explore intake submit persists global intake to profile）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     payload = {
         "session_id": sid,
@@ -224,6 +304,11 @@ def test_explore_intake_submit_persists_global_intake_to_profile(client):
 
 
 def test_new_session_creates_pipeline_list(client):
+    """test_new_session_creates_pipeline_list（测试 new session creates pipeline list）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     body = client.get("/v1/tasks", params={"session_id": sid}).json()
     assert len(body["lists"]) == 1
@@ -236,6 +321,11 @@ def test_new_session_creates_pipeline_list(client):
 
 
 def test_get_tasks_auto_promotes_started_pipeline_from_explore_to_market(client):
+    """test_get_tasks_auto_promotes_started_pipeline_from_explore_to_market（测试 get tasks auto promotes started pipeline from explore to market）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     from career_os.platform.store.profile import ProfileStore
     from career_os.platform.store.task import TaskStore
 
@@ -263,6 +353,11 @@ def test_get_tasks_auto_promotes_started_pipeline_from_explore_to_market(client)
 
 
 def test_get_tasks_keeps_explicit_explore_jump_from_auto_promoting(client):
+    """test_get_tasks_keeps_explicit_explore_jump_from_auto_promoting（测试 get tasks keeps explicit explore jump from auto promoting）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     from career_os.harness.pipeline_gates import jump_to_phase
     from career_os.platform.store.profile import ProfileStore
     from career_os.platform.store.session import SessionStore
@@ -294,6 +389,11 @@ def test_get_tasks_keeps_explicit_explore_jump_from_auto_promoting(client):
 
 
 def test_explore_intake_submit_keeps_single_pipeline_list(client):
+    """test_explore_intake_submit_keeps_single_pipeline_list（测试 explore intake submit keeps single pipeline list）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     payload = {
         "session_id": sid,
@@ -315,6 +415,11 @@ def test_explore_intake_submit_keeps_single_pipeline_list(client):
 
 
 def test_chat_explore_intake_event(client):
+    """test_chat_explore_intake_event（测试 chat explore intake event）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     session = client.post("/v1/sessions/new").json()["session_id"]
 
     with client.stream(
@@ -330,6 +435,11 @@ def test_chat_explore_intake_event(client):
 
 
 def test_chat_continues_explore_after_current_session_intake_submitted(client):
+    """test_chat_continues_explore_after_current_session_intake_submitted（测试 chat continues explore after current session intake submitted）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     payload = {
         "session_id": sid,
@@ -355,6 +465,11 @@ def test_chat_continues_explore_after_current_session_intake_submitted(client):
 
 
 def test_chat_jd_gate_chain(client):
+    """test_chat_jd_gate_chain（测试 chat jd gate chain）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     session = client.post("/v1/sessions/new").json()["session_id"]
     client.post(
         "/v1/profile/onboarding",
@@ -374,6 +489,11 @@ def test_chat_jd_gate_chain(client):
     session_store.update_state(session, state)
 
     def chat(message: str) -> str:
+        """chat（chat）的函数说明。
+
+        message（参数）用于向该函数传入运行所需的数据。
+
+        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
         with client.stream(
             "POST",
             "/v1/chat",
@@ -398,6 +518,11 @@ def test_chat_jd_gate_chain(client):
 
 
 def test_chat_sse_events(client):
+    """test_chat_sse_events（测试 chat sse events）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     with client.stream(
         "POST",
         "/v1/chat",
@@ -412,6 +537,11 @@ def test_chat_sse_events(client):
 
 
 def test_ping_refreshes_idle_session(client):
+    """test_ping_refreshes_idle_session（测试 ping refreshes idle session）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     from datetime import UTC, datetime, timedelta
 
@@ -430,6 +560,11 @@ def test_ping_refreshes_idle_session(client):
 
 
 def test_chat_without_session_id_creates_and_indexes(client):
+    """test_chat_without_session_id_creates_and_indexes（测试 chat without session id creates and indexes）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     with client.stream(
         "POST",
         "/v1/chat",
@@ -446,6 +581,11 @@ def test_chat_without_session_id_creates_and_indexes(client):
 
 
 def test_get_tasks_by_session_id(client):
+    """test_get_tasks_by_session_id（测试 get tasks by session id）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     r = client.get("/v1/tasks", params={"session_id": sid})
     assert r.status_code == 200
@@ -461,6 +601,11 @@ def test_get_tasks_by_session_id(client):
 
 
 def test_get_tasks_normalizes_ready_pipeline_phase_to_explore(client):
+    """test_get_tasks_normalizes_ready_pipeline_phase_to_explore（测试 get tasks normalizes ready pipeline phase to explore）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     from career_os.platform.store.task import TaskStore
 
     sid = client.post("/v1/sessions/new").json()["session_id"]
@@ -477,6 +622,11 @@ def test_get_tasks_normalizes_ready_pipeline_phase_to_explore(client):
 
 
 def test_get_tasks_by_session_id_all_completed(client):
+    """test_get_tasks_by_session_id_all_completed（测试 get tasks by session id all completed）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     from career_os.platform.store.task import TaskStore
 
@@ -497,24 +647,44 @@ def test_get_tasks_by_session_id_all_completed(client):
 
 
 def test_get_tasks_without_session_id_returns_400_object(client):
+    """test_get_tasks_without_session_id_returns_400_object（测试 get tasks without session id returns 400 object）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     r = client.get("/v1/tasks")
     assert r.status_code == 400
     assert r.json()["detail"]["code"] == "session_id_required"
 
 
 def test_get_tasks_invalid_session_id_400_object(client):
+    """test_get_tasks_invalid_session_id_400_object（测试 get tasks invalid session id 400 object）的函数说明。
+
+    client（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     r = client.get("/v1/tasks", params={"session_id": "bad-id"})
     assert r.status_code == 400
     assert r.json()["detail"]["code"] == "invalid_session_id"
 
 
 def test_chat_sse_llm_stream_multiple_tokens(client, monkeypatch):
+    """test_chat_sse_llm_stream_multiple_tokens（测试 chat sse llm stream multiple tokens）的函数说明。
+
+    client（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     import career_os.agents.lc.models as models_mod
 
     models_mod.model_settings.__init__()
 
     def fake_stream(*args, **kwargs):
+        """fake_stream（fake stream）的函数说明。
+
+        *args（参数）、**kwargs（参数）用于向该函数传入运行所需的数据。
+
+        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
         yield from ["第一段", "第二段", "第三段"]
 
     monkeypatch.setattr("career_os.api.chat.stream_text", fake_stream)

@@ -8,6 +8,11 @@ from career_os.harness.explore_closure import PHASE_SEGMENT_COMPLETE
 
 
 def test_build_synthesis_includes_pipeline_phase(monkeypatch, tmp_path):
+    """test_build_synthesis_includes_pipeline_phase（测试 build synthesis includes pipeline phase）的函数说明。
+
+    monkeypatch（参数）、tmp_path（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -50,6 +55,11 @@ def test_build_synthesis_includes_pipeline_phase(monkeypatch, tmp_path):
 
 
 def test_chat_only_draft_mentions_jd_when_phase_migrated(monkeypatch, tmp_path):
+    """test_chat_only_draft_mentions_jd_when_phase_migrated（测试 chat only draft mentions jd when phase migrated）的函数说明。
+
+    monkeypatch（参数）、tmp_path（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 

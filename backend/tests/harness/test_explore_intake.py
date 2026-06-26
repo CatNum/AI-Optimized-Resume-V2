@@ -6,6 +6,9 @@ from career_os.harness.explore_intake import (
 
 
 def test_is_explore_route():
+    """test_is_explore_route（测试 is explore route）的函数说明。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     assert is_explore_route(
         {"workers": ["identity"], "list_type": "pipeline", "pipeline_phase": "explore"}
     )
@@ -15,6 +18,11 @@ def test_is_explore_route():
 
 
 def test_enforce_explore_intake_blocks_without_submission(tmp_path, monkeypatch):
+    """test_enforce_explore_intake_blocks_without_submission（测试 enforce explore intake blocks without submission）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -38,6 +46,11 @@ def test_enforce_explore_intake_blocks_without_submission(tmp_path, monkeypatch)
 
 
 def test_enforce_explore_intake_repeat_gate_when_already_submitted(tmp_path, monkeypatch):
+    """test_enforce_explore_intake_repeat_gate_when_already_submitted（测试 enforce explore intake repeat gate when already submitted）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -66,6 +79,11 @@ def test_enforce_explore_intake_repeat_gate_when_already_submitted(tmp_path, mon
 def test_enforce_explore_intake_allows_submitted_intake_before_deep_explore_complete(
     tmp_path, monkeypatch
 ):
+    """test_enforce_explore_intake_allows_submitted_intake_before_deep_explore_complete（测试 enforce explore intake allows submitted intake before deep explore complete）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -97,6 +115,11 @@ def test_enforce_explore_intake_allows_submitted_intake_before_deep_explore_comp
 def test_enforce_explore_intake_allows_after_repeat_accepted_and_resubmit(
     tmp_path, monkeypatch
 ):
+    """test_enforce_explore_intake_allows_after_repeat_accepted_and_resubmit（测试 enforce explore intake allows after repeat accepted and resubmit）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 

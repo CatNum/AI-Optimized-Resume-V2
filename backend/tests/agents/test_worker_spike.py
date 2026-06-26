@@ -21,6 +21,11 @@ from tests.conftest import seed_jd_ready_profile
 
 @pytest.fixture
 def harness(tmp_path, monkeypatch):
+    """harness（harness）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     monkeypatch.setenv("OUTPUT_DIR", str(tmp_path / "output"))
     import career_os.config as config_mod
@@ -33,6 +38,11 @@ def harness(tmp_path, monkeypatch):
 
 
 def _tool_call(name: str, arguments: str, call_id: str) -> MagicMock:
+    """_tool_call（内部函数 tool call）的函数说明。
+
+    name（参数）、arguments（参数）、call_id（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     tc = MagicMock()
     tc.function.name = name
     tc.function.arguments = arguments
@@ -41,6 +51,11 @@ def _tool_call(name: str, arguments: str, call_id: str) -> MagicMock:
 
 
 def test_react_loads_two_skills_trace(harness, monkeypatch):
+    """test_react_loads_two_skills_trace（测试 react loads two skills trace）的函数说明。
+
+    harness（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     monkeypatch.setenv("LLM_API_KEY", "test-key")
 
     delegated = harness.delegate_worker(

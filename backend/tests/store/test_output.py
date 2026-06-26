@@ -3,6 +3,11 @@ from datetime import date
 
 
 def test_output_write_list_delete(tmp_path, monkeypatch):
+    """test_output_write_list_delete（测试 output write list delete）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     monkeypatch.setenv("OUTPUT_DIR", str(tmp_path / "output"))
     import career_os.config as config_mod
     import career_os.platform.store.output as output_mod

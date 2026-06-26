@@ -47,6 +47,11 @@ _JUMP_TARGET_WORKERS: dict[str, tuple[str, ...]] = {
 
 
 def _is_small_talk(user_message: str) -> bool:
+    """_is_small_talk（内部函数 is small talk）的函数说明。
+
+    user_message（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     text = user_message.strip().lower()
     if not text:
         return True
@@ -56,6 +61,9 @@ def _is_small_talk(user_message: str) -> bool:
 
 @dataclass(frozen=True)
 class IntentTransition:
+    """IntentTransition（IntentTransition）的项目代码结构说明。
+
+    该类封装当前模块中的一组相关状态或行为，供业务代码、测试代码或运行时流程复用。"""
     from_phases: frozenset[str]
     to_phase: str
     rule_id: str
@@ -104,6 +112,11 @@ INTENT_TRANSITIONS: tuple[IntentTransition, ...] = (
 
 
 def _explore_gate_precondition(session_state: dict[str, Any]) -> bool:
+    """_explore_gate_precondition（内部函数 explore gate precondition）的函数说明。
+
+    session_state（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     if is_explore_gate_confirmed(session_state):
         return True
     closure = session_state.get("explore_closure") or {}
@@ -117,6 +130,11 @@ def _check_precondition(
     *,
     chat_history: list[dict[str, str]] | None = None,
 ) -> bool:
+    """_check_precondition（内部函数 check precondition）的函数说明。
+
+    precondition_id（参数）、session_state（参数）、user_message（参数）、chat_history（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     if precondition_id == "P0":
         return bool(session_state.get("list_id")) and is_pipeline_session(session_state)
     if precondition_id == "P1":
@@ -145,6 +163,11 @@ def _preconditions_met(
     *,
     chat_history: list[dict[str, str]] | None = None,
 ) -> bool:
+    """_preconditions_met（内部函数 preconditions met）的函数说明。
+
+    transition（参数）、session_state（参数）、user_message（参数）、chat_history（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     return all(
         _check_precondition(
             pid, session_state, user_message, chat_history=chat_history
@@ -160,6 +183,11 @@ def _resolve_via_rules(
     *,
     chat_history: list[dict[str, str]] | None = None,
 ) -> IntentTransition | None:
+    """_resolve_via_rules（内部函数 resolve via rules）的函数说明。
+
+    current_phase（参数）、session_state（参数）、user_message（参数）、chat_history（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     rule_ids = set(match_pipeline_intent_rule_ids(user_message))
     if not rule_ids:
         return None
@@ -186,6 +214,11 @@ def _resolve_via_classifier(
     session_state: dict[str, Any],
     user_message: str,
 ) -> IntentTransition | None:
+    """_resolve_via_classifier（内部函数 resolve via classifier）的函数说明。
+
+    current_phase（参数）、session_state（参数）、user_message（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     prior = session_state.get("prior_results") or {}
     data = classify(
         "pipeline_phase_intent",

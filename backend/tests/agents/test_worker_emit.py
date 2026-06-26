@@ -3,6 +3,9 @@ from career_os.agents.schemas.workers import validate_structured_output
 
 
 def test_opportunity_missing_recommendation_fails():
+    """test_opportunity_missing_recommendation_fails（测试 opportunity missing recommendation fails）的函数说明。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     validated, error = validate_structured_output(
         "opportunity",
         {"user_visible_summary": "评估完成"},
@@ -12,6 +15,9 @@ def test_opportunity_missing_recommendation_fails():
 
 
 def test_identity_explore_gate_prompt_fails():
+    """test_identity_explore_gate_prompt_fails（测试 identity explore gate prompt fails）的函数说明。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     validated, error = validate_structured_output(
         "identity",
         {
@@ -25,6 +31,9 @@ def test_identity_explore_gate_prompt_fails():
 
 
 def test_strategy_nested_gate_prompt_normalizes():
+    """test_strategy_nested_gate_prompt_normalizes（测试 strategy nested gate prompt normalizes）的函数说明。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     validated, error = validate_structured_output(
         "strategy",
         {
@@ -45,6 +54,9 @@ def test_strategy_nested_gate_prompt_normalizes():
 
 
 def test_opportunity_gate_prompt_string_value_normalizes():
+    """test_opportunity_gate_prompt_string_value_normalizes（测试 opportunity gate prompt string value normalizes）的函数说明。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     validated, error = validate_structured_output(
         "opportunity",
         {
@@ -60,6 +72,9 @@ def test_opportunity_gate_prompt_string_value_normalizes():
 
 
 def test_opportunity_valid_output_passes():
+    """test_opportunity_valid_output_passes（测试 opportunity valid output passes）的函数说明。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     validated, error = validate_structured_output(
         "opportunity",
         {
@@ -73,6 +88,9 @@ def test_opportunity_valid_output_passes():
 
 
 def test_worker_emit_marks_failed_on_invalid_output():
+    """test_worker_emit_marks_failed_on_invalid_output（测试 worker emit marks failed on invalid output）的函数说明。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     state = run_worker_emit(
         {
             "worker_id": "identity",

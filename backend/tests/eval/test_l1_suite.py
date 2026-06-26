@@ -9,6 +9,11 @@ from career_os.platform.store.session import SessionStore
 
 @pytest.fixture
 def harness(tmp_path, monkeypatch):
+    """harness（harness）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
 
@@ -18,6 +23,11 @@ def harness(tmp_path, monkeypatch):
 
 @pytest.mark.no_llm
 def test_profile_patch_whitelist_rejects_asset(harness):
+    """test_profile_patch_whitelist_rejects_asset（测试 profile patch whitelist rejects asset）的函数说明。
+
+    harness（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     err = harness.execute_tool(
         "asset",
         "profile_patch",
@@ -28,6 +38,11 @@ def test_profile_patch_whitelist_rejects_asset(harness):
 
 @pytest.mark.no_llm
 def test_jd_r1_blocks_opportunity(harness, jd_ready_profile):
+    """test_jd_r1_blocks_opportunity（测试 jd r1 blocks opportunity）的函数说明。
+
+    harness（参数）、jd_ready_profile（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     err = harness.delegate_worker(
         "coordinator",
         "opportunity",
@@ -40,6 +55,9 @@ def test_jd_r1_blocks_opportunity(harness, jd_ready_profile):
 
 @pytest.mark.no_llm
 def test_explore_gate_intent():
+    """test_explore_gate_intent（测试 explore gate intent）的函数说明。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     result = match_gate_intent("确认完成初探")
     assert result["gate_name"] == "explore_complete"
     assert result["intent"] == "confirm"
@@ -47,6 +65,11 @@ def test_explore_gate_intent():
 
 @pytest.mark.no_llm
 def test_load_chat_history_no_trim(tmp_path, monkeypatch):
+    """test_load_chat_history_no_trim（测试 load chat history no trim）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.session as session_mod
@@ -64,5 +87,10 @@ def test_load_chat_history_no_trim(tmp_path, monkeypatch):
 
 @pytest.mark.no_llm
 def test_b3_worker_no_complete(harness):
+    """test_b3_worker_no_complete（测试 b3 worker no complete）的函数说明。
+
+    harness（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     err = harness.execute_tool("identity", "complete_task", {"task_id": "m1"})
     assert err.code == "tool_not_allowed"

@@ -18,6 +18,11 @@ from career_os.platform.store import task as task_mod
 
 @pytest.fixture
 def pipeline_env(tmp_path, monkeypatch, jd_ready_profile):
+    """pipeline_env（pipeline env）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）、jd_ready_profile（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.profile as profile_mod
@@ -34,6 +39,11 @@ def pipeline_env(tmp_path, monkeypatch, jd_ready_profile):
 
 
 def _session_state(list_id: str, phase: str, **extra) -> dict:
+    """_session_state（内部函数 session state）的函数说明。
+
+    list_id（参数）、phase（参数）、**extra（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     state = {
         "list_type": "pipeline",
         "list_id": list_id,
@@ -53,6 +63,11 @@ def _session_state(list_id: str, phase: str, **extra) -> dict:
 
 
 def _mock_classifier(monkeypatch, target_phase: str):
+    """_mock_classifier（内部函数 mock classifier）的函数说明。
+
+    monkeypatch（参数）、target_phase（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     monkeypatch.setattr(classifier_mod, "llm_enabled", lambda: True)
     monkeypatch.setattr(
         classifier_mod,
@@ -66,11 +81,21 @@ def _mock_classifier(monkeypatch, target_phase: str):
 
 
 def test_has_jd_context_from_prior(pipeline_env):
+    """test_has_jd_context_from_prior（测试 has jd context from prior）的函数说明。
+
+    pipeline_env（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     state = {"list_id": "list_x", "prior_results": {"opportunity": {}}}
     assert has_jd_context(state, "你好")
 
 
 def test_jd_analysis_to_resume_strategy_b(pipeline_env):
+    """test_jd_analysis_to_resume_strategy_b（测试 jd analysis to resume strategy b）的函数说明。
+
+    pipeline_env（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     session_id = "sess_intent01"
     list_id = instantiate_pipeline_for_session(session_id)
     state = _session_state(list_id, "jd_analysis")
@@ -87,6 +112,11 @@ def test_jd_analysis_to_resume_strategy_b(pipeline_env):
 
 
 def test_no_intent_when_gate_pending(pipeline_env):
+    """test_no_intent_when_gate_pending（测试 no intent when gate pending）的函数说明。
+
+    pipeline_env（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     session_id = "sess_intent02"
     list_id = instantiate_pipeline_for_session(session_id)
     state = _session_state(
@@ -99,6 +129,11 @@ def test_no_intent_when_gate_pending(pipeline_env):
 
 
 def test_chat_only_intent_does_not_transition(pipeline_env):
+    """test_chat_only_intent_does_not_transition（测试 chat only intent does not transition）的函数说明。
+
+    pipeline_env（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     session_id = "sess_intent_chat_only"
     list_id = instantiate_pipeline_for_session(session_id)
     state = _session_state(
@@ -113,6 +148,11 @@ def test_chat_only_intent_does_not_transition(pipeline_env):
 
 
 def test_intent_suggested_workers_fallback(pipeline_env):
+    """test_intent_suggested_workers_fallback（测试 intent suggested workers fallback）的函数说明。
+
+    pipeline_env（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     session_id = "sess_intent03"
     list_id = instantiate_pipeline_for_session(session_id)
     state = _session_state(list_id, "resume_strategy")
@@ -124,6 +164,9 @@ def test_intent_suggested_workers_fallback(pipeline_env):
 
 
 def test_phase_after_strategy_complete():
+    """test_phase_after_strategy_complete（测试 phase after strategy complete）的函数说明。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     assert (
         phase_after_worker_segment_complete(
             "strategy", {"phase_status": PHASE_SEGMENT_COMPLETE}
@@ -133,6 +176,9 @@ def test_phase_after_strategy_complete():
 
 
 def test_match_rule_ids_strategy_message():
+    """test_match_rule_ids_strategy_message（测试 match rule ids strategy message）的函数说明。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     from career_os.harness.micro_classifier_rules import match_pipeline_intent_rule_ids
 
     ids = match_pipeline_intent_rule_ids("简历优化策略是什么")
@@ -140,6 +186,11 @@ def test_match_rule_ids_strategy_message():
 
 
 def test_declare_career_agent_project_advances_phase(pipeline_env):
+    """test_declare_career_agent_project_advances_phase（测试 declare career agent project advances phase）的函数说明。
+
+    pipeline_env（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     session_id = "sess_intent05"
     list_id = instantiate_pipeline_for_session(session_id)
     state = _session_state(list_id, "jd_analysis")
@@ -151,6 +202,11 @@ def test_declare_career_agent_project_advances_phase(pipeline_env):
 
 
 def test_build_phase_draft_resume_strategy_no_chat_only(pipeline_env):
+    """test_build_phase_draft_resume_strategy_no_chat_only（测试 build phase draft resume strategy no chat only）的函数说明。
+
+    pipeline_env（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     from career_os.agents.lc.coordinator_llm import build_phase_synthesis_draft
 
     session_id = "sess_intent04"
@@ -163,6 +219,11 @@ def test_build_phase_draft_resume_strategy_no_chat_only(pipeline_env):
 
 
 def test_nl_jump_to_explore_from_market(pipeline_env, monkeypatch):
+    """test_nl_jump_to_explore_from_market（测试 nl jump to explore from market）的函数说明。
+
+    pipeline_env（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     _mock_classifier(monkeypatch, "explore")
     session_id = "sess_jump_explore"
     list_id = instantiate_pipeline_for_session(session_id)
@@ -181,6 +242,11 @@ def test_nl_jump_to_explore_from_market(pipeline_env, monkeypatch):
 
 
 def test_nl_jump_to_market_from_jd_analysis(pipeline_env, monkeypatch):
+    """test_nl_jump_to_market_from_jd_analysis（测试 nl jump to market from jd analysis）的函数说明。
+
+    pipeline_env（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     _mock_classifier(monkeypatch, "market")
     session_id = "sess_jump_market"
     list_id = instantiate_pipeline_for_session(session_id)
@@ -199,6 +265,11 @@ def test_nl_jump_to_market_from_jd_analysis(pipeline_env, monkeypatch):
 
 
 def test_nl_jump_to_explore_ignores_explore_gate(pipeline_env, monkeypatch):
+    """test_nl_jump_to_explore_ignores_explore_gate（测试 nl jump to explore ignores explore gate）的函数说明。
+
+    pipeline_env（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     _mock_classifier(monkeypatch, "explore")
     session_id = "sess_jump_explore_no_gate"
     list_id = instantiate_pipeline_for_session(session_id)
@@ -217,6 +288,11 @@ def test_nl_jump_to_explore_ignores_explore_gate(pipeline_env, monkeypatch):
 
 
 def test_nl_jump_to_market_requires_explore_complete(pipeline_env, monkeypatch):
+    """test_nl_jump_to_market_requires_explore_complete（测试 nl jump to market requires explore complete）的函数说明。
+
+    pipeline_env（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     _mock_classifier(monkeypatch, "market")
     session_id = "sess_jump_market_blocked"
     list_id = instantiate_pipeline_for_session(session_id)
@@ -236,6 +312,11 @@ def test_nl_jump_to_market_requires_explore_complete(pipeline_env, monkeypatch):
 
 
 def test_nl_jump_blocks_gate_pending(pipeline_env, monkeypatch):
+    """test_nl_jump_blocks_gate_pending（测试 nl jump blocks gate pending）的函数说明。
+
+    pipeline_env（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     _mock_classifier(monkeypatch, "explore")
     session_id = "sess_jump_gate"
     list_id = instantiate_pipeline_for_session(session_id)
@@ -250,6 +331,11 @@ def test_nl_jump_blocks_gate_pending(pipeline_env, monkeypatch):
 
 
 def test_vague_followup_does_not_transition_to_any_jump_phase(pipeline_env, monkeypatch):
+    """test_vague_followup_does_not_transition_to_any_jump_phase（测试 vague followup does not transition to any jump phase）的函数说明。
+
+    pipeline_env（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     _mock_classifier(monkeypatch, "market")
     session_id = "sess_jump_vague"
     list_id = instantiate_pipeline_for_session(session_id)

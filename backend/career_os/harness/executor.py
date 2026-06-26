@@ -38,12 +38,23 @@ from career_os.platform.tool.registry import (
 
 
 class Harness:
+    """Harness（Harness）的项目代码结构说明。
+
+    该类封装当前模块中的一组相关状态或行为，供业务代码、测试代码或运行时流程复用。"""
     def __init__(self, trace_writer: TraceWriter | None = None) -> None:
+        """__init__（初始化对象）的函数说明。
+
+        trace_writer（参数）用于向该函数传入运行所需的数据。
+
+        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
         self.tools = ToolRegistry()
         self.trace = trace_writer or TraceWriter()
         self._register_tools()
 
     def _register_tools(self) -> None:
+        """_register_tools（内部函数 register tools）的函数说明。
+
+        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
         worker_actors = set(WORKER_BUSINESS_TOOLS.keys())
         self.tools.register("profile_patch", profile_patch, actors=worker_actors)
         self.tools.register(
@@ -109,6 +120,11 @@ class Harness:
 
     @staticmethod
     def _match_gate_intent_handler(actor: str, args: dict[str, Any]) -> dict[str, Any]:
+        """_match_gate_intent_handler（内部函数 match gate intent handler）的函数说明。
+
+        actor（参数）、args（参数）用于向该函数传入运行所需的数据。
+
+        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
         return run_match_gate_intent(
             args.get("user_message", ""),
             args.get("pending_gate"),
@@ -122,6 +138,11 @@ class Harness:
         *,
         session_id: str | None = None,
     ) -> Any | HarnessError:
+        """execute_tool（execute tool）的函数说明。
+
+        actor（参数）、tool_name（参数）、args（参数）、session_id（参数）用于向该函数传入运行所需的数据。
+
+        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
         if not self._tool_visible_to_actor(actor, tool_name):
             return HarnessError("tool_not_allowed", f"{actor} cannot use {tool_name}")
         try:
@@ -156,6 +177,11 @@ class Harness:
         return result
 
     def _tool_visible_to_actor(self, actor: str, tool_name: str) -> bool:
+        """_tool_visible_to_actor（内部函数 tool visible to actor）的函数说明。
+
+        actor（参数）、tool_name（参数）用于向该函数传入运行所需的数据。
+
+        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
         if actor == "coordinator":
             return tool_name in COORDINATOR_TOOLS
         if tool_name in WORKER_META_TOOLS:
@@ -175,6 +201,11 @@ class Harness:
         context: dict[str, Any] | None = None,
         session_id: str | None = None,
     ) -> Any | HarnessError:
+        """delegate_worker（delegate worker）的函数说明。
+
+        actor（参数）、worker_id（参数）、goal（参数）、session_state（参数）、context（参数）、session_id（参数）用于向该函数传入运行所需的数据。
+
+        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
         result = run_delegate_worker(
             actor,
             worker_id,
@@ -189,4 +220,9 @@ class Harness:
     def check_delegate_rules(
         self, worker_id: str, session_state: dict[str, Any]
     ) -> HarnessError | None:
+        """check_delegate_rules（check delegate rules）的函数说明。
+
+        worker_id（参数）、session_state（参数）用于向该函数传入运行所需的数据。
+
+        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
         return check_delegate_rules(worker_id, session_state)

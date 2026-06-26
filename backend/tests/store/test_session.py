@@ -2,6 +2,11 @@ import importlib
 
 
 def _reload_store(tmp_path, monkeypatch, **env):
+    """_reload_store（内部函数 reload store）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）、**env（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     for k, v in env.items():
         monkeypatch.setenv(k, str(v))
@@ -14,6 +19,11 @@ def _reload_store(tmp_path, monkeypatch, **env):
 
 
 def test_load_chat_history_full_count(tmp_path, monkeypatch):
+    """test_load_chat_history_full_count（测试 load chat history full count）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     SessionStore = _reload_store(tmp_path, monkeypatch, CHAT_HISTORY_MAX_TOKENS="200000")
     s = SessionStore()
     sid = s.create_session()
@@ -28,6 +38,11 @@ def test_load_chat_history_full_count(tmp_path, monkeypatch):
 
 
 def test_usage_ratio_is_token_based(tmp_path, monkeypatch):
+    """test_usage_ratio_is_token_based（测试 usage ratio is token based）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     SessionStore = _reload_store(tmp_path, monkeypatch, CHAT_HISTORY_MAX_TOKENS="12000")
     s = SessionStore()
     sid = s.create_session()
@@ -40,6 +55,11 @@ def test_usage_ratio_is_token_based(tmp_path, monkeypatch):
 
 
 def test_reset_session_clears_messages_and_state(tmp_path, monkeypatch):
+    """test_reset_session_clears_messages_and_state（测试 reset session clears messages and state）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     SessionStore = _reload_store(tmp_path, monkeypatch)
     s = SessionStore()
     sid = s.create_session()
@@ -54,6 +74,11 @@ def test_reset_session_clears_messages_and_state(tmp_path, monkeypatch):
 
 
 def test_session_artifacts_default_and_patch(tmp_path, monkeypatch):
+    """test_session_artifacts_default_and_patch（测试 session artifacts default and patch）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     SessionStore = _reload_store(tmp_path, monkeypatch)
     s = SessionStore()
     sid = s.create_session()

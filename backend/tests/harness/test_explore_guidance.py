@@ -11,11 +11,17 @@ from career_os.harness.explore_guidance import (
 
 
 def test_wants_guidance_options_detects_clarification():
+    """test_wants_guidance_options_detects_clarification（测试 wants guidance options detects clarification）的函数说明。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     assert wants_guidance_options("你能给我一些选项吗，你说的和职业有关的事指的是什么？")
     assert not wants_guidance_options("我想选技术深度方向")
 
 
 def test_persist_and_reveal_guidance():
+    """test_persist_and_reveal_guidance（测试 persist and reveal guidance）的函数说明。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     session_state: dict = {}
     persist_worker_guidance(
         session_state,
@@ -44,6 +50,9 @@ def test_persist_and_reveal_guidance():
 
 
 def test_normalize_guidance_options_caps_at_five():
+    """test_normalize_guidance_options_caps_at_five（测试 normalize guidance options caps at five）的函数说明。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     raw = [{"label": f"方向{i}"} for i in range(7)]
     options = normalize_guidance_options(raw)
     assert len(options) == 5

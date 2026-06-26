@@ -9,6 +9,11 @@ from career_os.platform.trace.writer import TraceWriter
 def check_delegate_rules(
     worker_id: str, session_state: dict[str, Any]
 ) -> HarnessError | None:
+    """check_delegate_rules（check delegate rules）的函数说明。
+
+    worker_id（参数）、session_state（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     list_type = session_state.get("list_type")
     prior_results = session_state.get("prior_results") or {}
     gates = session_state.get("gates") or {}
@@ -50,6 +55,11 @@ def check_delegate_rules(
 
 
 def _build_capability_bundle(worker_id: str) -> dict[str, Any]:
+    """_build_capability_bundle（内部函数 build capability bundle）的函数说明。
+
+    worker_id（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     from career_os.platform.skill.registry import SkillRegistry
     from career_os.platform.worker.registry import WorkerRegistry
 
@@ -81,6 +91,11 @@ def delegate_worker(
     trace: TraceWriter | None = None,
     session_id: str | None = None,
 ) -> HarnessError | dict[str, Any]:
+    """delegate_worker（delegate worker）的函数说明。
+
+    actor（参数）、worker_id（参数）、goal（参数）、session_state（参数）、context（参数）、trace（参数）、session_id（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     if actor != "coordinator":
         return HarnessError(
             "tool_not_allowed",

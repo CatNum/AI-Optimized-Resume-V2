@@ -19,6 +19,11 @@ def explore_repeat_cleared_gates() -> dict[str, Any]:
 
 
 def seed_explore_intake_profile(store: ProfileStore | None = None) -> ProfileStore:
+    """seed_explore_intake_profile（seed explore intake profile）的函数说明。
+
+    store（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     profile = store or ProfileStore()
     resume = (
         "张三\n5年工作经验\n当前薪资：30k\n期望岗位：后端工程师\n"
@@ -70,6 +75,11 @@ def seed_explore_intake_profile(store: ProfileStore | None = None) -> ProfileSto
 
 
 def seed_jd_ready_profile(store: ProfileStore | None = None) -> ProfileStore:
+    """seed_jd_ready_profile（seed jd ready profile）的函数说明。
+
+    store（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     profile = store or ProfileStore()
     profile.patch(
         [
@@ -102,6 +112,11 @@ def seed_jd_ready_profile(store: ProfileStore | None = None) -> ProfileStore:
 
 @pytest.fixture
 def explore_intake_profile(tmp_path, monkeypatch):
+    """explore_intake_profile（explore intake profile）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.profile as profile_mod
@@ -113,6 +128,11 @@ def explore_intake_profile(tmp_path, monkeypatch):
 
 @pytest.fixture
 def jd_ready_profile(tmp_path, monkeypatch):
+    """jd_ready_profile（jd ready profile）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.profile as profile_mod

@@ -7,6 +7,9 @@ from career_os.harness.explore_closure import PHASE_SEGMENT_COMPLETE
 
 
 def _load_migrate_module():
+    """_load_migrate_module（内部函数 load migrate module）的函数说明。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     script_path = Path(__file__).resolve().parents[2] / "scripts" / "migrate_pipeline_phase.py"
     spec = importlib.util.spec_from_file_location("migrate_pipeline_phase", script_path)
     assert spec and spec.loader
@@ -16,6 +19,11 @@ def _load_migrate_module():
 
 
 def test_migrate_advances_explore_with_jd_prior(tmp_path, monkeypatch):
+    """test_migrate_advances_explore_with_jd_prior（测试 migrate advances explore with jd prior）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
 

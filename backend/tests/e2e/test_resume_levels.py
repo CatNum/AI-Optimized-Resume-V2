@@ -8,6 +8,11 @@ from career_os.harness.executor import Harness
 
 @pytest.fixture
 def harness(tmp_path, monkeypatch):
+    """harness（harness）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     monkeypatch.setenv("OUTPUT_DIR", str(tmp_path / "output"))
     import career_os.config as config_mod
@@ -23,6 +28,11 @@ def harness(tmp_path, monkeypatch):
 
 
 def test_resume_writes_multiple_levels(harness, tmp_path):
+    """test_resume_writes_multiple_levels（测试 resume writes multiple levels）的函数说明。
+
+    harness（参数）、tmp_path（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     session_state = {
         "session_id": "sess_resume",
         "gates": {"flags": {"optimize_confirmed": True}},

@@ -3,6 +3,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Settings（Settings）的项目代码结构说明。
+
+    该类封装当前模块中的一组相关状态或行为，供业务代码、测试代码或运行时流程复用。"""
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     data_dir: str = "./data"

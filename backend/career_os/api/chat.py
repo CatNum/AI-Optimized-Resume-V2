@@ -43,12 +43,20 @@ orchestrator = ChatOrchestrator()
 
 
 class ChatRequest(BaseModel):
+    """ChatRequest（ChatRequest）的项目代码结构说明。
+
+    该类封装当前模块中的一组相关状态或行为，供业务代码、测试代码或运行时流程复用。"""
     session_id: str | None = None
     message: str
     attachments: list[dict[str, Any]] | None = None
 
 
 def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str] | None:
+    """_apply_pending_gate（内部函数 apply pending gate）的函数说明。
+
+    message（参数）、session_state（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     session_state.pop("gate_clarify_pending", None)
     gates = dict(session_state.get("gates") or {})
     pending = gates.get("pending")
@@ -149,6 +157,11 @@ async def _chat_stream(
     begin: dict[str, Any],
     meta: dict[str, Any],
 ) -> AsyncIterator[str]:
+    """_chat_stream（内部函数 chat stream）的异步函数说明。
+
+    body（参数）、session_id（参数）、begin（参数）、meta（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     session_store = SessionStore()
     state = session_store.get_state(session_id)
     state["session_id"] = session_id
@@ -226,6 +239,11 @@ async def _chat_stream(
 
 @router.post("/chat")
 async def chat(body: ChatRequest):
+    """chat（chat）的异步函数说明。
+
+    body（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     user_message = enrich_user_message_with_attachments(body.message, body.attachments)
     if not user_message.strip():
         raise HTTPException(status_code=400, detail="message_or_attachment_required")

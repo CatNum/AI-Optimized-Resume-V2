@@ -19,6 +19,13 @@ def _format_boot_user(
     session_state: dict[str, Any] | None,
     context: dict[str, Any] | None,
 ) -> str:
+    """构造 Worker 启动用户消息。
+
+    goal（目标）是本次 Worker 要完成的任务描述；
+    session_state（会话状态）携带历史结果、session_id 等运行上下文；
+    context（上下文）携带聊天历史、能力包等补充信息。返回值是渲染后的
+    react_boot_user prompt，用于让模型理解当前任务输入。
+    """
     ctx = dict(context or {})
     scope = str(ctx.get("chat_history_scope") or "recent_10")
     chat_history = ctx.pop("chat_history", None) or []
@@ -38,6 +45,12 @@ def _format_boot_user(
 
 
 def _build_system_prompt(worker_id: str, context: dict[str, Any]) -> str:
+    """构造 Worker 系统提示词。
+
+    worker_id（工作者标识）用于加载对应 Worker 的基础 prompt；
+    context（上下文）中的 capability_bundle（能力包）会追加可参考技能和可用工具。
+    返回值是完整 system prompt，决定 ReAct Worker 的角色、边界和工具视野。
+    """
     prompt = load_prompt(worker_id)
     bundle = context.get("capability_bundle") or {}
     skill_lines = []
@@ -63,6 +76,11 @@ def _build_system_prompt(worker_id: str, context: dict[str, Any]) -> str:
 
 
 def _serialize_tool_result(result: Any) -> str:
+    """序列化工具执行结果。
+
+    result（工具结果）可能是普通对象，也可能是带 code/message 的错误对象。
+    返回值是 JSON 字符串，作为 tool message 回填给 LLM，保证模型能继续推理。
+    """
     if hasattr(result, "code"):
         message = getattr(result, "message", str(result))
         return json.dumps(
@@ -83,6 +101,15 @@ def run_worker_react(
     session_state: dict[str, Any] | None = None,
     context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """运行一个真实 ReAct Worker。
+
+    harness（运行时工具门面）负责执行模型发起的工具调用；
+    worker_id（工作者标识）决定加载哪个 prompt 和工具集合；
+    goal（目标）是 Worker 本轮要解决的问题；
+    session_state（会话状态）保存 session_id、历史结果等状态；
+    context（上下文）提供聊天历史、能力包和业务约束。返回值是标准 Worker 结果，
+    包含 worker_id、status、structured_output 和 error。
+    """
     session_state = dict(session_state or {})
     context = dict(context or {})
 

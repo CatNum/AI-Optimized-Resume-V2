@@ -3,9 +3,17 @@ from career_os.harness.executor import Harness
 
 
 def test_synthesize_gate_clarify_pending():
+    """test_synthesize_gate_clarify_pending（测试 synthesize gate clarify pending）的函数说明。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     harness = Harness()
 
     def runner(worker_id, goal, session_state, context):
+        """runner（runner）的函数说明。
+
+        worker_id（参数）、goal（参数）、session_state（参数）、context（参数）用于向该函数传入运行所需的数据。
+
+        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
         return {"worker_id": worker_id, "status": "completed", "structured_output": {}}
 
     state = run_coordinator_turn(
@@ -34,9 +42,17 @@ def test_synthesize_gate_clarify_pending():
 
 
 def test_chat_only_request_skips_gate_clarify():
+    """test_chat_only_request_skips_gate_clarify（测试 chat only request skips gate clarify）的函数说明。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     harness = Harness()
 
     def runner(worker_id, goal, session_state, context):
+        """runner（runner）的函数说明。
+
+        worker_id（参数）、goal（参数）、session_state（参数）、context（参数）用于向该函数传入运行所需的数据。
+
+        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
         return {"worker_id": worker_id, "status": "completed", "structured_output": {}}
 
     state = run_coordinator_turn(

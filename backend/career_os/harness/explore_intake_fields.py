@@ -31,6 +31,11 @@ INTAKE_FIELD_DEFS: dict[str, dict[str, str]] = {
 
 
 def pending_field_labels(pending: list[str]) -> dict[str, str]:
+    """pending_field_labels（pending field labels）的函数说明。
+
+    pending（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     return {
         key: INTAKE_FIELD_DEFS[key]["label"]
         for key in pending
@@ -39,6 +44,11 @@ def pending_field_labels(pending: list[str]) -> dict[str, str]:
 
 
 def _normalize_salary(match: re.Match[str]) -> str:
+    """_normalize_salary（内部函数 normalize salary）的函数说明。
+
+    match（参数）用于向该函数传入运行所需的数据。
+
+    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
     amount = match.group(1)
     unit = (match.group(2) or "").lower()
     if unit in {"k", "w"}:
@@ -47,6 +57,11 @@ def _normalize_salary(match: re.Match[str]) -> str:
 
 
 def extract_fields_from_resume(resume_text: str) -> dict[str, str]:
+    """extract_fields_from_resume（extract fields from resume）的函数说明。
+
+    resume_text（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     text = resume_text.strip()
     if not text:
         return {}
@@ -89,6 +104,11 @@ def merge_intake_field_values(
     resume_text: str,
     user_values: dict[str, str],
 ) -> tuple[dict[str, str], dict[str, str], list[str]]:
+    """merge_intake_field_values（merge intake field values）的函数说明。
+
+    resume_text（参数）、user_values（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     extracted = extract_fields_from_resume(resume_text)
     resolved: dict[str, str] = {}
     for key in INTAKE_FIELD_KEYS:
@@ -99,6 +119,11 @@ def merge_intake_field_values(
 
 
 def profile_patches_from_resolved(resolved: dict[str, str]) -> list[dict[str, Any]]:
+    """profile_patches_from_resolved（profile patches from resolved）的函数说明。
+
+    resolved（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     patches: list[dict[str, Any]] = []
     for key, value in resolved.items():
         if not value:

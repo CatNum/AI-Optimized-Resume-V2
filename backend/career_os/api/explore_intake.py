@@ -21,6 +21,9 @@ from career_os.platform.store.task import TaskStore
 _SESSION_ID_RE = re.compile(r"^sess_[0-9a-f]{32}$")
 
 class ExploreIntakeRequest(BaseModel):
+    """ExploreIntakeRequest（ExploreIntakeRequest）的项目代码结构说明。
+
+    该类封装当前模块中的一组相关状态或行为，供业务代码、测试代码或运行时流程复用。"""
     session_id: str
     resume_text: str
     years_of_experience: str = ""
@@ -31,6 +34,11 @@ class ExploreIntakeRequest(BaseModel):
     @field_validator("resume_text")
     @classmethod
     def resume_not_blank(cls, value: str) -> str:
+        """resume_not_blank（resume not blank）的函数说明。
+
+        value（参数）用于向该函数传入运行所需的数据。
+
+        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
         if not value.strip():
             raise ValueError("resume_text is required")
         return value
@@ -38,12 +46,22 @@ class ExploreIntakeRequest(BaseModel):
     @field_validator("session_id")
     @classmethod
     def session_id_format(cls, value: str) -> str:
+        """session_id_format（session id format）的函数说明。
+
+        value（参数）用于向该函数传入运行所需的数据。
+
+        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
         if not value.startswith("sess_") or not _SESSION_ID_RE.match(value):
             raise ValueError("invalid_session_id")
         return value
 
 
 def build_explore_intake_patches(body: ExploreIntakeRequest) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """build_explore_intake_patches（build explore intake patches）的函数说明。
+
+    body（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     submitted_at = datetime.now(UTC).isoformat()
     user_values = {
         "years_of_experience": body.years_of_experience,
@@ -71,6 +89,11 @@ def build_explore_intake_patches(body: ExploreIntakeRequest) -> tuple[dict[str, 
 
 
 def submit_explore_intake(body: ExploreIntakeRequest) -> dict[str, Any]:
+    """submit_explore_intake（submit explore intake）的函数说明。
+
+    body（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     session_store = SessionStore()
     if not session_store.session_exists(body.session_id):
         raise ValueError("session_not_found")
@@ -107,6 +130,11 @@ def submit_explore_intake(body: ExploreIntakeRequest) -> dict[str, Any]:
 
 
 def get_explore_intake_status(session_id: str | None = None) -> dict[str, Any]:
+    """get_explore_intake_status（get explore intake status）的函数说明。
+
+    session_id（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     intake: dict[str, Any] = {}
     if session_id:
         session = SessionStore().get_state(session_id)

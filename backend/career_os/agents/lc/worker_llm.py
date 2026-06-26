@@ -12,6 +12,13 @@ def enhance_worker_summary_with_llm(
     goal: str,
     structured_output: dict[str, Any],
 ) -> dict[str, Any] | None:
+    """用 LLM 优化 Worker 摘要。
+
+    worker_id（工作者标识）用于选择输出 schema 和 prompt 参数；
+    goal（目标）说明 Worker 原始任务；
+    structured_output（结构化输出）是已生成的 Worker 结果。
+    返回值是经过 schema 校验的新结构化输出；LLM 未启用、生成失败或校验失败时返回 None。
+    """
     if not llm_enabled():
         return None
     schema = WORKER_SCHEMAS.get(worker_id)

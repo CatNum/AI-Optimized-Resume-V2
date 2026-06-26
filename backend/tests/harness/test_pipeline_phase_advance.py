@@ -13,6 +13,11 @@ from career_os.platform.store import task as task_mod
 
 @pytest.fixture
 def pipeline_env(tmp_path, monkeypatch, jd_ready_profile):
+    """pipeline_env（pipeline env）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）、jd_ready_profile（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.profile as profile_mod
@@ -27,6 +32,9 @@ def pipeline_env(tmp_path, monkeypatch, jd_ready_profile):
 
 
 def test_resolve_target_phase_from_workers():
+    """test_resolve_target_phase_from_workers（测试 resolve target phase from workers）的函数说明。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     state = {"list_type": "pipeline", "list_id": "list_x"}
     target = resolve_analyze_target_phase(
         {"workers": ["strategy"], "pipeline_phase": "jd_analysis"},
@@ -36,6 +44,11 @@ def test_resolve_target_phase_from_workers():
 
 
 def test_analyze_advance_jd_to_strategy(pipeline_env):
+    """test_analyze_advance_jd_to_strategy（测试 analyze advance jd to strategy）的函数说明。
+
+    pipeline_env（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     session_id = "sess_adv01"
     list_id = instantiate_pipeline_for_session(session_id)
     task_mod.TaskStore().set_current_phase(list_id, "jd_analysis")
@@ -59,6 +72,11 @@ def test_analyze_advance_jd_to_strategy(pipeline_env):
 
 
 def test_analyze_advance_infers_phase_when_only_workers(pipeline_env):
+    """test_analyze_advance_infers_phase_when_only_workers（测试 analyze advance infers phase when only workers）的函数说明。
+
+    pipeline_env（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     session_id = "sess_adv02"
     list_id = instantiate_pipeline_for_session(session_id)
     task_mod.TaskStore().set_current_phase(list_id, "jd_analysis")
@@ -79,6 +97,11 @@ def test_analyze_advance_infers_phase_when_only_workers(pipeline_env):
 
 
 def test_analyze_does_not_auto_advance_ready_pipeline(pipeline_env):
+    """test_analyze_does_not_auto_advance_ready_pipeline（测试 analyze does not auto advance ready pipeline）的函数说明。
+
+    pipeline_env（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     session_id = "sess_adv03"
     list_id = instantiate_pipeline_for_session(session_id)
     state = {

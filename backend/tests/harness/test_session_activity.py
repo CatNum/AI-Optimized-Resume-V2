@@ -9,6 +9,11 @@ from tests.conftest import seed_explore_intake_profile
 
 @pytest.fixture(autouse=True)
 def explore_intake_ready(tmp_path, monkeypatch):
+    """explore_intake_ready（explore intake ready）的函数说明。
+
+    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.profile as profile_mod
@@ -19,6 +24,9 @@ def explore_intake_ready(tmp_path, monkeypatch):
 
 
 def test_build_session_activity_shows_explore_in_progress():
+    """test_build_session_activity_shows_explore_in_progress（测试 build session activity shows explore in progress）的函数说明。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     state = {
         "list_type": "pipeline",
         "explore_closure": init_explore_closure(),
@@ -36,6 +44,9 @@ def test_build_session_activity_shows_explore_in_progress():
 
 
 def test_explore_flow_active_when_identity_in_progress():
+    """test_explore_flow_active_when_identity_in_progress（测试 explore flow active when identity in progress）的函数说明。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     state = {
         "list_type": "pipeline",
         "explore_closure": init_explore_closure(),
@@ -45,6 +56,11 @@ def test_explore_flow_active_when_identity_in_progress():
 
 
 def test_build_session_activity_hides_intake_for_fresh_profile(monkeypatch):
+    """test_build_session_activity_hides_intake_for_fresh_profile（测试 build session activity hides intake for fresh profile）的函数说明。
+
+    monkeypatch（参数）用于向该函数传入运行所需的数据。
+
+    该函数用于验证对应业务场景的行为是否符合预期。"""
     import career_os.platform.store.profile as profile_mod
     import career_os.platform.store.session as session_mod
     import career_os.platform.pipeline_template as pipeline_mod
