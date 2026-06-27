@@ -23,21 +23,17 @@ def is_jd_intent(user_message: str) -> bool:
 
 
 def _onboarding_complete(profile: dict[str, Any]) -> bool:
-    """_onboarding_complete（内部函数 onboarding complete）的函数说明。
-
-    profile（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """判断用户基础画像是否已完成。"""
     basic = profile.get("basic") or {}
     return bool(basic)
 
 
 def _explore_completed(profile: dict[str, Any], session_state: dict[str, Any]) -> bool:
-    """_explore_completed（内部函数 explore completed）的函数说明。
+    """判断职业初探是否已完成。
 
-    profile（参数）、session_state（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    profile（用户画像）提供持久化完成时间；session_state（会话状态）提供本轮完成标记、
+    gate flags 和 explore_closure。任一来源确认完成即返回 True。
+    """
     exploration = profile.get("exploration") or {}
     if exploration.get("completed_at"):
         return True
@@ -50,14 +46,21 @@ def _explore_completed(profile: dict[str, Any], session_state: dict[str, Any]) -
 
 
 def check_jd_prerequisites(session_state: dict[str, Any]) -> tuple[bool, str | None]:
-    """返回 (ready, block_reason)，block_reason 表示 onboarding 或 explore 阻断原因。"""
+    """检查进入 JD 链路前置条件。
+
+    session_state（会话状态）用于判断探索完成与是否需要重探。返回值是
+    (ready（是否就绪）, block_reason（阻断原因）)，原因可能是 onboarding 或 explore。
+    """
     profile = ProfileStore().get(
         ["basic", "capability", "exploration", "intent", "resume"]
     )
+    # 没有基础画像时，先阻断到 onboarding。
     if not _onboarding_complete(profile):
         return False, "onboarding"
+    # 画像过期或信息变化导致需要完整初探时，阻断到 explore。
     if compute_needs_full_explore(profile, session_state):
         return False, "explore"
+    # 没有任何探索完成证据时，也不能进入 JD 链路。
     if not _explore_completed(profile, session_state):
         return False, "explore"
     return True, None
@@ -66,16 +69,18 @@ def check_jd_prerequisites(session_state: dict[str, Any]) -> tuple[bool, str | N
 def jd_delegate_block_error(
     worker_id: str, session_state: dict[str, Any]
 ) -> HarnessError | None:
-    """jd_delegate_block_error（jd delegate block error）的函数说明。
+    """在委托 JD 链路 Worker 前生成阻断错误。
 
-    worker_id（参数）、session_state（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    worker_id（工作者标识）用于判断是否属于 market/opportunity/strategy；
+    session_state（会话状态）用于检查前置条件。返回 None 表示允许委托。
+    """
+    # 非 JD 链路 Worker 不受 JD-B1 前置条件约束。
     if worker_id not in JD_CHAIN_WORKERS:
         return None
     ready, reason = check_jd_prerequisites(session_state)
     if ready:
         return None
+    # HarnessError 会被 Coordinator 解析成 jd_prerequisite_blocked 状态。
     block = reason or "explore"
     return HarnessError(
         "delegate_blocked",

@@ -13,12 +13,14 @@ def init_explore_closure(
     gate_name: str = "explore_complete",
     required_workers: list[str] | None = None,
 ) -> dict[str, Any]:
-    """init_explore_closure（init explore closure）的函数说明。
+    """初始化探索闭环状态。
 
-    gate_name（参数）、required_workers（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    gate_name（门禁名称）表示闭环完成后要触发的确认 gate；
+    required_workers（必需工作者）指定本轮探索必须完成哪些 Worker。
+    返回值包含 worker_done（工作者完成表）和 gate_pending（门禁待确认状态）。
+    """
     required = required_workers or DEFAULT_REQUIRED_WORKERS
+    # 默认探索 Worker 中，不在 required_workers 的 Worker 视为已完成，避免阻塞闭环。
     worker_done = {
         worker_id: worker_id not in required for worker_id in DEFAULT_REQUIRED_WORKERS
     }
@@ -62,12 +64,13 @@ def is_explore_segment_complete(
 
 
 def incomplete_explore_workers(session_state: dict[str, Any]) -> list[str]:
-    """incomplete_explore_workers（incomplete explore workers）的函数说明。
+    """返回当前探索闭环中尚未完成的 Worker。
 
-    session_state（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    session_state（会话状态）提供 explore_closure。返回值按 required_workers 的顺序排列，
+    供 Coordinator 决定下一次派发哪个探索 Worker。
+    """
     closure = session_state.get("explore_closure")
+    # 没有闭环状态时，默认从完整探索顺序 identity -> capability 开始。
     if not closure:
         return list(EXPLORE_DISPATCH_ORDER)
     required = closure.get("required_workers") or DEFAULT_REQUIRED_WORKERS
@@ -85,11 +88,14 @@ def plan_explore_worker_dispatch(
     explore_closure（探索闭环）进度。返回值通常只包含下一个应执行的探索 Worker，
     保证 identity 和 capability 按闭环顺序逐段推进。
     """
+    # 候选队列不包含探索 Worker 时，不改变原始调度顺序。
     if not any(worker_id in EXPLORE_WORKERS for worker_id in workers):
         return workers
     incomplete = incomplete_explore_workers(session_state)
+    # 探索流程一次只派发第一个未完成 Worker，等待它返回 segment_complete 后再继续。
     if incomplete:
         return [incomplete[0]]
+    # 所有必需 Worker 已完成时，只保留候选探索 Worker 中排在最前的一个作为兜底。
     ordered = [worker_id for worker_id in EXPLORE_DISPATCH_ORDER if worker_id in workers]
     return ordered[:1] if ordered else workers
 
@@ -103,19 +109,24 @@ def explore_continuation_analyze(session_state: dict[str, Any]) -> dict[str, Any
     from career_os.harness.pipeline_gates import is_explore_gate_confirmed
     from career_os.harness.pipeline_routing import get_current_phase, is_pipeline_explore_phase
 
+    # 只有 pipeline 的 explore 阶段才需要自动续跑探索 Worker。
     if not is_pipeline_explore_phase(session_state):
         return None
+    # 探索完成 gate 已确认后，不再自动派发探索 Worker。
     if is_explore_gate_confirmed(session_state):
         return None
     flags = (session_state.get("gates") or {}).get("flags") or {}
+    # 用户拒绝重复初探时，也不能继续自动续跑。
     if flags.get("explore_repeat_declined"):
         return None
     closure = session_state.get("explore_closure") or {}
+    # 闭环已完成或没有未完成 Worker 时，不需要续跑。
     if closure.get("completed"):
         return None
     incomplete = incomplete_explore_workers(session_state)
     if not incomplete:
         return None
+    # 返回形态对齐 analyze_workers 的结果，Coordinator 可直接当作路由分析结果处理。
     return {
         "workers": [incomplete[0]],
         "list_type": "pipeline",
@@ -135,10 +146,12 @@ def mark_worker_done(
     worker_id（工作者标识）是刚执行完的 Worker；structured_output（结构化输出）
     提供 phase_status。返回值是更新后的 explore_closure。
     """
+    # 没有现成闭环状态时先初始化，保证 worker_done 结构完整。
     state = dict(explore_closure or init_explore_closure())
     required = state.get("required_workers") or DEFAULT_REQUIRED_WORKERS
     worker_done = dict(state.get("worker_done") or {})
     if worker_id in required:
+        # 探索 Worker 只有返回 segment_complete 才能标记完成；in_progress 会继续保留在队列。
         if not is_explore_segment_complete(worker_id, structured_output):
             state["worker_done"] = worker_done
             return state
@@ -148,11 +161,11 @@ def mark_worker_done(
 
 
 def is_closure_ready(explore_closure: dict[str, Any] | None) -> bool:
-    """is_closure_ready（is closure ready）的函数说明。
+    """判断探索闭环必需 Worker 是否全部完成。
 
-    explore_closure（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    explore_closure（探索闭环状态）提供 required_workers 和 worker_done。
+    返回值为 True 表示可以准备发出完成确认 gate。
+    """
     if not explore_closure:
         return False
     required = explore_closure.get("required_workers") or DEFAULT_REQUIRED_WORKERS

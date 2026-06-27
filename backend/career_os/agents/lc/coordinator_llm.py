@@ -265,9 +265,11 @@ def build_phase_synthesis_draft(
     """
     from career_os.harness.profile_memory import build_profile_aware_chat_draft
 
+    # 先读取 pipeline 当前阶段；非深度阶段走普通档案感知闲聊草稿。
     phase = get_current_phase(session_state) or "explore"
     if not is_pipeline_session(session_state) or phase not in DEEP_PIPELINE_PHASES:
         return build_profile_aware_chat_draft(user_message, session_state)
+    # 深度阶段按 current_phase 选择专用草稿，避免回复误回到职业初探模板。
     if phase == "market":
         base = _market_continue_draft(session_state)
     elif phase == "jd_analysis":
@@ -276,6 +278,7 @@ def build_phase_synthesis_draft(
         return _resume_strategy_continue_draft(user_message, session_state)
     else:
         base = _resume_optimize_continue_draft(session_state)
+    # 草稿末尾附加本回合档案事实，约束最终合成不要违背已知简历/产物。
     memory_sections = resolve_profile_memory_sections(user_message, session_state)
     memory = materialize_profile_memory(
         memory_sections, full_resume_text=False, session_state=session_state
@@ -312,9 +315,11 @@ def normalize_analyze_result(
     session_state（会话状态）用于 pipeline 场景下补齐阶段信息。
     返回值至少包含 workers（工作者列表），pipeline 场景还会包含 list_type/pipeline_phase。
     """
+    # LLM/fallback 没有结果时，返回空 workers，Coordinator 会直接进入 synthesize。
     if not result:
         return {"workers": []}
 
+    # 过滤掉不存在于 WorkerRegistry 的 worker_id，防止 LLM 幻觉 Worker。
     raw_workers = [
         w
         for w in result.get("workers") or []
@@ -323,6 +328,7 @@ def normalize_analyze_result(
     if not raw_workers:
         return {"workers": []}
 
+    # pipeline 会话需要把 workers 归一化为 pipeline 分析结果，补齐 pipeline_phase。
     if session_state and (
         is_pipeline_session(session_state) or session_state.get("list_id")
     ):
@@ -371,11 +377,14 @@ def enforce_jd_prerequisites(
     user_message（用户消息）用于判断是否有 JD 意图。
     返回值可能是原路由，也可能是 jd_prerequisite_blocked（JD 前置阻断）结果。
     """
+    # 非 JD 路由且用户也没有 JD 意图时，不做 JD 前置检查。
     if not _is_jd_route(result) and not is_jd_intent(user_message):
         return result
+    # 有 JD 意图但最终路由不属于 JD 链路时，不额外阻断。
     if not _is_jd_route(result):
         return result
     ready, reason = check_jd_prerequisites(session_state)
+    # 前置条件满足时保留原路由；不满足时清空 workers 并写入阻断原因。
     if ready:
         return result
     blocked: dict[str, Any] = {
@@ -415,9 +424,11 @@ def _apply_explore_dispatch_plan(
     返回值会根据 plan_explore_worker_dispatch 调整 workers 顺序或数量。
     """
     workers = result.get("workers") or []
+    # 没有候选 Worker 时无需规划。
     if not workers:
         return result
     planned = plan_explore_worker_dispatch(workers, session_state)
+    # 调度计划未改变时保持原结果，避免无意义复制。
     if planned == workers:
         return result
     return {**result, "workers": planned}
@@ -433,6 +444,7 @@ def fallback_analyze_workers(
     session_state（会话状态）提供 pipeline 阶段、prior_results 和 gates。
     返回值是规则推导出的分析结果；无法判断时返回 None，让上层继续走其他路径。
     """
+    # 纯聊天/寒暄不调度 Worker，直接让 Coordinator 合成回复。
     if is_chat_only_intent(user_message):
         return {"workers": []}
     if is_small_talk(user_message):
@@ -443,6 +455,7 @@ def fallback_analyze_workers(
     flags = (session_state.get("gates") or {}).get("flags") or {}
 
     if is_pipeline_session(session_state) or session_state.get("list_id"):
+        # pipeline 会话中，JD 意图优先进入 jd_analysis，并先检查 JD 前置条件。
         if is_jd_intent(user_message) or "jd" in text:
             result = as_pipeline_analyze_result(
                 {
@@ -452,6 +465,7 @@ def fallback_analyze_workers(
                 session_state,
             )
             return enforce_jd_prerequisites(result, session_state, user_message)
+        # 市场意图只有在 JD 前置条件满足后才进入 market Worker。
         if any(keyword in user_message for keyword in _MARKET_INTENT_KEYWORDS):
             ready, _ = check_jd_prerequisites(session_state)
             if ready:
@@ -460,6 +474,7 @@ def fallback_analyze_workers(
                     session_state,
                 )
                 return enforce_jd_prerequisites(result, session_state, user_message)
+        # 明确请求初探时，先套探索调度计划，再强制检查 intake。
         if "初探" in user_message or "explore" in text:
             result = _apply_explore_dispatch_plan(
                 as_pipeline_analyze_result(
@@ -488,6 +503,7 @@ def fallback_analyze_workers(
             match_pipeline_intent_rule_ids,
         )
 
+        # 规则命中简历策略或 Agent 项目表达时，尝试推进到 resume_strategy。
         rule_ids = set(match_pipeline_intent_rule_ids(user_message))
         if rule_ids & {"intent_resume_strategy", "intent_declare_agent_project"}:
             result = enforce_pipeline_phase_rules(
@@ -500,6 +516,7 @@ def fallback_analyze_workers(
                 user_message,
             )
             return enforce_explore_intake(result, session_state)
+        # 已有市场和 JD 分析产物但还没有策略产物时，“继续/下一步/制定”倾向进入策略 Worker。
         if (
             "market" in prior
             and "opportunity" in prior
@@ -516,6 +533,7 @@ def fallback_analyze_workers(
                 user_message,
             )
             return enforce_explore_intake(result, session_state)
+        # 只有用户确认优化后，fallback 才允许调度 resume/asset 到 resume_optimize。
         if flags.get("optimize_confirmed"):
             if ("优化" in user_message or "resume" in text) and "resume" not in prior:
                 return as_pipeline_analyze_result(
@@ -525,14 +543,17 @@ def fallback_analyze_workers(
                     },
                     session_state,
                 )
+        # 最后交给 pipeline_fallback_workers 按当前阶段做兜底。
         pipeline_fb = pipeline_fallback_workers(user_message, session_state)
         if pipeline_fb is not None:
             return enforce_explore_intake(pipeline_fb, session_state)
+        # 如果仍无结果，检查探索闭环是否需要自动续跑。
         continued = explore_continuation_analyze(session_state)
         if continued:
             return enforce_explore_intake(continued, session_state)
         return None
 
+    # 非 pipeline 会话也先尝试 pipeline fallback，兼容尚未写 list_type 但已有阶段状态的场景。
     pipeline_fb = pipeline_fallback_workers(user_message, session_state)
     if pipeline_fb is not None:
         return enforce_explore_intake(pipeline_fb, session_state)
@@ -541,6 +562,7 @@ def fallback_analyze_workers(
     if continued:
         return enforce_explore_intake(continued, session_state)
 
+    # 普通会话中出现 JD/岗位/job 时，转入 JD 分析链路并执行前置检查。
     if "jd" in text or "岗位" in user_message or "job" in text:
         result = as_pipeline_analyze_result(
             {"workers": ["market", "opportunity"], "pipeline_phase": "jd_analysis"},
@@ -567,6 +589,7 @@ def analyze_workers(
     messages_meta（消息元数据）提供上下文长度等统计。
     返回值是标准分析结果；LLM 不可用或分析失败时返回 None。
     """
+    # 先把 WorkerRegistry 中的 Worker 转成 LLM 可读摘要，同时形成 allowed_workers 白名单。
     worker_summary: list[dict[str, Any]] = []
     allowed_workers: set[str] = set()
     for worker in worker_index:
@@ -582,14 +605,17 @@ def analyze_workers(
             }
         )
 
+    # 明确只聊天或寒暄时不调用 LLM，直接返回空队列。
     if is_chat_only_intent(user_message):
         return normalize_analyze_result({"workers": []}, allowed_workers, session_state)
     if is_small_talk(user_message):
         return normalize_analyze_result({"workers": []}, allowed_workers, session_state)
 
+    # LLM 未启用时返回 None，让 Coordinator 使用 fallback_analyze_workers。
     if not lc_client.llm_enabled():
         return None
 
+    # 构造 LLM 路由 payload：包含阶段、门禁、历史 Worker、前置条件、intake 和可选档案记忆。
     profile = ProfileStore().get(
         ["basic", "intent", "exploration", "resume", "capability"]
     )
@@ -614,12 +640,14 @@ def analyze_workers(
         analyze_payload["profile_memory"] = materialize_profile_memory(
             memory_sections, full_resume_text=False, session_state=session_state
         )
+    # pipeline 会话补充 current_phase 等单一事实来源，约束 LLM 不要跨阶段乱派发。
     if session_state.get("list_type") == "pipeline":
         analyze_payload.update(
             pipeline_analyze_payload(session_state, user_message)
         )
     user = json.dumps(analyze_payload, ensure_ascii=False)
     try:
+        # 调用 Coordinator LLM 得到候选 workers/pipeline_phase。
         data = lc_client.invoke_json(_coordinator_system(), user, role=LLMRole.COORDINATOR)
         if not data:
             return None
@@ -629,6 +657,7 @@ def analyze_workers(
             result["pipeline_phase"] = data["pipeline_phase"]
         if is_pipeline_session(session_state) or session_state.get("list_id"):
             result["list_type"] = "pipeline"
+        # LLM 输出先归一化，再套 pipeline/JD/intake/探索调度约束。
         normalized = normalize_analyze_result(result, allowed_workers, session_state)
         if is_pipeline_session(session_state) or session_state.get("list_id"):
             normalized = enforce_pipeline_phase_rules(
@@ -641,6 +670,7 @@ def analyze_workers(
         normalized = enforce_explore_intake(normalized, session_state)
         return _apply_explore_dispatch_plan(normalized, session_state)
     except Exception:
+        # LLM 调用或解析失败时让上层回退到规则路由。
         return None
 
 

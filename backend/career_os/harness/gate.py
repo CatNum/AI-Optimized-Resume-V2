@@ -27,11 +27,10 @@ _DEFAULT_HINT = "请明确回复「同意」或「暂不」"
 
 
 def gate_reply_hint(gate_name: str | None) -> str:
-    """gate_reply_hint（gate reply hint）的函数说明。
+    """返回指定 gate 的标准回复提示。
 
-    gate_name（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    gate_name（门禁名称）用于查找回复格式；没有匹配时返回默认“同意/暂不”提示。
+    """
     if not gate_name:
         return _DEFAULT_HINT
     return GATE_REPLY_HINTS.get(gate_name, _DEFAULT_HINT)
@@ -70,15 +69,16 @@ def _emit_gate_trace(
     session_id: str | None,
     result: dict[str, Any],
 ) -> None:
-    """_emit_gate_trace（内部函数 emit gate trace）的函数说明。
+    """记录 gate 意图匹配 trace。
 
-    trace（参数）、session_id（参数）、result（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    trace（追踪写入器）为空或 session_id（会话标识）为空时跳过；
+    result（匹配结果）决定记录 rule_hit 还是 llm_classify。
+    """
     if not trace or not session_id:
         return
     source = result.get("source")
     gate_name = result.get("gate_name")
+    # 硬规则明确命中时记录 gate.rule_hit，方便排查是哪条 pattern 生效。
     if source == "rule" and result.get("matched"):
         trace.emit(
             "gate.rule_hit",
@@ -92,6 +92,7 @@ def _emit_gate_trace(
                 "source": source,
             },
         )
+    # 回退到 LLM 时记录置信度、原因和是否命中。
     elif source == "llm":
         trace.emit(
             "gate.llm_classify",
@@ -117,22 +118,26 @@ def match_gate_intent(
     session_state: dict[str, Any] | None = None,
     trace_writer: TraceWriter | None = None,
 ) -> dict[str, Any]:
-    """match_gate_intent（match gate intent）的函数说明。
+    """匹配用户对当前 pending gate 的意图。
 
-    user_message（参数）、pending_gate（参数）、session_id（参数）、session_state（参数）、trace_writer（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    user_message（用户消息）先走硬规则；pending_gate（待确认门禁）提供 gate 名称和提示；
+    session_id/session_state/trace_writer 用于 LLM 分类和 trace。返回值描述 matched、intent 和来源。
+    """
+    # 第一优先级走硬规则；明确命中时直接返回，不再调用 LLM。
     rule_result = match_gate_intent_rules(user_message, pending_gate)
     if is_rule_clear_hit(rule_result):
         _emit_gate_trace(trace_writer, session_id, rule_result)
         return rule_result
 
     pending_name = (pending_gate or {}).get("name")
+    # 没有待确认 gate 时，规则结果就是最终结果。
     if not pending_name:
         return rule_result
+    # explore_complete gate 只接受明确规则，避免 LLM 误判导致提前离开探索阶段。
     if pending_name == "explore_complete":
         return rule_result
 
+    # 其他 gate 在规则不明确时回退 LLM 分类。
     llm_result = classify_gate_intent_llm(
         user_message,
         pending_gate or {},

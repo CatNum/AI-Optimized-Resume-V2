@@ -32,11 +32,14 @@ def explore_flow_active(session_state: dict[str, Any]) -> bool:
     from career_os.harness.pipeline_gates import is_explore_gate_confirmed
     from career_os.harness.pipeline_routing import is_pipeline_explore_phase
 
+    # 先用 profile + session_state 判断是否必须继续完整初探。
     profile = ProfileStore().get(["exploration", "intent"])
     if not compute_needs_full_explore(profile, session_state):
         return False
+    # 只有 pipeline/explore 阶段才认为初探流程活跃。
     if not is_pipeline_explore_phase(session_state):
         return False
+    # intake 阻断、完成 gate 已确认、用户拒绝重复初探，都表示不应继续自动推进探索 Worker。
     if session_state.get("explore_intake_blocked"):
         return False
     if is_explore_gate_confirmed(session_state):
@@ -45,6 +48,7 @@ def explore_flow_active(session_state: dict[str, Any]) -> bool:
     if flags.get("explore_repeat_declined"):
         return False
     closure = session_state.get("explore_closure") or {}
+    # 没有闭环状态或已经挂起完成 gate 时，synthesize 不再输出“继续探索”的草稿。
     if not closure:
         return False
     if closure.get("gate_pending"):
@@ -56,22 +60,26 @@ def _explore_worker_status(
     worker_id: str,
     session_state: dict[str, Any],
 ) -> str:
-    """_explore_worker_status（内部函数 explore worker status）的函数说明。
+    """计算探索 Worker 在会话活动摘要中的展示状态。
 
-    worker_id（参数）、session_state（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    worker_id（工作者标识）用于定位 identity/capability；
+    session_state（会话状态）提供 explore_closure 和 prior_results。
+    返回值是 completed、in_progress 或 pending。
+    """
     closure = session_state.get("explore_closure") or {}
     worker_done = closure.get("worker_done") or {}
+    # 已被闭环标记完成时，展示 completed。
     if worker_done.get(worker_id):
         return "completed"
 
     prior = (session_state.get("prior_results") or {}).get(worker_id) or {}
+    # Worker 最近一次结果仍是 in_progress 时，展示进行中。
     if prior.get("phase_status") == "in_progress":
         return "in_progress"
 
     required = closure.get("required_workers") or DEFAULT_REQUIRED_WORKERS
     incomplete = [wid for wid in required if not worker_done.get(wid, False)]
+    # 第一个未完成 Worker 是当前应答对象，展示 in_progress；其余未完成项保持 pending。
     if incomplete and incomplete[0] == worker_id:
         return "in_progress"
     return "pending"
@@ -88,6 +96,7 @@ def build_session_activity(session_state: dict[str, Any]) -> dict[str, Any]:
     items: list[dict[str, str]] = []
     list_id = session_state.get("list_id")
     list_meta = None
+    # pipeline 会话如果有 list_id，就读取任务列表元信息辅助判断 ready/阶段状态。
     if list_type == "pipeline" and list_id:
         from career_os.platform.store.task import TaskStore
 
@@ -97,6 +106,7 @@ def build_session_activity(session_state: dict[str, Any]) -> dict[str, Any]:
     profile = ProfileStore().get(["exploration", "intent"])
     needs_full_explore = compute_needs_full_explore(profile, session_state)
 
+    # 需要完整初探且 intake 未提交时，活动摘要只展示“填写初探信息表”。
     if needs_full_explore and (
         session_state.get("explore_intake_blocked") or (
         is_pipeline_session(session_state)
@@ -116,6 +126,7 @@ def build_session_activity(session_state: dict[str, Any]) -> dict[str, Any]:
         and get_current_phase(session_state) == "explore"
         and (list_meta or {}).get("status") != "ready"
     ):
+        # explore 阶段展示 identity/capability 两个探索 Worker 的完成情况。
         closure = session_state.get("explore_closure") or {}
         required = closure.get("required_workers") or DEFAULT_REQUIRED_WORKERS
         for worker_id in required:
@@ -136,6 +147,7 @@ def build_session_activity(session_state: dict[str, Any]) -> dict[str, Any]:
             "resume_optimize",
         }
     ):
+        # 非 explore 的 pipeline 阶段只展示一个当前阶段进行中条目。
         phase = get_current_phase(session_state) or ""
         items.append(
             {
@@ -157,20 +169,22 @@ def _activity_headline(
     session_state: dict[str, Any],
     items: list[dict[str, str]],
 ) -> str | None:
-    """_activity_headline（内部函数 activity headline）的函数说明。
+    """生成会话活动摘要标题。
 
-    session_state（参数）、items（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    session_state（会话状态）提供 list_type、list_id 和当前阶段；
+    items（阶段任务项）提供进行中/已完成状态。返回值是“当前：...”标题。
+    """
     list_type = session_state.get("list_type")
     list_id = session_state.get("list_id")
     list_meta = None
+    # pipeline 且有 list_id 时读取列表状态，区分待开始和进行中。
     if list_type == "pipeline" and list_id:
         from career_os.platform.store.task import TaskStore
 
         list_meta = TaskStore().get_list_meta(list_id)
     profile = ProfileStore().get(["exploration", "intent"])
     needs_full_explore = compute_needs_full_explore(profile, session_state)
+    # intake 阻断优先展示，因为此时用户下一步动作最明确。
     if session_state.get("explore_intake_blocked") and needs_full_explore:
         return "当前：请先填写初探信息表"
     from career_os.harness.pipeline_routing import get_current_phase, is_pipeline_session
@@ -189,6 +203,7 @@ def _activity_headline(
             "resume_optimize": "简历优化",
         }
         step = phase_labels.get(phase, phase)
+        # explore 阶段有具体 Worker 进行中时，把 Worker 标题带进 headline。
         active = next((item for item in items if item["status"] == "in_progress"), None)
         if active and phase == "explore":
             return f"当前：{step} · {active['title']}进行中"

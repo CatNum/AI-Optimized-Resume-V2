@@ -33,11 +33,7 @@ _ANALYZE_RESUME_SNIPPET_CHARS = 1200
 
 
 def _phase_requires_resume(session_state: dict[str, Any]) -> bool:
-    """_phase_requires_resume（内部函数 phase requires resume）的函数说明。
-
-    session_state（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """判断当前 pipeline 阶段是否必须加载简历记忆。"""
     phase = get_current_phase(session_state) or "explore"
     return phase in PHASES_REQUIRE_RESUME
 
@@ -48,9 +44,15 @@ def resolve_profile_memory_sections(
     *,
     worker_id: str | None = None,
 ) -> list[str]:
-    """返回本轮需要加载的有序分区 id，来源包括规则、分类器和必需简历。"""
+    """解析本轮 Worker 需要加载的 profile 记忆分区。
+
+    user_message（用户消息）先走关键词规则；session_state（会话状态）提供当前阶段；
+    worker_id（工作者标识）用于强制给 JD/简历链路加载简历。返回值是有序分区 id 列表。
+    """
+    # 第一层先用规则从用户消息中提取明显相关的记忆分区。
     found: set[str] = set(match_profile_memory_rules(user_message))
 
+    # JD/简历链路 Worker 和后续 pipeline 阶段必须加载 resume，避免 Worker 缺少基础材料。
     if worker_id and worker_id in WORKERS_REQUIRE_RESUME:
         found.add("resume")
     if _phase_requires_resume(session_state):
@@ -67,6 +69,7 @@ def resolve_profile_memory_sections(
         }:
             found.add("strategy")
 
+    # 规则和阶段约束之外，再调用轻量分类器补充分区范围。
     classified = classify(
         "profile_memory_scope",
         user_message,
@@ -76,6 +79,7 @@ def resolve_profile_memory_sections(
             "list_type": session_state.get("list_type"),
         },
     )
+    # rule 来源直接接受；llm 来源需要达到置信度阈值。
     if classified.get("source") in {"rule", "llm"} and (
         float(classified.get("confidence") or 0) >= 0.6
         or classified.get("source") == "rule"
@@ -84,6 +88,7 @@ def resolve_profile_memory_sections(
             if section in SECTION_PATHS:
                 found.add(section)
 
+    # 固定输出顺序，保证下游提示词稳定。
     order = ("resume", "basic_intent", "exploration", "market", "strategy", "capability")
     return [s for s in order if s in found]
 
@@ -94,11 +99,11 @@ def _resume_payload(
     full_text: bool,
     intake_override: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """_resume_payload（内部函数 resume payload）的函数说明。
+    """构造放入 profile_memory.resume 的简历负载。
 
-    profile（参数）、full_text（参数）、intake_override（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    profile（用户画像）提供 resume/basic/intent；full_text（是否全文）控制正文大小；
+    intake_override（intake 覆盖）用于优先使用会话内最新初探表单。
+    """
     resume = profile.get("resume") or {}
     exploration = profile.get("exploration") or {}
     intake = intake_override or exploration.get("intake") or {}
@@ -120,6 +125,7 @@ def _resume_payload(
         "submitted_at": intake.get("submitted_at"),
         "summary": " · ".join(str(x) for x in summary_parts) if summary_parts else None,
     }
+    # 真实执行 JD/简历链路 Worker 时给全文；分析或草稿场景只给摘录。
     if full_text and source:
         out["source_text"] = source
     elif source:
@@ -129,22 +135,24 @@ def _resume_payload(
 
 
 def _session_artifact_memory(session_state: dict[str, Any] | None) -> dict[str, Any]:
-    """_session_artifact_memory（内部函数 session artifact memory）的函数说明。
+    """读取当前会话和显式引用会话中的产物记忆。
 
-    session_state（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    session_state（会话状态）提供 session_id、prior_results 和 artifact_refs。
+    返回值优先使用当前会话 artifacts，其次回退到 prior_results 和显式引用产物。
+    """
     state = session_state or {}
     prior = state.get("prior_results") or {}
     artifacts: dict[str, Any] = {}
     session_id = state.get("session_id")
     if session_id:
+        # 当前会话 artifacts 是最权威的结构化产物来源。
         artifacts = SessionStore().get_artifacts(session_id)
     ref_artifacts: list[dict[str, Any]] = []
     for ref in state.get("artifact_refs") or []:
         if isinstance(ref, str):
             ref_artifacts.append(SessionStore().get_artifacts(ref))
     out: dict[str, Any] = {}
+    # market/strategy 优先取已持久化产物，没有时取本轮 prior_results 摘要。
     if isinstance(artifacts.get("market"), dict) and artifacts.get("market"):
         out["market"] = artifacts.get("market") or {}
     elif isinstance(prior.get("market"), dict):
@@ -153,6 +161,7 @@ def _session_artifact_memory(session_state: dict[str, Any] | None) -> dict[str, 
         out["strategy"] = artifacts.get("strategy") or {}
     elif isinstance(prior.get("strategy"), dict):
         out["strategy"] = prior.get("strategy") or {}
+    # exploration 产物聚合 identity/capability，供后续 Worker 复用探索结论。
     exploration: dict[str, Any] = {}
     for key in ("identity", "capability"):
         blob = (artifacts.get("exploration") or {}).get(key)
@@ -188,8 +197,10 @@ def materialize_profile_memory(
     session_state（会话状态）提供 session artifacts、prior_results 和 intake 覆盖信息。
     返回值是可放入 LLM 上下文的 profile_memory（档案记忆）。
     """
+    # 没有需要加载的分区时，返回空 dict，调用方不会向上下文写 profile_memory。
     if not sections:
         return {}
+    # 把逻辑分区映射到 ProfileStore 路径，并去重保持顺序。
     paths: list[str] = []
     for section in sections:
         paths.extend(SECTION_PATHS.get(section, ()))
@@ -197,6 +208,7 @@ def materialize_profile_memory(
     profile = ProfileStore().get(paths)
 
     memory: dict[str, Any] = {"sections_loaded": sections}
+    # 会话产物优先级高于 profile 历史产物，确保同一轮刚生成的结果能被后续 Worker 看到。
     session_memory = _session_artifact_memory(session_state)
     if "resume" in sections:
         intake_override = (
@@ -240,6 +252,7 @@ def attach_profile_memory_to_context(
     session_state（会话状态）提供当前阶段和会话产物；
     worker_id（工作者标识）用于强制给 JD 链路 Worker 加载简历。
     """
+    # 先解析需要哪些 profile 分区，再按 Worker 类型决定是否加载完整简历。
     sections = resolve_profile_memory_sections(
         user_message, session_state, worker_id=worker_id
     )
@@ -247,6 +260,7 @@ def attach_profile_memory_to_context(
     memory = materialize_profile_memory(
         sections, full_resume_text=full_resume, session_state=session_state
     )
+    # 只有实际加载到记忆时才写入 context，避免下游误判有空记忆。
     if memory:
         context["profile_memory"] = memory
         context["profile_memory_sections"] = sections
