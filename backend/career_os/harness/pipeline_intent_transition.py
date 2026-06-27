@@ -47,10 +47,7 @@ _JUMP_TARGET_WORKERS: dict[str, tuple[str, ...]] = {
 
 
 def _is_small_talk(user_message: str) -> bool:
-    """判断用户消息是否只是简单寒暄。
-
-    user_message（用户消息）会去掉标点和空白后匹配寒暄短语。返回值为 True 表示不触发阶段切换。
-    """
+    """判断用户消息是否只是简单寒暄。"""
     text = user_message.strip().lower()
     if not text:
         return True
@@ -60,16 +57,15 @@ def _is_small_talk(user_message: str) -> bool:
 
 @dataclass(frozen=True)
 class IntentTransition:
-    """描述一条用户意图到 pipeline 阶段的切换规则。
-
-    from_phases（允许起点阶段）、to_phase（目标阶段）、rule_id（规则标识）、
-    preconditions（前置条件集合）和 suggested_workers（建议 Worker）共同定义一次可执行切换。
     """
-    from_phases: frozenset[str]
-    to_phase: str
-    rule_id: str
-    preconditions: frozenset[str]
-    suggested_workers: tuple[str, ...]
+    IntentTransition（意图切换规则）描述一条用户意图到 pipeline 阶段的切换规则。
+    """
+
+    from_phases: frozenset[str]  # 允许来源阶段集合
+    to_phase: str  # 目标阶段
+    rule_id: str  # 规则标识
+    preconditions: frozenset[str]  # 前置条件集合
+    suggested_workers: tuple[str, ...]  # 建议调度 Worker
 
 
 # 规则表顺序：多个规则命中时，选择 PHASE_RANK[to_phase] 最高的目标阶段。
@@ -127,11 +123,7 @@ def _check_precondition(
     *,
     chat_history: list[dict[str, str]] | None = None,
 ) -> bool:
-    """检查单个阶段切换前置条件是否满足。
-
-    precondition_id（前置条件标识）对应 P0-P6；session_state（会话状态）提供 list/gate；
-    user_message（用户消息）和 chat_history（聊天历史）用于判断 JD 上下文与闲聊。
-    """
+    """检查单个阶段切换前置条件是否满足。"""
     # P0：必须绑定 pipeline 任务列表。
     if precondition_id == "P0":
         return bool(session_state.get("list_id")) and is_pipeline_session(session_state)
@@ -219,11 +211,7 @@ def _resolve_via_classifier(
     session_state: dict[str, Any],
     user_message: str,
 ) -> IntentTransition | None:
-    """通过轻量分类器解析用户意图对应的 pipeline 阶段切换。
-
-    current_phase（当前阶段）是切换起点；session_state（会话状态）提供历史结果和 gate；
-    user_message（用户消息）是分类器输入。返回值是可执行的 IntentTransition 或 None。
-    """
+    """通过轻量分类器解析用户意图对应的 pipeline 阶段切换。"""
     # 先读取已完成 Worker 摘要，供分类器判断当前上下文是否足够。
     prior = session_state.get("prior_results") or {}
     # 调用 pipeline_phase_intent 分类器，尝试从用户消息中识别目标阶段。

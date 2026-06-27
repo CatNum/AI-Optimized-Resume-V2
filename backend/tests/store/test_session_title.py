@@ -9,11 +9,7 @@ from career_os.platform.store.session_title import (
 
 
 def _reload_session_store(tmp_path, monkeypatch):
-    """_reload_session_store（内部函数 reload session store）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """构造测试环境和基础状态。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.session as session_mod
@@ -24,27 +20,19 @@ def _reload_session_store(tmp_path, monkeypatch):
 
 
 def test_fallback_title_from_first_user():
-    """test_fallback_title_from_first_user（测试 fallback title from first user）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 fallback title from first user 场景。"""
     messages = [{"role": "assistant", "content": "hi"}, {"role": "user", "content": "hello world"}]
     assert fallback_title_from_messages(messages) == "hello world"
 
 
 def test_fallback_title_empty_user_defaults():
-    """test_fallback_title_empty_user_defaults（测试 fallback title empty user defaults）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 fallback title empty user defaults 场景。"""
     assert fallback_title_from_messages([]) == "未命名会话"
     assert fallback_title_from_messages([{"role": "user", "content": ""}]) == "未命名会话"
 
 
 def test_maybe_generate_title_after_first_user(tmp_path, monkeypatch):
-    """test_maybe_generate_title_after_first_user（测试 maybe generate title after first user）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 maybe generate title after first user 场景。"""
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     from career_os.agents.lc import models as models_mod
 
@@ -66,11 +54,7 @@ def test_maybe_generate_title_after_first_user(tmp_path, monkeypatch):
 
 
 def test_maybe_generate_title_skips_user_locked(tmp_path, monkeypatch):
-    """test_maybe_generate_title_skips_user_locked（测试 maybe generate title skips user locked）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 maybe generate title skips user locked 场景。"""
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     from career_os.agents.lc import models as models_mod
 
@@ -93,11 +77,7 @@ def test_maybe_generate_title_skips_user_locked(tmp_path, monkeypatch):
 
 
 def test_append_first_user_sets_fallback_then_auto(tmp_path, monkeypatch):
-    """test_append_first_user_sets_fallback_then_auto（测试 append first user sets fallback then auto）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 append first user sets fallback then auto 场景。"""
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     from career_os.agents.lc import models as models_mod
 

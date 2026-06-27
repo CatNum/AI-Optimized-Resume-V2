@@ -8,11 +8,7 @@ from career_os.platform.store.session import SessionStore
 
 
 def _intake_from_state(session_state: dict[str, Any] | None) -> dict[str, Any]:
-    """按优先级读取初探信息表状态。
-
-    session_state（会话状态）优先提供本轮内存态；如果没有，则按 session 持久化状态、
-    session artifacts、profile 旧数据的顺序回退。返回值是 intake（初探信息表）字典。
-    """
+    """按优先级读取初探信息表状态。"""
     state = session_state or {}
     # 本轮 session_state 中已有 intake_status 时，直接使用最新内存态。
     if isinstance(state.get("intake_status"), dict):
@@ -42,21 +38,13 @@ def resolve_explore_intake(session_state: dict[str, Any] | None = None) -> dict[
 
 
 def explore_intake_submitted(session_state: dict[str, Any] | None = None) -> bool:
-    """判断初探信息表是否已经提交。
-
-    session_state（会话状态）用于定位 intake。返回值为 True 表示 intake 中存在 submitted_at。
-    """
+    """判断初探信息表是否已经提交。"""
     intake = resolve_explore_intake(session_state)
     return bool(intake.get("submitted_at"))
 
 
 def explore_intake_payload(session_state: dict[str, Any] | None = None) -> dict[str, Any]:
-    """构造初探信息表上下文负载。
-
-    session_state（会话状态）用于读取已提交的 intake（初探信息）。
-    返回值包含是否已提交、待补字段、待补字段中文标签和完整 intake，
-    供 Coordinator 分析路由时判断是否阻断初探 Worker。
-    """
+    """构造初探信息表上下文负载。"""
     intake = resolve_explore_intake(session_state)
     pending = list(intake.get("pending_fields") or [])
     return {
@@ -70,11 +58,7 @@ def explore_intake_payload(session_state: dict[str, Any] | None = None) -> dict[
 def worker_context_from_intake(
     session_state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """把初探信息表整理成 Worker 上下文。
-
-    session_state（会话状态）用于读取 intake。返回值包含待补字段、中文标签和已解析字段，
-    供探索 Worker 在问题中避开已填写信息。
-    """
+    """把初探信息表整理成 Worker 上下文。"""
     intake = resolve_explore_intake(session_state)
     pending = list(intake.get("pending_fields") or [])
     return {
@@ -85,11 +69,7 @@ def worker_context_from_intake(
 
 
 def is_explore_route(result: dict[str, Any]) -> bool:
-    """判断路由结果是否属于 pipeline 的探索阶段。
-
-    result（分析结果）提供 list_type、pipeline_phase 和 workers。返回值为 True 表示需要套用
-    初探 intake 规则。
-    """
+    """判断路由结果是否属于 pipeline 的探索阶段。"""
     # 只有 pipeline 列表才走新的初探表单约束。
     if result.get("list_type") != "pipeline":
         return False
@@ -109,11 +89,7 @@ def _gate_flags(session_state: dict[str, Any]) -> dict[str, Any]:
 
 
 def _deep_explore_completed(session_state: dict[str, Any]) -> bool:
-    """判断深度职业初探是否已经完成。
-
-    session_state（会话状态）先检查本会话完成标记、探索闭环和 gate flags；
-    都没有时再回退到 profile.exploration.completed_at。
-    """
+    """判断深度职业初探是否已经完成。"""
     # 当前会话已有完成时间，说明本轮或历史已经完成探索。
     if session_state.get("explore_completed_at"):
         return True
@@ -130,11 +106,7 @@ def _deep_explore_completed(session_state: dict[str, Any]) -> bool:
 
 
 def needs_repeat_intake(session_state: dict[str, Any]) -> bool:
-    """判断重复初探是否需要重新填写信息表。
-
-    session_state（会话状态）提供探索完成状态和 gates.flags。
-    返回值为 True 表示用户接受重新初探后，还没有提交新的 intake 信息表。
-    """
+    """判断重复初探是否需要重新填写信息表。"""
     # 没有完成过深度探索时，不存在“重复初探”语义。
     if not _deep_explore_completed(session_state):
         return False
@@ -155,12 +127,7 @@ def enforce_explore_intake(
     result: dict[str, Any],
     session_state: dict[str, Any],
 ) -> dict[str, Any]:
-    """对探索路由强制执行 intake 信息表规则。
-
-    result（分析结果）是候选 Worker 路由；session_state（会话状态）提供 intake、
-    gates 和探索完成状态。返回值可能保留原路由，也可能清空 workers 并标记
-    explore_intake_blocked 或 explore_repeat_blocked。
-    """
+    """对探索路由强制执行 intake 信息表规则。"""
     # 非探索路由不受 intake 规则影响，原样返回。
     if not is_explore_route(result):
         return result

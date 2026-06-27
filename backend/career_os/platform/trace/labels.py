@@ -99,11 +99,7 @@ ERROR_CODE_ZH: dict[str, str] = {
 
 
 def _tag(value: str | None, mapping: dict[str, str]) -> str | None:
-    """_tag（内部函数 tag）的函数说明。
-
-    value（参数）、mapping（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """处理tag。"""
     if value is None:
         return None
     label = mapping.get(value)
@@ -113,11 +109,7 @@ def _tag(value: str | None, mapping: dict[str, str]) -> str | None:
 
 
 def _annotate_detail(detail: dict[str, Any]) -> dict[str, str]:
-    """_annotate_detail（内部函数 annotate detail）的函数说明。
-
-    detail（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """处理annotate detail。"""
     out: dict[str, str] = {}
     for key, raw in detail.items():
         key_label = DETAIL_KEY_ZH.get(key, key)
@@ -146,11 +138,7 @@ def _annotate_detail(detail: dict[str, Any]) -> dict[str, str]:
 
 
 def build_trace_summary(record: dict[str, Any]) -> str:
-    """build_trace_summary（build trace summary）的函数说明。
-
-    record（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """构造trace summary。"""
     event = record.get("event") or ""
     event_zh = EVENT_ZH.get(event, event)
     parts = [event_zh]

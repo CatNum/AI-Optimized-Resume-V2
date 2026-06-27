@@ -20,52 +20,37 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class TaskStoreError:
-    """TaskStoreError（TaskStoreError）的项目代码结构说明。
+    """
+    TaskStoreError（任务存储错误）表示任务列表读写或状态操作失败。
+    """
 
-    该类封装当前模块中的一组相关状态或行为，供业务代码、测试代码或运行时流程复用。"""
-    code: str
-    message: str
+    code: str  # 错误码
+    message: str  # 错误消息
 
 
 class TaskStore:
-    """TaskStore（任务列表存储）负责读写 pipeline 任务列表。
-
-    每个 list_id 对应一个任务目录，包含 meta.json 和多个任务 JSON。
-    Agent 使用它记录当前 pipeline 阶段、里程碑任务和 work 任务状态。
+    """
+    TaskStore（任务列表存储）负责读写 pipeline 任务列表。
     """
 
     def __init__(self) -> None:
-        """__init__（初始化对象）的函数说明。
-
-        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+        """初始化对象。"""
         self._data_dir = Path(settings.data_dir)
         self._tasks_dir = self._data_dir / "tasks"
 
     def _list_dir(self, list_id: str) -> Path:
-        """_list_dir（内部函数 list dir）的函数说明。
-
-        list_id（参数）用于向该函数传入运行所需的数据。
-
-        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+        """列出dir。"""
         return self._tasks_dir / list_id
 
     def _meta_path(self, list_id: str) -> Path:
-        """_meta_path（内部函数 meta path）的函数说明。
-
-        list_id（参数）用于向该函数传入运行所需的数据。
-
-        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+        """处理meta path。"""
         return self._list_dir(list_id) / "meta.json"
 
     def _task_path(self, list_id: str, task_id: str) -> Path:
-        """_task_path（内部函数 task path）的函数说明。
-
-        list_id（参数）、task_id（参数）用于向该函数传入运行所需的数据。
-
-        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+        """处理task path。"""
         return self._list_dir(list_id) / f"{task_id}.json"
 
-    _DEPRECATED_LIST_TYPES = frozenset({"explore", "jd"})
+    _DEPRECATED_LIST_TYPES = frozenset({"explore", "jd"})  # 废弃列表类型集合
 
     def create_task_list(
         self,
@@ -75,11 +60,7 @@ class TaskStore:
         status: str = "active",
         current_phase: str | None = None,
     ) -> str | TaskStoreError:
-        """create_task_list（create task list）的函数说明。
-
-        session_id（参数）、list_type（参数）、status（参数）、current_phase（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """创建task list。"""
         if list_type in self._DEPRECATED_LIST_TYPES:
             return TaskStoreError(
                 "list_type_deprecated",
@@ -113,11 +94,7 @@ class TaskStore:
         return list_id
 
     def get_list_meta(self, list_id: str) -> dict[str, Any] | None:
-        """读取任务列表元数据。
-
-        list_id（列表标识）定位任务列表目录。返回值是 meta.json 内容；
-        如果列表不存在则返回 None。
-        """
+        """读取任务列表元数据。"""
         with _lock:
             meta_path = self._meta_path(list_id)
             if not meta_path.exists():
@@ -139,11 +116,7 @@ class TaskStore:
         blocked_by: str | None = None,
         requires_user_confirm: bool | None = None,
     ) -> dict[str, Any] | TaskStoreError:
-        """create_task（create task）的函数说明。
-
-        list_id（参数）、task_id（参数）、title（参数）、kind（参数）、worker_id（参数）、parent_milestone_id（参数）、pipeline_phase（参数）、description（参数） 等用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """创建task。"""
         with _lock:
             meta_path = self._meta_path(list_id)
             if not meta_path.exists():
@@ -181,11 +154,7 @@ class TaskStore:
         return task
 
     def get_task(self, list_id: str, task_id: str) -> dict[str, Any] | None:
-        """get_task（get task）的函数说明。
-
-        list_id（参数）、task_id（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """读取task。"""
         with _lock:
             task_path = self._task_path(list_id, task_id)
             if not task_path.exists():
@@ -193,11 +162,7 @@ class TaskStore:
             return self._read_json(task_path)
 
     def get_task_list(self, list_id: str) -> dict[str, Any] | None:
-        """get_task_list（get task list）的函数说明。
-
-        list_id（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """读取task list。"""
         with _lock:
             meta_path = self._meta_path(list_id)
             if not meta_path.exists():
@@ -207,20 +172,12 @@ class TaskStore:
             return meta
 
     def list_tasks(self, list_id: str) -> list[dict[str, Any]]:
-        """list_tasks（list tasks）的函数说明。
-
-        list_id（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """列出tasks。"""
         with _lock:
             return self._list_tasks_unlocked(list_id)
 
     def _list_tasks_unlocked(self, list_id: str) -> list[dict[str, Any]]:
-        """_list_tasks_unlocked（内部函数 list tasks unlocked）的函数说明。
-
-        list_id（参数）用于向该函数传入运行所需的数据。
-
-        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+        """列出tasks unlocked。"""
         list_dir = self._list_dir(list_id)
         if not list_dir.exists():
             return []
@@ -232,11 +189,7 @@ class TaskStore:
         return tasks
 
     def claim_task(self, list_id: str, task_id: str) -> TaskStoreError | dict[str, Any]:
-        """claim_task（claim task）的函数说明。
-
-        list_id（参数）、task_id（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """领取task。"""
         with _lock:
             err = self._ensure_mutable_list(list_id)
             if err:
@@ -250,11 +203,7 @@ class TaskStore:
             return task
 
     def complete_task(self, list_id: str, task_id: str) -> TaskStoreError | None:
-        """complete_task（complete task）的函数说明。
-
-        list_id（参数）、task_id（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """完成task。"""
         with _lock:
             task_path = self._task_path(list_id, task_id)
             if not task_path.exists():
@@ -275,11 +224,7 @@ class TaskStore:
             return None
 
     def patch_list_meta(self, list_id: str, fields: dict[str, Any]) -> TaskStoreError | None:
-        """patch_list_meta（patch list meta）的函数说明。
-
-        list_id（参数）、fields（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """补丁更新list meta。"""
         with _lock:
             meta_path = self._meta_path(list_id)
             if not meta_path.exists():
@@ -291,11 +236,7 @@ class TaskStore:
             return None
 
     def set_current_phase(self, list_id: str, phase: str) -> TaskStoreError | None:
-        """set_current_phase（set current phase）的函数说明。
-
-        list_id（参数）、phase（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """设置current phase。"""
         if phase not in PIPELINE_PHASES:
             return TaskStoreError("invalid_phase", f"Unknown pipeline phase: {phase}")
         with _lock:
@@ -312,11 +253,7 @@ class TaskStore:
             return None
 
     def clear_works_for_phase(self, list_id: str, phase: str) -> TaskStoreError | None:
-        """clear_works_for_phase（clear works for phase）的函数说明。
-
-        list_id（参数）、phase（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """清理works for phase。"""
         milestone_id = PHASE_TO_MILESTONE_ID.get(phase)
         if not milestone_id:
             return TaskStoreError("invalid_phase", f"Unknown pipeline phase: {phase}")
@@ -335,11 +272,7 @@ class TaskStore:
             return None
 
     def claim_first_work_for_phase(self, list_id: str, phase: str) -> dict[str, Any] | None:
-        """claim_first_work_for_phase（claim first work for phase）的函数说明。
-
-        list_id（参数）、phase（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """领取first work for phase。"""
         milestone_id = PHASE_TO_MILESTONE_ID.get(phase)
         if not milestone_id:
             return None
@@ -364,11 +297,7 @@ class TaskStore:
             return first
 
     def list_tasks_tree(self, list_id: str) -> dict[str, Any] | None:
-        """list_tasks_tree（list tasks tree）的函数说明。
-
-        list_id（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """列出tasks tree。"""
         with _lock:
             meta_path = self._meta_path(list_id)
             if not meta_path.exists():
@@ -420,11 +349,7 @@ class TaskStore:
             }
 
     def list_works_for_phase(self, list_id: str, phase: str) -> list[dict[str, Any]]:
-        """list_works_for_phase（list works for phase）的函数说明。
-
-        list_id（参数）、phase（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """列出works for phase。"""
         milestone_id = PHASE_TO_MILESTONE_ID.get(phase)
         if not milestone_id:
             return []
@@ -437,11 +362,7 @@ class TaskStore:
             ]
 
     def start_task_list(self, list_id: str) -> TaskStoreError | None:
-        """start_task_list（start task list）的函数说明。
-
-        list_id（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """启动task list。"""
         with _lock:
             meta_path = self._meta_path(list_id)
             if not meta_path.exists():
@@ -465,11 +386,7 @@ class TaskStore:
             return None
 
     def abandon_task_list(self, list_id: str) -> TaskStoreError | None:
-        """abandon_task_list（abandon task list）的函数说明。
-
-        list_id（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """废弃task list。"""
         with _lock:
             list_dir = self._list_dir(list_id)
             if not list_dir.exists():
@@ -481,11 +398,7 @@ class TaskStore:
             return None
 
     def get_active_list_id_for_session(self, session_id: str) -> str | None:
-        """get_active_list_id_for_session（get active list id for session）的函数说明。
-
-        session_id（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """读取active list id for session。"""
         with _lock:
             self.normalize_multi_active_for_session_unlocked(session_id)
             actives = self._find_active_metas_for_session_unlocked(session_id)
@@ -514,20 +427,12 @@ class TaskStore:
             return newest["list_id"]
 
     def normalize_multi_active_for_session(self, session_id: str) -> None:
-        """normalize_multi_active_for_session（normalize multi active for session）的函数说明。
-
-        session_id（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """规范化multi active for session。"""
         with _lock:
             self.normalize_multi_active_for_session_unlocked(session_id)
 
     def list_lists_for_session(self, session_id: str) -> list[dict[str, Any]]:
-        """list_lists_for_session（list lists for session）的函数说明。
-
-        session_id（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """列出lists for session。"""
         with _lock:
             self.normalize_multi_active_for_session_unlocked(session_id)
             if not self._tasks_dir.exists():
@@ -562,11 +467,7 @@ class TaskStore:
             ]
 
     def delete_lists_for_session(self, session_id: str) -> None:
-        """delete_lists_for_session（delete lists for session）的函数说明。
-
-        session_id（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """删除lists for session。"""
         with _lock:
             if not self._tasks_dir.exists():
                 return
@@ -587,11 +488,7 @@ class TaskStore:
     def _find_active_metas_for_session_unlocked(
         self, session_id: str
     ) -> list[dict[str, Any]]:
-        """_find_active_metas_for_session_unlocked（内部函数 find active metas for session unlocked）的函数说明。
-
-        session_id（参数）用于向该函数传入运行所需的数据。
-
-        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+        """查找active metas for session unlocked。"""
         if not self._tasks_dir.exists():
             return []
         actives: list[dict[str, Any]] = []
@@ -609,11 +506,7 @@ class TaskStore:
         return actives
 
     def normalize_multi_active_for_session_unlocked(self, session_id: str) -> None:
-        """normalize_multi_active_for_session_unlocked（normalize multi active for session unlocked）的函数说明。
-
-        session_id（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """规范化multi active for session unlocked。"""
         actives = self._find_active_metas_for_session_unlocked(session_id)
         if len(actives) <= 1:
             return
@@ -636,11 +529,7 @@ class TaskStore:
         )
 
     def _ensure_mutable_list(self, list_id: str) -> TaskStoreError | None:
-        """_ensure_mutable_list（内部函数 ensure mutable list）的函数说明。
-
-        list_id（参数）用于向该函数传入运行所需的数据。
-
-        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+        """确保mutable list。"""
         meta_path = self._meta_path(list_id)
         if not meta_path.exists():
             return TaskStoreError("list_not_found", f"List {list_id} not found")
@@ -651,21 +540,13 @@ class TaskStore:
 
     @staticmethod
     def _read_json(path: Path) -> dict[str, Any]:
-        """_read_json（内部函数 read json）的函数说明。
-
-        path（参数）用于向该函数传入运行所需的数据。
-
-        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+        """读取json。"""
         with path.open(encoding="utf-8") as f:
             return json.load(f)
 
     @staticmethod
     def _write_json(path: Path, data: dict[str, Any]) -> None:
-        """_write_json（内部函数 write json）的函数说明。
-
-        path（参数）、data（参数）用于向该函数传入运行所需的数据。
-
-        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+        """写入json。"""
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)

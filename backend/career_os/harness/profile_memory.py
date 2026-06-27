@@ -44,11 +44,7 @@ def resolve_profile_memory_sections(
     *,
     worker_id: str | None = None,
 ) -> list[str]:
-    """解析本轮 Worker 需要加载的 profile 记忆分区。
-
-    user_message（用户消息）先走关键词规则；session_state（会话状态）提供当前阶段；
-    worker_id（工作者标识）用于强制给 JD/简历链路加载简历。返回值是有序分区 id 列表。
-    """
+    """解析本轮 Worker 需要加载的 profile 记忆分区。"""
     # 第一层先用规则从用户消息中提取明显相关的记忆分区。
     found: set[str] = set(match_profile_memory_rules(user_message))
 
@@ -99,11 +95,7 @@ def _resume_payload(
     full_text: bool,
     intake_override: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """构造放入 profile_memory.resume 的简历负载。
-
-    profile（用户画像）提供 resume/basic/intent；full_text（是否全文）控制正文大小；
-    intake_override（intake 覆盖）用于优先使用会话内最新初探表单。
-    """
+    """构造放入 profile_memory.resume 的简历负载。"""
     resume = profile.get("resume") or {}
     exploration = profile.get("exploration") or {}
     intake = intake_override or exploration.get("intake") or {}
@@ -135,11 +127,7 @@ def _resume_payload(
 
 
 def _session_artifact_memory(session_state: dict[str, Any] | None) -> dict[str, Any]:
-    """读取当前会话和显式引用会话中的产物记忆。
-
-    session_state（会话状态）提供 session_id、prior_results 和 artifact_refs。
-    返回值优先使用当前会话 artifacts，其次回退到 prior_results 和显式引用产物。
-    """
+    """读取当前会话和显式引用会话中的产物记忆。"""
     state = session_state or {}
     prior = state.get("prior_results") or {}
     artifacts: dict[str, Any] = {}
@@ -190,13 +178,7 @@ def materialize_profile_memory(
     full_resume_text: bool = False,
     session_state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """按 section 加载本轮需要的档案记忆。
-
-    sections（档案切片列表）指定 resume、market、strategy 等逻辑区域；
-    full_resume_text（是否加载完整简历）控制简历正文是全文还是摘录；
-    session_state（会话状态）提供 session artifacts、prior_results 和 intake 覆盖信息。
-    返回值是可放入 LLM 上下文的 profile_memory（档案记忆）。
-    """
+    """按 section 加载本轮需要的档案记忆。"""
     # 没有需要加载的分区时，返回空 dict，调用方不会向上下文写 profile_memory。
     if not sections:
         return {}
@@ -245,13 +227,7 @@ def attach_profile_memory_to_context(
     *,
     worker_id: str | None = None,
 ) -> None:
-    """把本轮相关档案记忆附加到 Worker 上下文。
-
-    context（上下文字典）会被原地写入 profile_memory；
-    user_message（用户消息）用于判断需要哪些档案切片；
-    session_state（会话状态）提供当前阶段和会话产物；
-    worker_id（工作者标识）用于强制给 JD 链路 Worker 加载简历。
-    """
+    """把本轮相关档案记忆附加到 Worker 上下文。"""
     # 先解析需要哪些 profile 分区，再按 Worker 类型决定是否加载完整简历。
     sections = resolve_profile_memory_sections(
         user_message, session_state, worker_id=worker_id
@@ -267,11 +243,7 @@ def attach_profile_memory_to_context(
 
 
 def format_profile_memory_for_draft(memory: dict[str, Any]) -> str:
-    """把档案记忆格式化为合成草稿中的事实说明。
-
-    memory（档案记忆）是 materialize_profile_memory 的结果。
-    返回值是简短中文事实文本，帮助合成阶段避免说“没有简历”等事实错误。
-    """
+    """把档案记忆格式化为合成草稿中的事实说明。"""
     if not memory:
         return "（本轮未加载档案切片）"
     lines: list[str] = []

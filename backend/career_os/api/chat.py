@@ -43,31 +43,32 @@ orchestrator = ChatOrchestrator()
 
 
 class ChatRequest(BaseModel):
-    """ChatRequest（ChatRequest）的项目代码结构说明。
+    """
+    ChatRequest（聊天请求）承载前端发起一轮对话时提交的输入数据。
+    """
 
-    该类封装当前模块中的一组相关状态或行为，供业务代码、测试代码或运行时流程复用。"""
-    session_id: str | None = None
-    message: str
-    attachments: list[dict[str, Any]] | None = None
+    session_id: str | None = None  # 会话标识
+    message: str  # 用户消息
+    attachments: list[dict[str, Any]] | None = None  # 附件列表
 
 
 def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str] | None:
-    """_apply_pending_gate（内部函数 apply pending gate）的函数说明。
-
-    message（参数）、session_state（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """应用pending gate。"""
+    # 每轮先清理上一轮未理解 gate 的澄清标记，避免影响本轮匹配。
     session_state.pop("gate_clarify_pending", None)
     gates = dict(session_state.get("gates") or {})
     pending = gates.get("pending")
+    # 没有待确认 gate 时返回 None，让调用方继续走普通 Coordinator 路由。
     if not pending:
         return None
 
+    # 用户明确只想聊天时，不消费 gate，只标记后续合成走纯聊天回复。
     if is_chat_only_intent(message):
         session_state["chat_only_requested"] = True
         session_state["gates"] = gates
         return []
 
+    # 先用 gate 匹配器判断用户对 pending gate 是确认、拒绝还是不明确。
     match = match_gate_intent(
         message,
         pending,
@@ -79,6 +80,7 @@ def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str
     gate_name = match.get("gate_name") or pending.get("name")
 
     if match.get("matched") and match.get("intent") == "confirm":
+        # confirm 分支会按 gate 类型推进阶段、设置 flags 或返回需要立即派发的 Worker。
         gates["pending"] = None
         if gate_name == "optimize_confirm":
             flags["optimize_confirmed"] = True
@@ -128,6 +130,7 @@ def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str
         return []
 
     if match.get("matched") and match.get("intent") == "reject":
+        # reject 分支会关闭当前 gate；探索类 gate 还需要回退或固化对应阶段状态。
         gates["pending"] = None
         if gate_name == "explore_complete":
             reopen_explore_after_gate_reject(session_state, gates)
@@ -146,6 +149,7 @@ def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str
         return []
 
     if pending and not match.get("matched"):
+        # gate 存在但用户意图不明确时，交给 synthesize 输出澄清问题。
         session_state["gate_clarify_pending"] = True
         session_state["gates"] = gates
     return []
@@ -157,11 +161,8 @@ async def _chat_stream(
     begin: dict[str, Any],
     meta: dict[str, Any],
 ) -> AsyncIterator[str]:
-    """_chat_stream（内部函数 chat stream）的异步函数说明。
-
-    body（参数）、session_id（参数）、begin（参数）、meta（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """流式处理一轮聊天。"""
+    # 先加载会话状态，并把 profile 中已有的探索完成信息同步进当前 session。
     session_store = SessionStore()
     state = session_store.get_state(session_id)
     state["session_id"] = session_id
@@ -171,20 +172,24 @@ async def _chat_stream(
 
     yield format_sse("session", {"session_id": session_id})
 
+    # 如果上下文接近上限，先通过 SSE 提醒前端建议用户开新会话。
     if begin.get("recommend_new_session"):
         yield format_sse(
             "history_notice",
             orchestrator.context_usage_payload(meta),
         )
 
+    # 附件会先转换成请求上下文和增强后的用户消息，再一起进入 Coordinator。
     user_message = enrich_user_message_with_attachments(body.message, body.attachments)
     session_store.append_message(session_id, "user", user_message)
     chat_history, meta = session_store.load_chat_history(session_id)
+    # pending gate 优先消费；没有 gate 时 pending 为空队列，后续由 Coordinator 自行分析。
     pending = _apply_pending_gate(body.message, state)
     if pending is None:
         pending = []
     request_context = build_request_context_from_attachments(body.attachments)
 
+    # Coordinator 负责本轮路由、Worker 委托和确定性合成草稿。
     result = run_coordinator_turn(
         harness,
         session_id=session_id,
@@ -198,6 +203,7 @@ async def _chat_stream(
     )
     session_store.update_state(session_id, result["session_state"])
 
+    # 初探信息缺失时，通过专门事件告诉前端需要展示 intake 表单。
     if result["session_state"].get("explore_intake_blocked") and compute_needs_full_explore(
         profile, result["session_state"]
     ):
@@ -205,6 +211,7 @@ async def _chat_stream(
 
     draft = result.get("synthesis_draft") or result.get("synthesis_text") or "已完成处理。"
 
+    # LLM 可用时用 draft + 上下文润色最终回复；不可用时直接把 draft 分块流式返回。
     if llm_enabled():
         from career_os.platform.store.session import slice_synthesize_chat_history
 
@@ -227,6 +234,7 @@ async def _chat_stream(
         async for chunk in stream_tokens(text):
             yield chunk
 
+    # 回复完成后写入 assistant 消息，再输出 done 事件和上下文使用情况。
     session_store.append_message(session_id, "assistant", text)
 
     _, meta_after = session_store.load_chat_history(session_id)
@@ -239,21 +247,20 @@ async def _chat_stream(
 
 @router.post("/chat")
 async def chat(body: ChatRequest):
-    """chat（chat）的异步函数说明。
-
-    body（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """处理聊天请求。"""
+    # 先合并文本和附件内容；二者都为空时直接拒绝请求。
     user_message = enrich_user_message_with_attachments(body.message, body.attachments)
     if not user_message.strip():
         raise HTTPException(status_code=400, detail="message_or_attachment_required")
 
+    # 没有传 session_id 时创建新会话；随后加载会话状态和历史元数据。
     session_store = SessionStore()
     session_id = body.session_id or session_store.create_session()
     state = session_store.get_state(session_id)
     state["session_id"] = session_id
     _, meta = session_store.load_chat_history(session_id)
     begin = orchestrator.begin_chat(session_id, state, meta)
+    # 同一会话已有流式响应未结束时，返回 409，避免并发写状态。
     if hasattr(begin, "code"):
         if begin.code == "chat_in_progress":
             raise HTTPException(status_code=409, detail={"code": begin.code, "message": begin.message})

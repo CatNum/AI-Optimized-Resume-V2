@@ -9,11 +9,7 @@ from career_os.platform.store.task import TaskStore
 
 
 def jd_fingerprint(jd_text: str) -> str:
-    """jd_fingerprint（jd fingerprint）的函数说明。
-
-    jd_text（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """处理jd fingerprint。"""
     normalized = jd_text.strip()
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
 
@@ -24,11 +20,7 @@ def apply_jd_fingerprint_change(
     new_fingerprint: str,
     session_state: dict[str, Any],
 ) -> PipelineGateError | dict[str, Any]:
-    """apply_jd_fingerprint_change（apply jd fingerprint change）的函数说明。
-
-    session_id（参数）、list_id（参数）、new_fingerprint（参数）、session_state（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """应用jd fingerprint change。"""
     store = TaskStore()
     meta = store.get_list_meta(list_id)
     if not meta:

@@ -10,11 +10,7 @@ from tests.conftest import seed_explore_intake_profile
 
 @pytest.fixture
 def isolated_stores(tmp_path, monkeypatch):
-    """isolated_stores（isolated stores）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """构造测试环境和基础状态。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.profile as profile_mod
@@ -33,11 +29,7 @@ def isolated_stores(tmp_path, monkeypatch):
 def test_instantiate_pipeline_creates_five_milestone_files(
     isolated_stores, tmp_path, monkeypatch
 ):
-    """test_instantiate_pipeline_creates_five_milestone_files（测试 instantiate pipeline creates five milestone files）的函数说明。
-
-    isolated_stores（参数）、tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 instantiate pipeline creates five milestone files 场景。"""
     pipeline_mod, profile_mod, session_mod, _task_mod = isolated_stores
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     session_id = session_mod.SessionStore().create_session()
@@ -55,11 +47,7 @@ def test_instantiate_pipeline_creates_five_milestone_files(
 def test_instantiate_pipeline_remains_in_explore_when_profile_is_fresh(
     isolated_stores, tmp_path, monkeypatch
 ):
-    """test_instantiate_pipeline_remains_in_explore_when_profile_is_fresh（测试 instantiate pipeline remains in explore when profile is fresh）的函数说明。
-
-    isolated_stores（参数）、tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 instantiate pipeline remains in explore when profile is fresh 场景。"""
     pipeline_mod, profile_mod, session_mod, _task_mod = isolated_stores
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     profile = seed_explore_intake_profile(profile_mod.ProfileStore())

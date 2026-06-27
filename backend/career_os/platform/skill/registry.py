@@ -7,50 +7,50 @@ from typing import Any
 
 @dataclass
 class SkillIndexEntry:
-    """SkillIndexEntry（SkillIndexEntry）的项目代码结构说明。
+    """
+    SkillIndexEntry（技能索引项）描述一个可被发现的 Skill 摘要信息。
+    """
 
-    该类封装当前模块中的一组相关状态或行为，供业务代码、测试代码或运行时流程复用。"""
-    name: str
-    description: str
-    when_to_use: list[str]
-    allowed_workers: list[str]
-    modes: list[str]
+    name: str  # 名称
+    description: str  # 描述
+    when_to_use: list[str]  # 适用场景
+    allowed_workers: list[str]  # 允许使用的 Worker
+    modes: list[str]  # 技能模式列表
 
 
 @dataclass
 class SkillBundle:
-    """SkillBundle（SkillBundle）的项目代码结构说明。
+    """
+    SkillBundle（技能包）承载加载后的 Skill 正文、模式和访问约束。
+    """
 
-    该类封装当前模块中的一组相关状态或行为，供业务代码、测试代码或运行时流程复用。"""
-    name: str
-    mode: str | None
-    body: str
-    attachments: list[str]
-    hash: str
-    allowed_workers: list[str]
+    name: str  # 名称
+    mode: str | None  # 模式
+    body: str  # 正文内容
+    attachments: list[str]  # 附件列表
+    hash: str  # 内容哈希
+    allowed_workers: list[str]  # 允许使用的 Worker
 
 
 @dataclass
 class SkillRegistryError:
-    """SkillRegistryError（SkillRegistryError）的项目代码结构说明。
+    """
+    SkillRegistryError（技能注册表错误）表示 Skill 发现或加载失败。
+    """
 
-    该类封装当前模块中的一组相关状态或行为，供业务代码、测试代码或运行时流程复用。"""
-    code: str
-    message: str
+    code: str  # 错误码
+    message: str  # 错误消息
 
 
 class SkillRegistry:
-    """SkillRegistry（SkillRegistry）的项目代码结构说明。
+    """
+    SkillRegistry（技能注册表）负责发现、索引和加载本地 Skill。
+    """
 
-    该类封装当前模块中的一组相关状态或行为，供业务代码、测试代码或运行时流程复用。"""
-    _FRONT_MATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
+    _FRONT_MATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)  # front matter 正则
 
     def __init__(self, skills_dir: Path | None = None) -> None:
-        """__init__（初始化对象）的函数说明。
-
-        skills_dir（参数）用于向该函数传入运行所需的数据。
-
-        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+        """初始化对象。"""
         self._repo_root = self._find_repo_root()
         self._skills_dir = skills_dir or (self._repo_root / ".agent" / "skills")
         self._entries: dict[str, SkillIndexEntry] = {}
@@ -60,9 +60,7 @@ class SkillRegistry:
 
     @staticmethod
     def _find_repo_root() -> Path:
-        """_find_repo_root（内部函数 find repo root）的函数说明。
-
-        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+        """查找repo root。"""
         current = Path(__file__).resolve()
         for parent in current.parents:
             if (parent / ".agent" / "skills").exists():
@@ -70,9 +68,7 @@ class SkillRegistry:
         return current.parents[4]
 
     def reload(self) -> None:
-        """reload（reload）的函数说明。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """处理reload。"""
         self._entries.clear()
         self._skill_paths.clear()
         self._mode_workers.clear()
@@ -114,9 +110,7 @@ class SkillRegistry:
                 }
 
     def list_skills(self) -> list[SkillIndexEntry]:
-        """list_skills（list skills）的函数说明。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """列出skills。"""
         return list(self._entries.values())
 
     def load_skill(
@@ -126,11 +120,7 @@ class SkillRegistry:
         mode: str | None = None,
         worker_id: str | None = None,
     ) -> SkillBundle | SkillRegistryError:
-        """load_skill（load skill）的函数说明。
-
-        name（参数）、mode（参数）、worker_id（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """加载skill。"""
         skill_path = self._skill_paths.get(name)
         if skill_path is None:
             return SkillRegistryError("skill_not_found", f"Skill {name} not found")
@@ -156,11 +146,7 @@ class SkillRegistry:
     def _allowed_workers_for_mode(
         self, name: str, mode: str | None, meta: dict[str, Any]
     ) -> list[str]:
-        """_allowed_workers_for_mode（内部函数 allowed workers for mode）的函数说明。
-
-        name（参数）、mode（参数）、meta（参数）用于向该函数传入运行所需的数据。
-
-        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+        """处理allowed workers for mode。"""
         if mode:
             mode_workers = self._mode_workers.get(name, {})
             return list(mode_workers.get(mode, []))
@@ -174,11 +160,7 @@ class SkillRegistry:
         return list(self._entries.get(name, SkillIndexEntry("", "", [], [], [])).allowed_workers)
 
     def _parse_skill_file(self, path: Path) -> tuple[dict[str, Any], str]:
-        """_parse_skill_file（内部函数 parse skill file）的函数说明。
-
-        path（参数）用于向该函数传入运行所需的数据。
-
-        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+        """解析skill file。"""
         text = path.read_text(encoding="utf-8")
         match = self._FRONT_MATTER_RE.match(text)
         if not match:
@@ -190,11 +172,7 @@ class SkillRegistry:
 
     @staticmethod
     def _parse_simple_yaml(text: str) -> dict[str, Any]:
-        """_parse_simple_yaml（内部函数 parse simple yaml）的函数说明。
-
-        text（参数）用于向该函数传入运行所需的数据。
-
-        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+        """解析simple yaml。"""
         result: dict[str, Any] = {}
         current_key: str | None = None
         current_mode: str | None = None
@@ -245,11 +223,7 @@ class SkillRegistry:
 
     @staticmethod
     def _parse_inline_list(value: str) -> list[str]:
-        """_parse_inline_list（内部函数 parse inline list）的函数说明。
-
-        value（参数）用于向该函数传入运行所需的数据。
-
-        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+        """解析inline list。"""
         value = value.strip()
         if value.startswith("[") and value.endswith("]"):
             inner = value[1:-1].strip()

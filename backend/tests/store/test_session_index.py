@@ -1,9 +1,5 @@
 def test_touch_index_on_create(tmp_path, monkeypatch):
-    """test_touch_index_on_create（测试 touch index on create）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 touch index on create 场景。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -27,11 +23,7 @@ def test_touch_index_on_create(tmp_path, monkeypatch):
 
 
 def test_touch_index_updates_preview_and_count(tmp_path, monkeypatch):
-    """test_touch_index_updates_preview_and_count（测试 touch index updates preview and count）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 touch index updates preview and count 场景。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -63,11 +55,7 @@ def test_touch_index_updates_preview_and_count(tmp_path, monkeypatch):
 
 
 def _reload_session_store(tmp_path, monkeypatch):
-    """_reload_session_store（内部函数 reload session store）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """构造测试环境和基础状态。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -80,11 +68,7 @@ def _reload_session_store(tmp_path, monkeypatch):
 
 
 def test_rebuild_index_from_disk_dirs(tmp_path, monkeypatch):
-    """test_rebuild_index_from_disk_dirs（测试 rebuild index from disk dirs）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 rebuild index from disk dirs 场景。"""
     s = _reload_session_store(tmp_path, monkeypatch)
     session_id = "sess_" + "a" * 32
     session_dir = tmp_path / "sessions" / session_id
@@ -110,11 +94,7 @@ def test_rebuild_index_from_disk_dirs(tmp_path, monkeypatch):
 
 
 def test_rebuild_prunes_orphan_index_entries(tmp_path, monkeypatch):
-    """test_rebuild_prunes_orphan_index_entries（测试 rebuild prunes orphan index entries）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 rebuild prunes orphan index entries 场景。"""
     s = _reload_session_store(tmp_path, monkeypatch)
     orphan_id = "sess_" + "0" * 32
     real_id = "sess_" + "1" * 32
@@ -158,11 +138,7 @@ def test_rebuild_prunes_orphan_index_entries(tmp_path, monkeypatch):
 
 
 def test_delete_session_removes_dir_index_and_tasks(tmp_path, monkeypatch):
-    """test_delete_session_removes_dir_index_and_tasks（测试 delete session removes dir index and tasks）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 delete session removes dir index and tasks 场景。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 

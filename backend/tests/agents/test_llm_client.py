@@ -5,11 +5,7 @@ from career_os.agents.lc.models import LLMRole
 
 
 def test_invoke_text_uses_litellm(monkeypatch):
-    """test_invoke_text_uses_litellm（测试 invoke text uses litellm）的函数说明。
-
-    monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 invoke text uses litellm 场景。"""
     monkeypatch.setenv("LLM_PROVIDER", "deepseek")
     monkeypatch.setenv("LLM_API_KEY", "test-key")
 

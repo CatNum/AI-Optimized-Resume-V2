@@ -14,22 +14,17 @@ _lock = threading.Lock()
 
 
 class TraceWriter:
-    """TraceWriter（TraceWriter）的项目代码结构说明。
+    """
+    TraceWriter（追踪写入器）负责写入和读取本地 JSONL trace 事件。
+    """
 
-    该类封装当前模块中的一组相关状态或行为，供业务代码、测试代码或运行时流程复用。"""
     def __init__(self, logs_dir: Path | None = None) -> None:
-        """__init__（初始化对象）的函数说明。
-
-        logs_dir（参数）用于向该函数传入运行所需的数据。
-
-        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+        """初始化对象。"""
         self._logs_dir = Path(logs_dir or settings.data_dir) / "logs" / "traces"
         self._logs_dir.mkdir(parents=True, exist_ok=True)
 
     def _path_for_today(self) -> Path:
-        """_path_for_today（内部函数 path for today）的函数说明。
-
-        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+        """处理path for today。"""
         day = datetime.now(UTC).strftime("%Y-%m-%d")
         return self._logs_dir / f"{day}.jsonl"
 
@@ -46,11 +41,7 @@ class TraceWriter:
         latency_ms: int | None = None,
         detail: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """emit（emit）的函数说明。
-
-        event（参数）、session_id（参数）、run_id（参数）、worker_id（参数）、tool_name（参数）、actor（参数）、status（参数）、latency_ms（参数） 等用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """处理emit。"""
         record = annotate_trace_record(
             {
                 "ts": datetime.now(UTC).isoformat(),
@@ -71,11 +62,7 @@ class TraceWriter:
         return record
 
     def read_events(self, day: str | None = None) -> list[dict[str, Any]]:
-        """read_events（read events）的函数说明。
-
-        day（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """读取events。"""
         target = self._logs_dir / f"{day or datetime.now(UTC).strftime('%Y-%m-%d')}.jsonl"
         if not target.exists():
             return []
@@ -98,19 +85,11 @@ def timed_emit(
     worker_id: str | None = None,
     detail: dict[str, Any] | None = None,
 ) -> Callable[[], None]:
-    """timed_emit（timed emit）的函数说明。
-
-    writer（参数）、event（参数）、session_id（参数）、actor（参数）、tool_name（参数）、worker_id（参数）、detail（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """记录带耗时的 trace 事件。"""
     started = time.perf_counter()
 
     def finalize(status: str = "ok") -> None:
-        """finalize（finalize）的函数说明。
-
-        status（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """结束计时并写入 trace 事件。"""
         latency_ms = int((time.perf_counter() - started) * 1000)
         writer.emit(
             event,

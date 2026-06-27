@@ -18,20 +18,16 @@ from career_os.platform.store.task import TaskStore, TaskStoreError
 
 @dataclass
 class PipelineGateError:
-    """表示 pipeline gate 或阶段操作失败。
-
-    code（错误码）用于程序判断失败类型；message（错误消息）用于 trace 或上层提示。
     """
-    code: str
-    message: str
+    PipelineGateError（流程门禁错误）表示 pipeline gate 或阶段操作失败。
+    """
+
+    code: str  # 错误码
+    message: str  # 错误消息
 
 
 def is_explore_gate_confirmed(session_state: dict[str, Any]) -> bool:
-    """判断探索完成 gate 是否已经确认。
-
-    session_state（会话状态）可能在顶层或 gates.flags 中保存确认标记。
-    返回值为 True 表示可以离开 explore 阶段。
-    """
+    """判断探索完成 gate 是否已经确认。"""
     if session_state.get("explore_gate_confirmed"):
         return True
     flags = (session_state.get("gates") or {}).get("flags") or {}
@@ -39,11 +35,7 @@ def is_explore_gate_confirmed(session_state: dict[str, Any]) -> bool:
 
 
 def set_explore_gate_confirmed(session_state: dict[str, Any], value: bool) -> None:
-    """同步设置探索完成 gate 确认标记。
-
-    session_state（会话状态）会被原地更新；value（确认值）同时写入顶层
-    explore_gate_confirmed 和 gates.flags.explore_gate_confirmed。
-    """
+    """同步设置探索完成 gate 确认标记。"""
     session_state["explore_gate_confirmed"] = value
     gates = dict(session_state.get("gates") or {})
     flags = dict(gates.get("flags") or {})
@@ -53,11 +45,7 @@ def set_explore_gate_confirmed(session_state: dict[str, Any], value: bool) -> No
 
 
 def compute_hard_pass(profile: dict[str, Any]) -> tuple[bool, list[str]]:
-    """计算用户画像是否满足硬性通过条件。
-
-    profile（用户画像）提供 intake、简历、基础信息和求职意向。返回值是
-    (是否通过, 未通过原因列表)。
-    """
+    """计算用户画像是否满足硬性通过条件。"""
     reasons: list[str] = []
     exploration = profile.get("exploration") or {}
     intake = exploration.get("intake") or {}
@@ -83,11 +71,7 @@ def compute_hard_pass(profile: dict[str, Any]) -> tuple[bool, list[str]]:
 
 
 def never_explored(profile: dict[str, Any]) -> bool:
-    """判断用户是否从未完成过职业初探。
-
-    profile（用户画像）提供 exploration.completed_at 和 intake_baseline。
-    返回值为 True 表示没有完成时间，也没有历史初探基线。
-    """
+    """判断用户是否从未完成过职业初探。"""
     exploration = profile.get("exploration") or {}
     if exploration.get("completed_at"):
         return False
@@ -140,12 +124,7 @@ def _session_has_explore_completion(session_state: dict[str, Any]) -> bool:
 def compute_needs_full_explore(
     profile: dict[str, Any], session_state: dict[str, Any]
 ) -> bool:
-    """判断是否需要重新走完整职业初探。
-
-    profile（用户画像）提供 exploration、resume、intent 等持久化信息；
-    session_state（会话状态）提供本会话的探索完成标记和 gates.flags。
-    返回值为 True 表示画像过旧、信息变化或从未完成初探，需要先回到 explore。
-    """
+    """判断是否需要重新走完整职业初探。"""
     # 当前会话已经确认完成探索时，不需要再看 profile 是否过期。
     if _session_has_explore_completion(session_state):
         return False
@@ -176,11 +155,7 @@ def compute_needs_full_explore(
 
 
 def clear_gate_flags_for_jump(target_phase: str, session_state: dict[str, Any]) -> None:
-    """阶段跳转前清理不再适用的 gate flags。
-
-    target_phase（目标阶段）决定要清理哪些确认标记；
-    session_state（会话状态）会被原地更新，避免旧 gate 影响新阶段。
-    """
+    """阶段跳转前清理不再适用的 gate flags。"""
     gates = dict(session_state.get("gates") or {})
     flags = dict(gates.get("flags") or {})
     pending = gates.get("pending")
@@ -228,11 +203,7 @@ def clear_gate_flags_for_jump(target_phase: str, session_state: dict[str, Any]) 
 def validate_jump_target(
     target_phase: str, session_state: dict[str, Any]
 ) -> PipelineGateError | None:
-    """校验目标阶段是否允许被显式跳转。
-
-    target_phase（目标阶段）必须在允许跳转集合中；session_state（会话状态）用于检查
-    explore gate 是否确认。返回 None 表示允许跳转，否则返回 PipelineGateError。
-    """
+    """校验目标阶段是否允许被显式跳转。"""
     # resume_optimize 只能通过 optimize_confirm 后的 advance_current_phase 进入，不能直接跳转。
     if target_phase == "resume_optimize":
         return PipelineGateError(
@@ -256,12 +227,7 @@ def jump_to_phase(
     target_phase: str,
     session_state: dict[str, Any],
 ) -> PipelineGateError | dict[str, Any]:
-    """执行 pipeline 显式阶段跳转。
-
-    session_id（会话标识）用于回写会话状态；list_id（列表标识）定位任务列表；
-    target_phase（目标阶段）是要跳到的阶段；session_state（会话状态）会同步清理 gate。
-    返回值是跳转结果，或 PipelineGateError。
-    """
+    """执行 pipeline 显式阶段跳转。"""
     # 先校验目标阶段是否合法，以及是否满足离开 explore 的 gate 约束。
     err = validate_jump_target(target_phase, session_state)
     if err:
@@ -308,11 +274,7 @@ def jump_to_phase(
 def ensure_milestone_works(
     list_id: str, phase: str, *, session_state: dict[str, Any] | None = None
 ) -> dict[str, Any] | PipelineGateError:
-    """确保当前阶段存在可领取的 work 任务。
-
-    list_id（列表标识）定位 pipeline 任务列表；phase（阶段）必须等于列表当前阶段；
-    session_state（会话状态）用于检查优化确认。返回值包含 created 和 claimed_work。
-    """
+    """确保当前阶段存在可领取的 work 任务。"""
     store = TaskStore()
     meta = store.get_list_meta(list_id)
     if not meta or meta.get("list_type") != "pipeline":
@@ -386,12 +348,7 @@ def advance_current_phase(
     target_phase: str,
     session_state: dict[str, Any],
 ) -> PipelineGateError | dict[str, Any]:
-    """从当前阶段向 resume_optimize 做受控推进。
-
-    session_id（会话标识）用于持久化会话状态；list_id（列表标识）定位任务列表；
-    target_phase（目标阶段）当前只允许 resume_optimize；session_state（会话状态）
-    必须包含 optimize_confirmed。返回值是推进结果或 PipelineGateError。
-    """
+    """从当前阶段向 resume_optimize 做受控推进。"""
     # 该函数只服务“策略确认后进入简历优化”，其他阶段推进走普通阶段切换。
     if target_phase != "resume_optimize":
         return PipelineGateError(
@@ -452,12 +409,7 @@ def apply_proposed_work_tasks(
     proposals: list[dict[str, Any]],
     session_state: dict[str, Any],
 ) -> PipelineGateError | dict[str, Any]:
-    """把 Worker 提议的 work 任务写入当前 pipeline 阶段。
-
-    list_id（列表标识）定位任务列表；proposals（任务提议列表）提供待创建 work；
-    session_state（会话状态）用于读取当前阶段。返回值包含 created 和 claimed_work，
-    或返回 PipelineGateError。
-    """
+    """把 Worker 提议的 work 任务写入当前 pipeline 阶段。"""
     store = TaskStore()
     meta = store.get_list_meta(list_id)
     if not meta or meta.get("list_type") != "pipeline":

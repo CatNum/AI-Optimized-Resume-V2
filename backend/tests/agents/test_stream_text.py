@@ -4,11 +4,7 @@ from career_os.agents.lc.client import stream_text
 
 
 def test_stream_text_yields_deltas(monkeypatch):
-    """test_stream_text_yields_deltas（测试 stream text yields deltas）的函数说明。
-
-    monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 stream text yields deltas 场景。"""
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     import career_os.agents.lc.models as models_mod
 

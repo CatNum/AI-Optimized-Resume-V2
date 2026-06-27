@@ -84,16 +84,12 @@ EMPTY_PROFILE: dict[str, Any] = {
 
 
 class ProfileStore:
-    """ProfileStore（用户画像存储）负责读写 profile.json。
-
-    profile.json 保存 basic、intent、exploration、resume、market、strategy 等长期档案。
-    该类提供按路径读取和受限 patch 写入能力，避免 Worker 随意改写敏感区域。
+    """
+    ProfileStore（用户画像存储）负责读写 profile.json。
     """
 
     def __init__(self) -> None:
-        """__init__（初始化对象）的函数说明。
-
-        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+        """初始化对象。"""
         self._data_dir = Path(settings.data_dir)
         self._profile_path = self._data_dir / "profile.json"
 
@@ -106,29 +102,19 @@ class ProfileStore:
         return True
 
     def _load(self) -> dict[str, Any]:
-        """_load（内部函数 load）的函数说明。
-
-        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+        """处理load。"""
         self.ensure_empty_profile()
         with self._profile_path.open(encoding="utf-8") as f:
             return json.load(f)
 
     def _save(self, data: dict[str, Any]) -> None:
-        """_save（内部函数 save）的函数说明。
-
-        data（参数）用于向该函数传入运行所需的数据。
-
-        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+        """处理save。"""
         self._data_dir.mkdir(parents=True, exist_ok=True)
         with self._profile_path.open("w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
     def get(self, paths: list[str]) -> dict[str, Any]:
-        """按路径读取用户画像片段。
-
-        paths（路径列表）是 profile.json 中要读取的顶层或点分路径。
-        返回值是只包含请求路径的 dict，用于给 Agent/Worker 提供最小必要档案。
-        """
+        """按路径读取用户画像片段。"""
         with _lock:
             data = self._load()
             result: dict[str, Any] = {}
@@ -138,11 +124,7 @@ class ProfileStore:
             return result
 
     def patch(self, patches: list[dict[str, Any]]) -> None:
-        """按补丁写入用户画像。
-
-        patches（补丁列表）每项包含 path、value、op；当前只处理 op=set。
-        该方法会先校验路径权限，再写回 profile.json。
-        """
+        """按补丁写入用户画像。"""
         with _lock:
             data = self._load()
             for patch in patches:
@@ -156,11 +138,7 @@ class ProfileStore:
 
 
 def _validate_patch_path(path: str, value: Any) -> None:
-    """_validate_patch_path（内部函数 validate patch path）的函数说明。
-
-    path（参数）、value（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """校验patch path。"""
     if path == "outputs_index":
         _validate_outputs_index(value)
         return
@@ -183,11 +161,7 @@ def _validate_patch_path(path: str, value: Any) -> None:
 
 
 def _validate_outputs_index(value: Any) -> None:
-    """_validate_outputs_index（内部函数 validate outputs index）的函数说明。
-
-    value（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """校验outputs index。"""
     if not isinstance(value, list):
         raise ValueError("profile_path_forbidden:outputs_index")
     for idx, item in enumerate(value):
@@ -198,11 +172,7 @@ def _validate_outputs_index(value: Any) -> None:
 
 
 def _get_by_path(data: dict[str, Any], path: str) -> Any:
-    """_get_by_path（内部函数 get by path）的函数说明。
-
-    data（参数）、path（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """读取by path。"""
     current: Any = data
     for key in path.split("."):
         if not isinstance(current, dict) or key not in current:
@@ -212,11 +182,7 @@ def _get_by_path(data: dict[str, Any], path: str) -> Any:
 
 
 def _set_by_path(data: dict[str, Any], path: str, value: Any) -> None:
-    """_set_by_path（内部函数 set by path）的函数说明。
-
-    data（参数）、path（参数）、value（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """设置by path。"""
     keys = path.split(".")
     current = data
     for key in keys[:-1]:
@@ -227,11 +193,7 @@ def _set_by_path(data: dict[str, Any], path: str, value: Any) -> None:
 
 
 def _merge_path(target: dict[str, Any], path: str, value: Any) -> None:
-    """_merge_path（内部函数 merge path）的函数说明。
-
-    target（参数）、path（参数）、value（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """合并path。"""
     keys = path.split(".")
     current = target
     for key in keys[:-1]:

@@ -11,12 +11,7 @@ from career_os.platform.tool.handlers.resume_html import sort_optimization_level
 
 
 def _next_explore_phase_status(worker_id: str, session_state: dict[str, Any]) -> str:
-    """计算探索阶段的下一步状态。
-
-    worker_id（工作者标识）用于读取该 Worker 的 prior_results（历史结果）；
-    session_state（会话状态）保存上一轮 phase_status（阶段状态）。
-    返回值是 PHASE_IN_PROGRESS（进行中）或 PHASE_SEGMENT_COMPLETE（阶段完成）。
-    """
+    """计算探索阶段的下一步状态。"""
     prior = (session_state.get("prior_results") or {}).get(worker_id) or {}
     if prior.get("phase_status") == PHASE_IN_PROGRESS:
         return PHASE_SEGMENT_COMPLETE
@@ -31,15 +26,7 @@ def mock_run_worker_react(
     session_state: dict[str, Any],
     context: dict[str, Any],
 ) -> dict[str, Any]:
-    """运行确定性的 ReAct Worker mock。
-
-    harness（运行时工具门面）仍会执行必要的 profile_patch、write_resume_html 等工具；
-    worker_id（工作者标识）决定模拟 market/opportunity/resume 等哪条分支；
-    goal（目标）用于生成机会评估 fingerprint（指纹）等测试数据；
-    session_state（会话状态）提供 session_id、prior_results 和 list_type；
-    context（上下文）提供 gate、复用路径、优化等级等控制参数。
-    返回值是与真实 Worker 兼容的标准结果。
-    """
+    """运行确定性的 ReAct Worker mock。"""
     session_id = session_state.get("session_id")
 
     if worker_id == "market":

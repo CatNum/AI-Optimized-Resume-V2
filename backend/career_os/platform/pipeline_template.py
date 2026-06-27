@@ -13,16 +13,12 @@ from career_os.platform.store.task import TaskStore, TaskStoreError
 
 
 def repo_root() -> Path:
-    """repo_root（repo root）的函数说明。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """定位仓库根目录。"""
     return Path(__file__).resolve().parents[3]
 
 
 def load_pipeline_milestones() -> list[dict[str, Any]]:
-    """load_pipeline_milestones（load pipeline milestones）的函数说明。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """加载pipeline milestones。"""
     path = repo_root() / "config" / "pipeline_milestones.json"
     with path.open(encoding="utf-8") as f:
         return json.load(f)
@@ -32,11 +28,7 @@ def hydrate_explore_completion_from_sessions(
     profile_store: ProfileStore | None = None,
     session_store: SessionStore | None = None,
 ) -> bool:
-    """hydrate_explore_completion_from_sessions（hydrate explore completion from sessions）的函数说明。
-
-    profile_store（参数）、session_store（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """处理hydrate explore completion from sessions。"""
     profile_store = profile_store or ProfileStore()
     session_store = session_store or SessionStore()
     profile = profile_store.get(["exploration"])
@@ -84,11 +76,7 @@ def seed_session_explore_completion_from_profile(
     session_state: dict[str, Any],
     profile: dict[str, Any],
 ) -> bool:
-    """seed_session_explore_completion_from_profile（seed session explore completion from profile）的函数说明。
-
-    session_state（参数）、profile（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """写入初始session explore completion from profile。"""
     exploration = profile.get("exploration") or {}
     completed_at = exploration.get("completed_at")
     if not completed_at:
@@ -128,11 +116,7 @@ def seed_session_explore_completion_from_profile(
 
 
 def instantiate_pipeline_for_session(session_id: str) -> str | TaskStoreError:
-    """instantiate_pipeline_for_session（instantiate pipeline for session）的函数说明。
-
-    session_id（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """实例化pipeline for session。"""
     store = TaskStore()
     existing = store.get_active_list_id_for_session(session_id)
     if existing:

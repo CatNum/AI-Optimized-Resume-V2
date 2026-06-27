@@ -12,11 +12,7 @@ from tests.conftest import seed_jd_ready_profile
 
 @pytest.fixture(autouse=True)
 def _pin_settings_data_dir(tmp_path, monkeypatch):
-    """_pin_settings_data_dir（内部函数 pin settings data dir）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """构造测试辅助数据。"""
     import career_os.config as config_mod
 
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
@@ -25,11 +21,7 @@ def _pin_settings_data_dir(tmp_path, monkeypatch):
 
 @pytest.fixture
 def pipeline_ctx(tmp_path, monkeypatch):
-    """pipeline_ctx（pipeline ctx）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """构造测试环境和基础状态。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.pipeline_template as pipeline_mod
@@ -56,11 +48,7 @@ def pipeline_ctx(tmp_path, monkeypatch):
 
 
 def test_explore_flow_inactive_fixture_draft_not_forced(pipeline_ctx):
-    """test_explore_flow_inactive_fixture_draft_not_forced（测试 explore flow inactive fixture draft not forced）的函数说明。
-
-    pipeline_ctx（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 explore flow inactive fixture draft not forced 场景。"""
     session_id, list_id, task_mod, _ = pipeline_ctx
     task_mod.TaskStore().set_current_phase(list_id, "jd_analysis")
     session_state = {
@@ -79,20 +67,12 @@ def test_explore_flow_inactive_fixture_draft_not_forced(pipeline_ctx):
 
 
 def test_market_segment_complete_advances_current_phase(pipeline_ctx, tmp_path):
-    """test_market_segment_complete_advances_current_phase（测试 market segment complete advances current phase）的函数说明。
-
-    pipeline_ctx（参数）、tmp_path（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 market segment complete advances current phase 场景。"""
     session_id, list_id, task_mod, coordinator_mod = pipeline_ctx
     harness = Harness()
 
     def runner(worker_id, goal, session_state, context):
-        """runner（runner）的函数说明。
-
-        worker_id（参数）、goal（参数）、session_state（参数）、context（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """构造测试用 Worker runner。"""
         return {
             "worker_id": worker_id,
             "status": "completed",
@@ -124,11 +104,7 @@ def test_market_segment_complete_advances_current_phase(pipeline_ctx, tmp_path):
 
 
 def test_synthesize_not_explore_draft_when_gate_confirmed(pipeline_ctx):
-    """test_synthesize_not_explore_draft_when_gate_confirmed（测试 synthesize not explore draft when gate confirmed）的函数说明。
-
-    pipeline_ctx（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 synthesize not explore draft when gate confirmed 场景。"""
     session_id, list_id, task_mod, coordinator_mod = pipeline_ctx
     task_mod.TaskStore().set_current_phase(list_id, "jd_analysis")
     harness = Harness()

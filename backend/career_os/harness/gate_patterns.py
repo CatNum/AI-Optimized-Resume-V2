@@ -112,11 +112,7 @@ GATE_PATTERNS: list[tuple[str, str, list[str], list[str]]] = [
 
 
 def matches_explore_complete_affirmative(message: str) -> bool:
-    """matches_explore_complete_affirmative（matches explore complete affirmative）的函数说明。
-
-    message（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """处理matches explore complete affirmative。"""
     return any(
         re.search(pattern, message, re.IGNORECASE)
         for pattern in EXPLORE_COMPLETE_AFFIRMATIVE

@@ -10,11 +10,7 @@ from career_os.platform.store import task as task_mod
 
 @pytest.fixture
 def pipeline_env(tmp_path, monkeypatch, jd_ready_profile):
-    """pipeline_env（pipeline env）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）、jd_ready_profile（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """构造测试环境和基础状态。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.profile as profile_mod
@@ -29,11 +25,7 @@ def pipeline_env(tmp_path, monkeypatch, jd_ready_profile):
 
 
 def test_analyze_result_advances_phase_in_enforce(pipeline_env):
-    """test_analyze_result_advances_phase_in_enforce（测试 analyze result advances phase in enforce）的函数说明。
-
-    pipeline_env（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 analyze result advances phase in enforce 场景。"""
     session_id = "sess_chat_intent"
     list_id = instantiate_pipeline_for_session(session_id)
     task_mod.TaskStore().set_current_phase(list_id, "jd_analysis")

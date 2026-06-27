@@ -9,11 +9,7 @@ from career_os.agents.lc.models import (
 
 
 def test_deepseek_default_config(monkeypatch):
-    """test_deepseek_default_config（测试 deepseek default config）的函数说明。
-
-    monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 deepseek default config 场景。"""
     monkeypatch.setenv("LLM_PROVIDER", "deepseek")
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     monkeypatch.delenv("LLM_BASE_URL", raising=False)
@@ -35,11 +31,7 @@ def test_deepseek_default_config(monkeypatch):
 
 
 def test_custom_model_override(monkeypatch):
-    """test_custom_model_override（测试 custom model override）的函数说明。
-
-    monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 custom model override 场景。"""
     monkeypatch.setenv("LLM_PROVIDER", "deepseek")
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     monkeypatch.setenv("COORDINATOR_MODEL", "deepseek-reasoner")
@@ -53,18 +45,12 @@ def test_custom_model_override(monkeypatch):
 
 
 def test_full_litellm_model_passthrough():
-    """test_full_litellm_model_passthrough（测试 full litellm model passthrough）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 full litellm model passthrough 场景。"""
     assert to_litellm_model("deepseek", "deepseek/deepseek-chat") == "deepseek/deepseek-chat"
 
 
 def test_openai_compatible_custom_base_url(monkeypatch):
-    """test_openai_compatible_custom_base_url（测试 openai compatible custom base url）的函数说明。
-
-    monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 openai compatible custom base url 场景。"""
     monkeypatch.setenv("LLM_PROVIDER", "openai_compatible")
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     monkeypatch.setenv("LLM_BASE_URL", "https://gateway.example/v1")
@@ -80,11 +66,7 @@ def test_openai_compatible_custom_base_url(monkeypatch):
 
 
 def test_unknown_provider_raises(monkeypatch):
-    """test_unknown_provider_raises（测试 unknown provider raises）的函数说明。
-
-    monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 unknown provider raises 场景。"""
     monkeypatch.setenv("LLM_PROVIDER", "unknown-vendor")
 
     from career_os.agents.lc import models as models_mod

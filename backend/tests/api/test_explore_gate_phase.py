@@ -9,11 +9,7 @@ from tests.conftest import seed_explore_intake_profile
 
 @pytest.fixture
 def pipeline_session(tmp_path, monkeypatch):
-    """pipeline_session（pipeline session）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """构造测试环境和基础状态。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.profile as profile_mod
@@ -39,11 +35,7 @@ def pipeline_session(tmp_path, monkeypatch):
 
 
 def test_explore_complete_advances_to_market(pipeline_session, monkeypatch):
-    """test_explore_complete_advances_to_market（测试 explore complete advances to market）的函数说明。
-
-    pipeline_session（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 explore complete advances to market 场景。"""
     session_store, task_store, session_id, list_id = pipeline_session
     from career_os.api import chat as chat_mod
 
@@ -76,11 +68,7 @@ def test_explore_complete_advances_to_market(pipeline_session, monkeypatch):
 
 
 def test_explore_complete_question_does_not_advance_phase(pipeline_session, monkeypatch):
-    """test_explore_complete_question_does_not_advance_phase（测试 explore complete question does not advance phase）的函数说明。
-
-    pipeline_session（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 explore complete question does not advance phase 场景。"""
     session_store, task_store, session_id, list_id = pipeline_session
     from career_os.api import chat as chat_mod
 
@@ -109,11 +97,7 @@ def test_explore_complete_question_does_not_advance_phase(pipeline_session, monk
 
 
 def test_explore_complete_reject_keeps_explore_phase_open(pipeline_session):
-    """test_explore_complete_reject_keeps_explore_phase_open（测试 explore complete reject keeps explore phase open）的函数说明。
-
-    pipeline_session（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 explore complete reject keeps explore phase open 场景。"""
     session_store, task_store, session_id, list_id = pipeline_session
     from career_os.api import chat as chat_mod
 
@@ -149,11 +133,7 @@ def test_explore_complete_reject_keeps_explore_phase_open(pipeline_session):
 
 
 def test_jd_continue_gate_confirm_dispatches_opportunity(pipeline_session):
-    """test_jd_continue_gate_confirm_dispatches_opportunity（测试 jd continue gate confirm dispatches opportunity）的函数说明。
-
-    pipeline_session（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 jd continue gate confirm dispatches opportunity 场景。"""
     session_store, task_store, session_id, list_id = pipeline_session
     from career_os.api import chat as chat_mod
 
@@ -180,11 +160,7 @@ def test_jd_continue_gate_confirm_dispatches_opportunity(pipeline_session):
 
 
 def test_explore_repeat_accept_uses_global_intake_baseline(pipeline_session):
-    """test_explore_repeat_accept_uses_global_intake_baseline（测试 explore repeat accept uses global intake baseline）的函数说明。
-
-    pipeline_session（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 explore repeat accept uses global intake baseline 场景。"""
     session_store, _task_store, session_id, _list_id = pipeline_session
     from career_os.api import chat as chat_mod
     from career_os.platform.store.profile import ProfileStore
@@ -220,11 +196,7 @@ def test_explore_repeat_accept_uses_global_intake_baseline(pipeline_session):
 
 
 def test_explore_repeat_reject_advances_phase_from_prior(pipeline_session):
-    """test_explore_repeat_reject_advances_phase_from_prior（测试 explore repeat reject advances phase from prior）的函数说明。
-
-    pipeline_session（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 explore repeat reject advances phase from prior 场景。"""
     session_store, task_store, session_id, list_id = pipeline_session
     from career_os.api import chat as chat_mod
 

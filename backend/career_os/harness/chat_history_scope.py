@@ -14,13 +14,7 @@ def select_worker_chat_history(
     user_message: str,
     messages_meta: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, str]], str]:
-    """选择委托给 Worker 的聊天历史窗口。
-
-    chat_history_full（完整聊天历史）是当前会话可用的全部消息；
-    user_message（用户消息）用于判断是否需要完整上下文；
-    messages_meta（消息元数据）当前仅保留签名兼容。
-    返回值是二元组：选中的消息列表，以及 scope_label（范围标签），例如 full 或 recent_10。
-    """
+    """选择委托给 Worker 的聊天历史窗口。"""
     # messages_meta（消息元数据）当前不参与判断，保留参数用于未来扩展和调用签名稳定。
     _ = messages_meta
     # 先用轻量分类器判断本轮 Worker 是否需要完整历史。

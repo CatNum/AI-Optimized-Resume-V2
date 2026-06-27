@@ -13,9 +13,7 @@ from career_os.harness.explore_closure import (
 
 
 def test_default_required_workers():
-    """test_default_required_workers（测试 default required workers）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 default required workers 场景。"""
     state = init_explore_closure()
     assert state["required_workers"] == ["identity", "capability"]
     assert state["worker_done"]["identity"] is False
@@ -23,9 +21,7 @@ def test_default_required_workers():
 
 
 def test_single_worker_other_done():
-    """test_single_worker_other_done（测试 single worker other done）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 single worker other done 场景。"""
     state = init_explore_closure(required_workers=["identity"])
     assert state["worker_done"]["capability"] is True
     state = mark_worker_done(
@@ -37,9 +33,7 @@ def test_single_worker_other_done():
 
 
 def test_in_progress_does_not_mark_worker_done():
-    """test_in_progress_does_not_mark_worker_done（测试 in progress does not mark worker done）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 in progress does not mark worker done 场景。"""
     state = init_explore_closure()
     state = mark_worker_done(
         state,
@@ -55,9 +49,7 @@ def test_in_progress_does_not_mark_worker_done():
 
 
 def test_both_done_allows_gate_pending():
-    """test_both_done_allows_gate_pending（测试 both done allows gate pending）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 both done allows gate pending 场景。"""
     state = init_explore_closure()
     state = mark_worker_done(
         state,
@@ -74,9 +66,7 @@ def test_both_done_allows_gate_pending():
 
 
 def test_completed_explore_does_not_reopen_gate():
-    """test_completed_explore_does_not_reopen_gate（测试 completed explore does not reopen gate）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 completed explore does not reopen gate 场景。"""
     state = init_explore_closure()
     state = mark_worker_done(
         state,
@@ -93,18 +83,14 @@ def test_completed_explore_does_not_reopen_gate():
 
 
 def test_plan_explore_dispatch_one_worker_at_a_time():
-    """test_plan_explore_dispatch_one_worker_at_a_time（测试 plan explore dispatch one worker at a time）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 plan explore dispatch one worker at a time 场景。"""
     session_state = {"explore_closure": init_explore_closure()}
     planned = plan_explore_worker_dispatch(["identity", "capability"], session_state)
     assert planned == ["identity"]
 
 
 def test_identity_explore_gate_prompt_fails_validation():
-    """test_identity_explore_gate_prompt_fails_validation（测试 identity explore gate prompt fails validation）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 identity explore gate prompt fails validation 场景。"""
     err = validate_worker_structured_output(
         "identity",
         {"gate_prompt": {"name": "explore_complete", "prompt": "确认？"}},

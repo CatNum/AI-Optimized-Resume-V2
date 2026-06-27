@@ -11,11 +11,7 @@ from career_os.harness.chat_attachments import (
 
 @pytest.fixture
 def output_env(tmp_path, monkeypatch):
-    """output_env（output env）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """构造测试环境和基础状态。"""
     out = tmp_path / "output" / "demo" / "2026-06-02"
     out.mkdir(parents=True)
     html = out / "resume.html"
@@ -33,11 +29,7 @@ def output_env(tmp_path, monkeypatch):
 
 
 def test_build_request_context_resolves_file_ref(output_env):
-    """test_build_request_context_resolves_file_ref（测试 build request context resolves file ref）的函数说明。
-
-    output_env（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 build request context resolves file ref 场景。"""
     ctx = build_request_context_from_attachments(
         [{"type": "file_ref", "path": output_env, "optimization_level": "保守"}]
     )
@@ -48,11 +40,7 @@ def test_build_request_context_resolves_file_ref(output_env):
 
 
 def test_build_request_context_skips_missing_file(tmp_path):
-    """test_build_request_context_skips_missing_file（测试 build request context skips missing file）的函数说明。
-
-    tmp_path（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 build request context skips missing file 场景。"""
     ctx = build_request_context_from_attachments(
         [{"type": "file_ref", "path": "output/demo/missing.html"}]
     )
@@ -60,11 +48,7 @@ def test_build_request_context_skips_missing_file(tmp_path):
 
 
 def test_enrich_user_message_appends_block(output_env):
-    """test_enrich_user_message_appends_block（测试 enrich user message appends block）的函数说明。
-
-    output_env（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 enrich user message appends block 场景。"""
     text = enrich_user_message_with_attachments(
         "请复用这份简历",
         [{"type": "file_ref", "path": output_env}],

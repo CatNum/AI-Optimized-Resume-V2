@@ -63,19 +63,12 @@ _SMALL_TALK_PHRASES = frozenset(
 
 
 def _coordinator_system() -> str:
-    """加载 Coordinator 系统提示词。
-
-    返回值是 Coordinator LLM 使用的 system prompt，用于分析路由和合成回复。
-    """
+    """加载 Coordinator 系统提示词。"""
     return load_coordinator_prompt().system
 
 
 def chat_only_synthesis_draft(session_state: dict[str, Any] | None = None) -> str:
-    """生成纯聊天场景的合成草稿。
-
-    session_state（会话状态）用于判断是否处于 pipeline 列表和当前阶段。
-    返回值是确定性的 draft（草稿），后续可直接回复或交给 LLM 润色。
-    """
+    """生成纯聊天场景的合成草稿。"""
     base = load_coordinator_prompt().chat_only_draft
     if not session_state or session_state.get("list_type") != "pipeline":
         return base
@@ -102,11 +95,7 @@ def chat_only_synthesis_draft(session_state: dict[str, Any] | None = None) -> st
 
 
 def jd_prerequisites_draft(reason: str | None) -> str:
-    """生成 JD 前置条件不足时的提示草稿。
-
-    reason（原因）区分 onboarding（缺少基础信息）和 explore（需要先完成初探）。
-    返回值是对应场景下提示用户补充信息的文案。
-    """
+    """生成 JD 前置条件不足时的提示草稿。"""
     prompts = load_coordinator_prompt()
     if reason == "onboarding":
         return prompts.jd_prerequisite_draft_onboarding
@@ -116,10 +105,7 @@ def jd_prerequisites_draft(reason: str | None) -> str:
 
 
 def explore_intake_draft() -> str:
-    """生成初探信息表提示草稿。
-
-    返回值用于提醒用户先粘贴简历、工作年限、薪资、目标岗位等初探输入。
-    """
+    """生成初探信息表提示草稿。"""
     return (
         "为了更高效地开展职业初探，请先填写「初探信息表」。"
         "请粘贴完整简历；工作年限、当前/目标薪资、目标岗位等补充项可选填——"
@@ -129,18 +115,12 @@ def explore_intake_draft() -> str:
 
 
 def explore_repeat_draft() -> str:
-    """生成重复初探确认草稿。
-
-    返回值用于用户已完成初探后，再次请求初探时的确认提示。
-    """
+    """生成重复初探确认草稿。"""
     return "您已完成初探，是否需要再次进行？"
 
 
 def explore_complete_synthesis_draft() -> str:
-    """生成初探完成确认草稿。
-
-    返回值用于 identity/capability 两条探索线完成后，请用户确认职业画像是否完整。
-    """
+    """生成初探完成确认草稿。"""
     return (
         "内在需求和能力图谱两条线我们都梳理完了。想请你确认一下："
         "你觉得我们刚才的交流，是否已经足够完整地概括了你的职业画像？"
@@ -149,11 +129,7 @@ def explore_complete_synthesis_draft() -> str:
 
 
 def _market_continue_draft(session_state: dict[str, Any]) -> str:
-    """生成市场阶段续聊草稿。
-
-    session_state（会话状态）提供当前 pipeline 活动摘要。
-    返回值强调 current_phase=market，避免误回到初探模板。
-    """
+    """生成市场阶段续聊草稿。"""
     from career_os.harness.session_activity import build_session_activity
 
     headline = (build_session_activity(session_state).get("headline") or "")
@@ -168,12 +144,7 @@ def _jd_analysis_continue_draft(
     user_message: str,
     session_state: dict[str, Any],
 ) -> str:
-    """生成 JD 分析阶段续聊草稿。
-
-    user_message（用户消息）用于识别是否偏策略、优化或 Agent 项目说明；
-    session_state（会话状态）提供当前 pipeline 活动摘要。
-    返回值用于约束回复聚焦 JD 匹配评估，而不是重复初探引导。
-    """
+    """生成 JD 分析阶段续聊草稿。"""
     from career_os.harness.session_activity import build_session_activity
 
     headline = (build_session_activity(session_state).get("headline") or "")
@@ -195,12 +166,7 @@ def _resume_strategy_continue_draft(
     user_message: str,
     session_state: dict[str, Any],
 ) -> str:
-    """生成简历策略阶段续聊草稿。
-
-    user_message（用户消息）用于识别策略、项目、Agent 等意图；
-    session_state（会话状态）提供 pending gate、prior_results 和档案事实。
-    返回值用于指导模型直接回答简历策略和写法问题。
-    """
+    """生成简历策略阶段续聊草稿。"""
     pending = (session_state.get("gates") or {}).get("pending") or {}
     pending_name = pending.get("name") or ""
     prior = session_state.get("prior_results") or {}
@@ -239,11 +205,7 @@ def _resume_strategy_continue_draft(
 
 
 def _resume_optimize_continue_draft(session_state: dict[str, Any]) -> str:
-    """生成简历优化执行阶段续聊草稿。
-
-    session_state（会话状态）提供当前 pipeline 活动摘要。
-    返回值强调 current_phase=resume_optimize，约束回复围绕改写和交付物。
-    """
+    """生成简历优化执行阶段续聊草稿。"""
     from career_os.harness.session_activity import build_session_activity
 
     headline = (build_session_activity(session_state).get("headline") or "")
@@ -257,12 +219,7 @@ def build_phase_synthesis_draft(
     user_message: str,
     session_state: dict[str, Any],
 ) -> str:
-    """构造阶段感知的合成草稿。
-
-    user_message（用户消息）用于匹配当前问题和档案事实；
-    session_state（会话状态）用于判断 pipeline 当前阶段。
-    返回值是合成回复草稿；深度阶段会避开 chat_only 寒暄模板。
-    """
+    """构造阶段感知的合成草稿。"""
     from career_os.harness.profile_memory import build_profile_aware_chat_draft
 
     # 先读取 pipeline 当前阶段；非深度阶段走普通档案感知闲聊草稿。
@@ -291,11 +248,7 @@ def build_phase_synthesis_draft(
 
 
 def is_small_talk(user_message: str) -> bool:
-    """判断用户消息是否只是寒暄。
-
-    user_message（用户消息）会被去除标点和空白后匹配常见寒暄短语。
-    返回值为 True 表示无需调度 Worker。
-    """
+    """判断用户消息是否只是寒暄。"""
     text = user_message.strip().lower()
     if not text:
         return True
@@ -308,13 +261,7 @@ def normalize_analyze_result(
     allowed_workers: set[str],
     session_state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """归一化 Coordinator 分析结果。
-
-    result（分析结果）是 LLM 或规则得到的 Worker 路由；
-    allowed_workers（允许工作者）用于过滤不存在的 Worker；
-    session_state（会话状态）用于 pipeline 场景下补齐阶段信息。
-    返回值至少包含 workers（工作者列表），pipeline 场景还会包含 list_type/pipeline_phase。
-    """
+    """归一化 Coordinator 分析结果。"""
     # LLM/fallback 没有结果时，返回空 workers，Coordinator 会直接进入 synthesize。
     if not result:
         return {"workers": []}
@@ -351,11 +298,7 @@ def normalize_analyze_result(
 
 
 def _is_jd_route(result: dict[str, Any]) -> bool:
-    """判断分析结果是否进入 JD/pipeline 深度路线。
-
-    result（分析结果）包含 workers、list_type 和 pipeline_phase。
-    返回值为 True 表示需要应用 JD 前置条件检查。
-    """
+    """判断分析结果是否进入 JD/pipeline 深度路线。"""
     workers = result.get("workers") or []
     if result.get("list_type") == "pipeline":
         phase = result.get("pipeline_phase")
@@ -370,13 +313,7 @@ def enforce_jd_prerequisites(
     session_state: dict[str, Any],
     user_message: str,
 ) -> dict[str, Any]:
-    """强制检查 JD 路由前置条件。
-
-    result（分析结果）是待执行的 Worker 路由；
-    session_state（会话状态）提供简历、初探等准备情况；
-    user_message（用户消息）用于判断是否有 JD 意图。
-    返回值可能是原路由，也可能是 jd_prerequisite_blocked（JD 前置阻断）结果。
-    """
+    """强制检查 JD 路由前置条件。"""
     # 非 JD 路由且用户也没有 JD 意图时，不做 JD 前置检查。
     if not _is_jd_route(result) and not is_jd_intent(user_message):
         return result
@@ -418,11 +355,7 @@ def _apply_explore_dispatch_plan(
     result: dict[str, Any],
     session_state: dict[str, Any],
 ) -> dict[str, Any]:
-    """应用探索 Worker 分发计划。
-
-    result（分析结果）包含候选 workers；session_state（会话状态）提供探索进度。
-    返回值会根据 plan_explore_worker_dispatch 调整 workers 顺序或数量。
-    """
+    """应用探索 Worker 分发计划。"""
     workers = result.get("workers") or []
     # 没有候选 Worker 时无需规划。
     if not workers:
@@ -438,12 +371,7 @@ def fallback_analyze_workers(
     user_message: str,
     session_state: dict[str, Any],
 ) -> dict[str, Any] | None:
-    """使用规则兜底分析应调度的 Worker。
-
-    user_message（用户消息）用于匹配 JD、市场、初探、简历策略等意图；
-    session_state（会话状态）提供 pipeline 阶段、prior_results 和 gates。
-    返回值是规则推导出的分析结果；无法判断时返回 None，让上层继续走其他路径。
-    """
+    """使用规则兜底分析应调度的 Worker。"""
     # 纯聊天/寒暄不调度 Worker，直接让 Coordinator 合成回复。
     if is_chat_only_intent(user_message):
         return {"workers": []}
@@ -580,15 +508,7 @@ def analyze_workers(
     chat_history: list[dict[str, str]] | None = None,
     messages_meta: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
-    """分析本轮用户消息需要调度哪些 Worker。
-
-    user_message（用户消息）是当前输入；
-    session_state（会话状态）提供阶段、历史结果和门禁；
-    worker_index（工作者索引）描述可用 Worker 及使用场景；
-    chat_history（聊天历史）提供上下文窗口；
-    messages_meta（消息元数据）提供上下文长度等统计。
-    返回值是标准分析结果；LLM 不可用或分析失败时返回 None。
-    """
+    """分析本轮用户消息需要调度哪些 Worker。"""
     # 先把 WorkerRegistry 中的 Worker 转成 LLM 可读摘要，同时形成 allowed_workers 白名单。
     worker_summary: list[dict[str, Any]] = []
     allowed_workers: set[str] = set()
@@ -683,14 +603,7 @@ def build_synthesis_messages(
     chat_history: list[dict[str, str]] | None = None,
     messages_meta: dict[str, Any] | None = None,
 ) -> tuple[str, str]:
-    """构造合成回复的 LLM 消息。
-
-    user_message（用户消息）是当前输入；draft_text（草稿文本）是确定性提纲；
-    session_state（会话状态）提供 prior_results、gates 和 pipeline 信息；
-    last_worker_result（最近工作者结果）保存本轮最后一个 Worker 输出；
-    chat_history（聊天历史）和 messages_meta（消息元数据）补充上下文。
-    返回值是二元组：system prompt 和 user payload。
-    """
+    """构造合成回复的 LLM 消息。"""
     explore_guidance = session_state.get("explore_guidance")
     prior_results = sanitize_prior_results_for_synthesis(
         session_state.get("prior_results"),
@@ -741,13 +654,7 @@ def synthesize_with_llm(
     session_state: dict[str, Any],
     last_worker_result: dict[str, Any] | None,
 ) -> str | None:
-    """调用 LLM 合成最终回复。
-
-    user_message（用户消息）是当前输入；draft_text（草稿文本）是确定性回复提纲；
-    session_state（会话状态）提供历史结果和门禁；
-    last_worker_result（最近工作者结果）提供最新 Worker 输出。
-    返回值是模型润色后的回复文本；LLM 未启用或调用失败时返回 None。
-    """
+    """调用 LLM 合成最终回复。"""
     if not lc_client.llm_enabled():
         return None
     system, user = build_synthesis_messages(

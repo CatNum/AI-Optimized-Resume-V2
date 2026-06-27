@@ -11,29 +11,17 @@ _SECTION_RE = re.compile(r"^### ([^\n]+)\n", re.MULTILINE)
 
 
 def _strip_frontmatter(text: str) -> str:
-    """_strip_frontmatter（内部函数 strip frontmatter）的函数说明。
-
-    text（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """去除frontmatter。"""
     return _FRONTMATTER_RE.sub("", text, count=1).strip()
 
 
 def _read_system_document(path: Path) -> str:
-    """_read_system_document（内部函数 read system document）的函数说明。
-
-    path（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """读取system document。"""
     return _strip_frontmatter(path.read_text(encoding="utf-8"))
 
 
 def _parse_sections(body: str) -> dict[str, str]:
-    """_parse_sections（内部函数 parse sections）的函数说明。
-
-    body（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """解析sections。"""
     matches = list(_SECTION_RE.finditer(body))
     sections: dict[str, str] = {}
     for index, match in enumerate(matches):
@@ -57,12 +45,7 @@ def load_worker_system_prompt(worker_id: str) -> str:
 
 
 def load_prompt(worker_id: str, name: str = "default") -> str:
-    """加载指定 Worker 的 prompt。
-
-    worker_id（工作者标识）决定读取哪个 prompt 目录；
-    name（模板名称）默认为 default，表示读取系统 prompt。
-    返回值是 prompt 文本；如果指定模板不存在，会回退到 Worker system prompt。
-    """
+    """加载指定 Worker 的 prompt。"""
     if name == "default":
         return load_worker_system_prompt(worker_id)
     path = _PROMPT_DIR / worker_id / f"{name}.tmpl"
@@ -87,21 +70,19 @@ def render_prompt(template: str, **replacements: str) -> str:
 
 @dataclass(frozen=True)
 class CoordinatorPrompt:
-    """结构化入口路由 Agent prompt，来源于 platform/prompt/coordinator/system.md。"""
+    """
+    CoordinatorPrompt（协调器提示词）承载结构化入口路由 Agent 的 prompt 文本。
+    """
 
-    system: str
-    chat_only_draft: str
-    jd_prerequisite_draft_onboarding: str
-    jd_prerequisite_draft_explore: str
+    system: str  # 系统提示词
+    chat_only_draft: str  # 纯聊天草稿
+    jd_prerequisite_draft_onboarding: str  # onboarding 阻断草稿
+    jd_prerequisite_draft_explore: str  # 初探阻断草稿
 
 
 @lru_cache(maxsize=1)
 def load_coordinator_prompt() -> CoordinatorPrompt:
-    """加载 Coordinator 结构化 prompt。
-
-    返回值是 CoordinatorPrompt（协调器提示词对象），包含 system（系统提示词）、
-    chat_only_draft（纯聊天草稿）和 JD 前置条件提示草稿。
-    """
+    """加载 Coordinator 结构化 prompt。"""
     path = _PROMPT_DIR / "coordinator" / "system.md"
     raw = path.read_text(encoding="utf-8")
     body = _strip_frontmatter(raw)
@@ -123,20 +104,14 @@ def load_coordinator_prompt() -> CoordinatorPrompt:
 
 @lru_cache(maxsize=1)
 def load_gate_intent_prompt() -> str:
-    """load_gate_intent_prompt（load gate intent prompt）的函数说明。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """加载gate intent prompt。"""
     path = _PROMPT_DIR / "gate_intent" / "system.md"
     return _read_system_document(path)
 
 
 @lru_cache(maxsize=8)
 def load_micro_classifier_prompt(task: str) -> str:
-    """load_micro_classifier_prompt（load micro classifier prompt）的函数说明。
-
-    task（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """加载micro classifier prompt。"""
     path = _PROMPT_DIR / "micro_classifier" / task / "system.md"
     if not path.exists():
         raise FileNotFoundError(f"micro_classifier prompt not found: {task}")

@@ -15,18 +15,14 @@ from tests.conftest import explore_repeat_cleared_gates
 
 
 def test_is_small_talk():
-    """test_is_small_talk（测试 is small talk）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 is small talk 场景。"""
     assert is_small_talk("你好")
     assert is_small_talk("  你好吗！ ")
     assert not is_small_talk("请评估这个 JD")
 
 
 def test_normalize_filters_market_on_explore_phase():
-    """test_normalize_filters_market_on_explore_phase（测试 normalize filters market on explore phase）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 normalize filters market on explore phase 场景。"""
     allowed = {"identity", "capability", "market", "opportunity"}
     result = normalize_analyze_result(
         {
@@ -42,9 +38,7 @@ def test_normalize_filters_market_on_explore_phase():
 
 
 def test_fallback_greeting_returns_empty_workers():
-    """test_fallback_greeting_returns_empty_workers（测试 fallback greeting returns empty workers）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 fallback greeting returns empty workers 场景。"""
     result = fallback_analyze_workers("你好", {"prior_results": {}, "list_type": "pipeline"})
     assert result == {"workers": []}
 
@@ -52,11 +46,7 @@ def test_fallback_greeting_returns_empty_workers():
 def test_fallback_explore_returns_pipeline_phase(
     monkeypatch, tmp_path, explore_intake_profile
 ):
-    """test_fallback_explore_returns_pipeline_phase（测试 fallback explore returns pipeline phase）的函数说明。
-
-    monkeypatch（参数）、tmp_path（参数）、explore_intake_profile（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 fallback explore returns pipeline phase 场景。"""
     result = fallback_analyze_workers(
         "帮我理清职业方向",
         {
@@ -72,11 +62,7 @@ def test_fallback_explore_returns_pipeline_phase(
 
 
 def test_analyze_workers_sanitizes_llm_mismatch(monkeypatch, explore_intake_profile):
-    """test_analyze_workers_sanitizes_llm_mismatch（测试 analyze workers sanitizes llm mismatch）的函数说明。
-
-    monkeypatch（参数）、explore_intake_profile（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 analyze workers sanitizes llm mismatch 场景。"""
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(
         coordinator_llm_mod.lc_client,
@@ -96,11 +82,7 @@ def test_analyze_workers_sanitizes_llm_mismatch(monkeypatch, explore_intake_prof
 
 
 def test_coordinator_hello_does_not_delegate(monkeypatch):
-    """test_coordinator_hello_does_not_delegate（测试 coordinator hello does not delegate）的函数说明。
-
-    monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 coordinator hello does not delegate 场景。"""
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(
         coordinator_llm_mod.lc_client,
@@ -112,11 +94,7 @@ def test_coordinator_hello_does_not_delegate(monkeypatch):
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
-        """runner（runner）的函数说明。
-
-        worker_id（参数）、goal（参数）、session_state（参数）、context（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """构造测试用 Worker runner。"""
         calls.append(worker_id)
         return {
             "worker_id": worker_id,
@@ -141,11 +119,7 @@ def test_coordinator_hello_does_not_delegate(monkeypatch):
 
 
 def test_coordinator_jd_still_delegates(jd_ready_profile, monkeypatch):
-    """test_coordinator_jd_still_delegates（测试 coordinator jd still delegates）的函数说明。
-
-    jd_ready_profile（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 coordinator jd still delegates 场景。"""
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(
         coordinator_llm_mod.lc_client,
@@ -160,11 +134,7 @@ def test_coordinator_jd_still_delegates(jd_ready_profile, monkeypatch):
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
-        """runner（runner）的函数说明。
-
-        worker_id（参数）、goal（参数）、session_state（参数）、context（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """构造测试用 Worker runner。"""
         calls.append(worker_id)
         return {
             "worker_id": worker_id,
@@ -193,11 +163,7 @@ def test_coordinator_jd_still_delegates(jd_ready_profile, monkeypatch):
 
 
 def test_coordinator_applies_intent_phase_transition(monkeypatch, jd_ready_profile):
-    """test_coordinator_applies_intent_phase_transition（测试 coordinator applies intent phase transition）的函数说明。
-
-    monkeypatch（参数）、jd_ready_profile（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 coordinator applies intent phase transition 场景。"""
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: False)
 
     harness = Harness()
@@ -230,11 +196,7 @@ def test_coordinator_applies_intent_phase_transition(monkeypatch, jd_ready_profi
 
 
 def test_coordinator_turn_switches_to_explore(monkeypatch, jd_ready_profile):
-    """test_coordinator_turn_switches_to_explore（测试 coordinator turn switches to explore）的函数说明。
-
-    monkeypatch（参数）、jd_ready_profile（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 coordinator turn switches to explore 场景。"""
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: False)
     monkeypatch.setattr(classifier_mod, "llm_enabled", lambda: True)
     monkeypatch.setattr(
@@ -279,11 +241,7 @@ def test_coordinator_turn_switches_to_explore(monkeypatch, jd_ready_profile):
 
 
 def test_coordinator_turn_switches_to_market(monkeypatch, jd_ready_profile):
-    """test_coordinator_turn_switches_to_market（测试 coordinator turn switches to market）的函数说明。
-
-    monkeypatch（参数）、jd_ready_profile（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 coordinator turn switches to market 场景。"""
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: False)
     monkeypatch.setattr(classifier_mod, "llm_enabled", lambda: True)
     monkeypatch.setattr(

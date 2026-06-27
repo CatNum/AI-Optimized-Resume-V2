@@ -6,11 +6,7 @@ import pytest
 
 @pytest.fixture
 def task_store(tmp_path, monkeypatch):
-    """task_store（task store）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """构造测试辅助数据。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.task as task_mod
@@ -21,11 +17,7 @@ def task_store(tmp_path, monkeypatch):
 
 
 def test_create_task_list_writes_files(task_store, tmp_path):
-    """test_create_task_list_writes_files（测试 create task list writes files）的函数说明。
-
-    task_store（参数）、tmp_path（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 create task list writes files 场景。"""
     list_id = task_store.create_task_list("sess_test", list_type="plan")
     assert isinstance(list_id, str)
     list_dir = tmp_path / "tasks" / list_id
@@ -36,11 +28,7 @@ def test_create_task_list_writes_files(task_store, tmp_path):
 
 
 def test_create_task_list_writes_created_and_updated_at(task_store):
-    """test_create_task_list_writes_created_and_updated_at（测试 create task list writes created and updated at）的函数说明。
-
-    task_store（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 create task list writes created and updated at 场景。"""
     list_id = task_store.create_task_list("sess_test", list_type="pipeline", status="ready")
     assert isinstance(list_id, str)
     meta = task_store.get_task_list(list_id)
@@ -49,11 +37,7 @@ def test_create_task_list_writes_created_and_updated_at(task_store):
 
 
 def test_complete_task_deletes_file(task_store, tmp_path):
-    """test_complete_task_deletes_file（测试 complete task deletes file）的函数说明。
-
-    task_store（参数）、tmp_path（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 complete task deletes file 场景。"""
     list_id = task_store.create_task_list("sess_test", list_type="plan")
     task_store.create_task(list_id, "milestone_1", "JD 录入")
     task_path = tmp_path / "tasks" / list_id / "milestone_1.json"
@@ -65,11 +49,7 @@ def test_complete_task_deletes_file(task_store, tmp_path):
 
 
 def test_ready_list_blocks_claim_and_complete(task_store):
-    """test_ready_list_blocks_claim_and_complete（测试 ready list blocks claim and complete）的函数说明。
-
-    task_store（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 ready list blocks claim and complete 场景。"""
     list_id = task_store.create_task_list("sess_test", list_type="plan", status="ready")
     task_store.create_task(list_id, "milestone_1", "Plan step")
 
@@ -81,11 +61,7 @@ def test_ready_list_blocks_claim_and_complete(task_store):
 
 
 def test_create_second_active_same_session_returns_error(task_store):
-    """test_create_second_active_same_session_returns_error（测试 create second active same session returns error）的函数说明。
-
-    task_store（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 create second active same session returns error 场景。"""
     assert isinstance(
         task_store.create_task_list("sess_a", list_type="plan", status="active"), str
     )
@@ -94,22 +70,14 @@ def test_create_second_active_same_session_returns_error(task_store):
 
 
 def test_cross_session_parallel_active_ok(task_store):
-    """test_cross_session_parallel_active_ok（测试 cross session parallel active ok）的函数说明。
-
-    task_store（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 cross session parallel active ok 场景。"""
     a = task_store.create_task_list("sess_a", list_type="pipeline", status="active")
     b = task_store.create_task_list("sess_b", list_type="pipeline", status="active")
     assert isinstance(a, str) and isinstance(b, str)
 
 
 def test_start_task_list_ready_to_active(task_store):
-    """test_start_task_list_ready_to_active（测试 start task list ready to active）的函数说明。
-
-    task_store（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 start task list ready to active 场景。"""
     list_id = task_store.create_task_list("sess_a", list_type="pipeline", status="ready")
     assert isinstance(list_id, str)
     assert task_store.start_task_list(list_id) is None
@@ -119,22 +87,14 @@ def test_start_task_list_ready_to_active(task_store):
 
 
 def test_start_task_list_rejects_non_ready(task_store):
-    """test_start_task_list_rejects_non_ready（测试 start task list rejects non ready）的函数说明。
-
-    task_store（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 start task list rejects non ready 场景。"""
     list_id = task_store.create_task_list("sess_a", list_type="pipeline", status="active")
     err = task_store.start_task_list(list_id)
     assert err.code == "list_not_ready"
 
 
 def test_start_task_list_rejects_when_other_active(task_store):
-    """test_start_task_list_rejects_when_other_active（测试 start task list rejects when other active）的函数说明。
-
-    task_store（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 start task list rejects when other active 场景。"""
     assert isinstance(
         task_store.create_task_list("sess_a", list_type="pipeline", status="active"), str
     )
@@ -144,11 +104,7 @@ def test_start_task_list_rejects_when_other_active(task_store):
 
 
 def test_abandon_task_list_deletes_files(task_store, tmp_path):
-    """test_abandon_task_list_deletes_files（测试 abandon task list deletes files）的函数说明。
-
-    task_store（参数）、tmp_path（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 abandon task list deletes files 场景。"""
     list_id = task_store.create_task_list("sess_a", list_type="pipeline", status="ready")
     task_store.create_task(list_id, "identity", "内心探索", kind="milestone")
     assert task_store.abandon_task_list(list_id) is None
@@ -156,11 +112,7 @@ def test_abandon_task_list_deletes_files(task_store, tmp_path):
 
 
 def test_normalize_multi_active_keeps_newest(task_store, tmp_path, caplog):
-    """test_normalize_multi_active_keeps_newest（测试 normalize multi active keeps newest）的函数说明。
-
-    task_store（参数）、tmp_path（参数）、caplog（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 normalize multi active keeps newest 场景。"""
     id_old = task_store.create_task_list("sess_a", list_type="pipeline", status="active")
     assert isinstance(id_old, str)
     id_new = task_store.create_task_list("sess_a", list_type="plan", status="ready")
@@ -180,11 +132,7 @@ def test_normalize_multi_active_keeps_newest(task_store, tmp_path, caplog):
 
 
 def test_list_lists_for_session_orders_active_then_ready(task_store):
-    """test_list_lists_for_session_orders_active_then_ready（测试 list lists for session orders active then ready）的函数说明。
-
-    task_store（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 list lists for session orders active then ready 场景。"""
     active = task_store.create_task_list("sess_a", list_type="pipeline", status="active")
     ready = task_store.create_task_list("sess_a", list_type="plan", status="ready")
     rows = task_store.list_lists_for_session("sess_a")
@@ -194,11 +142,7 @@ def test_list_lists_for_session_orders_active_then_ready(task_store):
 
 
 def test_list_lists_for_session_ready_sorted_by_updated_at(task_store, tmp_path):
-    """test_list_lists_for_session_ready_sorted_by_updated_at（测试 list lists for session ready sorted by updated at）的函数说明。
-
-    task_store（参数）、tmp_path（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 list lists for session ready sorted by updated at 场景。"""
     older = task_store.create_task_list("sess_a", list_type="plan", status="ready")
     newer = task_store.create_task_list("sess_a", list_type="plan", status="ready")
     older_meta_path = tmp_path / "tasks" / older / "meta.json"
@@ -215,11 +159,7 @@ def test_list_lists_for_session_ready_sorted_by_updated_at(task_store, tmp_path)
 
 
 def test_list_lists_for_session_filters_other_sessions(task_store):
-    """test_list_lists_for_session_filters_other_sessions（测试 list lists for session filters other sessions）的函数说明。
-
-    task_store（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 list lists for session filters other sessions 场景。"""
     task_store.create_task_list("sess_a", list_type="pipeline", status="active")
     task_store.create_task_list("sess_b", list_type="pipeline", status="active")
     rows = task_store.list_lists_for_session("sess_a")
@@ -227,11 +167,7 @@ def test_list_lists_for_session_filters_other_sessions(task_store):
 
 
 def test_delete_lists_for_session(task_store, tmp_path):
-    """test_delete_lists_for_session（测试 delete lists for session）的函数说明。
-
-    task_store（参数）、tmp_path（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 delete lists for session 场景。"""
     list_id = task_store.create_task_list("sess_a", list_type="plan")
     task_store.create_task(list_id, "milestone_1", "Step")
     other_id = task_store.create_task_list("sess_b", list_type="plan")
@@ -244,11 +180,7 @@ def test_delete_lists_for_session(task_store, tmp_path):
 
 
 def test_get_active_list_id_for_session(task_store):
-    """test_get_active_list_id_for_session（测试 get active list id for session）的函数说明。
-
-    task_store（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 get active list id for session 场景。"""
     list_id = task_store.create_task_list("sess_a", list_type="pipeline", status="active")
     assert isinstance(list_id, str)
     assert task_store.get_active_list_id_for_session("sess_a") == list_id

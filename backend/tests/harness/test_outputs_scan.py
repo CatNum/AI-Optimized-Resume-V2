@@ -6,19 +6,13 @@ from career_os.platform.tool.handlers.resume_html import ensure_html_filename
 
 
 def test_ensure_html_filename_appends_suffix():
-    """test_ensure_html_filename_appends_suffix（测试 ensure html filename appends suffix）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 ensure html filename appends suffix 场景。"""
     assert ensure_html_filename("resume_进取_AI_Agent") == "resume_进取_AI_Agent.html"
     assert ensure_html_filename("resume.html") == "resume.html"
 
 
 def _reload_output_modules(tmp_path, monkeypatch, *, output_subdir: str):
-    """_reload_output_modules（内部函数 reload output modules）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）、output_subdir（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """加载测试所需模块或存储对象。"""
     out = tmp_path / output_subdir
     monkeypatch.setenv("OUTPUT_DIR", str(out))
     monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
@@ -33,11 +27,7 @@ def _reload_output_modules(tmp_path, monkeypatch, *, output_subdir: str):
 
 
 def test_merge_outputs_index_includes_disk_files(tmp_path, monkeypatch):
-    """test_merge_outputs_index_includes_disk_files（测试 merge outputs index includes disk files）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 merge outputs index includes disk files 场景。"""
     output_mod, outputs_mod = _reload_output_modules(tmp_path, monkeypatch, output_subdir="output")
 
     day = date(2026, 6, 1)
@@ -59,11 +49,7 @@ def test_merge_outputs_index_includes_disk_files(tmp_path, monkeypatch):
 
 
 def test_normalize_output_path_idempotent_for_demo_env(tmp_path, monkeypatch):
-    """test_normalize_output_path_idempotent_for_demo_env（测试 normalize output path idempotent for demo env）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 normalize output path idempotent for demo env 场景。"""
     output_mod, outputs_mod = _reload_output_modules(
         tmp_path, monkeypatch, output_subdir="output/demo"
     )
@@ -81,11 +67,7 @@ def test_normalize_output_path_idempotent_for_demo_env(tmp_path, monkeypatch):
 
 
 def test_resolve_doubled_canonical_prefix(tmp_path, monkeypatch):
-    """test_resolve_doubled_canonical_prefix（测试 resolve doubled canonical prefix）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 resolve doubled canonical prefix 场景。"""
     output_mod, outputs_mod = _reload_output_modules(
         tmp_path, monkeypatch, output_subdir="output/demo"
     )
@@ -102,9 +84,7 @@ def test_resolve_doubled_canonical_prefix(tmp_path, monkeypatch):
 
 
 def test_validate_resume_html_rejects_plain_text():
-    """test_validate_resume_html_rejects_plain_text（测试 validate resume html rejects plain text）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 validate resume html rejects plain text 场景。"""
     import career_os.platform.tool.handlers.resume_html as resume_mod
 
     plain = "苑晓龙\nGo 后端工程师\nEXPERIENCE\n..."
@@ -114,11 +94,7 @@ def test_validate_resume_html_rejects_plain_text():
 
 
 def test_write_resume_html_rejects_invalid_content(tmp_path, monkeypatch):
-    """test_write_resume_html_rejects_invalid_content（测试 write resume html rejects invalid content）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 write resume html rejects invalid content 场景。"""
     _reload_output_modules(tmp_path, monkeypatch, output_subdir="output/demo")
     import career_os.platform.tool.handlers.resume_html as resume_mod
 
@@ -131,11 +107,7 @@ def test_write_resume_html_rejects_invalid_content(tmp_path, monkeypatch):
 
 
 def test_write_resume_html_uses_prd_filename_template(tmp_path, monkeypatch):
-    """test_write_resume_html_uses_prd_filename_template（测试 write resume html uses prd filename template）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 write resume html uses prd filename template 场景。"""
     _reload_output_modules(tmp_path, monkeypatch, output_subdir="output/demo")
     import career_os.platform.tool.handlers.resume_html as resume_mod
 
@@ -155,11 +127,7 @@ def test_write_resume_html_uses_prd_filename_template(tmp_path, monkeypatch):
 
 
 def test_write_resume_html_auto_derives_tags_from_role_and_stack(tmp_path, monkeypatch):
-    """test_write_resume_html_auto_derives_tags_from_role_and_stack（测试 write resume html auto derives tags from role and stack）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 write resume html auto derives tags from role and stack 场景。"""
     _reload_output_modules(tmp_path, monkeypatch, output_subdir="output/demo")
     import career_os.platform.tool.handlers.resume_html as resume_mod
 

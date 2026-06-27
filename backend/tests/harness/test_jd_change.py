@@ -6,11 +6,7 @@ from career_os.platform.pipeline_template import instantiate_pipeline_for_sessio
 
 
 def test_jd_fingerprint_change(tmp_path, monkeypatch):
-    """test_jd_fingerprint_change（测试 jd fingerprint change）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 jd fingerprint change 场景。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.session as session_mod

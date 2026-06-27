@@ -14,46 +14,31 @@ from career_os.platform.store.task import TaskStore, TaskStoreError
 
 @dataclass
 class TaskToolError:
-    """TaskToolError（TaskToolError）的项目代码结构说明。
+    """
+    TaskToolError（任务工具错误）表示任务工具调用失败。
+    """
 
-    该类封装当前模块中的一组相关状态或行为，供业务代码、测试代码或运行时流程复用。"""
-    code: str
-    message: str
+    code: str  # 错误码
+    message: str  # 错误消息
 
 
 def _store_error(err: TaskStoreError) -> TaskToolError:
-    """_store_error（内部函数 store error）的函数说明。
-
-    err（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """处理store error。"""
     return TaskToolError(code=err.code, message=err.message)
 
 
 def _gate_error(err: PipelineGateError) -> TaskToolError:
-    """_gate_error（内部函数 gate error）的函数说明。
-
-    err（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """处理gate error。"""
     return TaskToolError(code=err.code, message=err.message)
 
 
 def _sync_state_list_id(session_id: str, list_id: str | None) -> None:
-    """_sync_state_list_id（内部函数 sync state list id）的函数说明。
-
-    session_id（参数）、list_id（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """处理sync state list id。"""
     SessionStore().update_state(session_id, {"list_id": list_id})
 
 
 def create_task_list(actor: str, args: dict[str, Any]) -> TaskToolError | dict[str, Any]:
-    """create_task_list（create task list）的函数说明。
-
-    actor（参数）、args（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """创建task list。"""
     if actor != "coordinator":
         return TaskToolError("tool_not_allowed", "create_task_list is coordinator-only")
     store = TaskStore()
@@ -69,11 +54,7 @@ def create_task_list(actor: str, args: dict[str, Any]) -> TaskToolError | dict[s
 
 
 def create_task(actor: str, args: dict[str, Any]) -> TaskToolError | dict[str, Any]:
-    """create_task（create task）的函数说明。
-
-    actor（参数）、args（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """创建task。"""
     if actor != "coordinator":
         return TaskToolError("tool_not_allowed", "create_task is coordinator-only")
     store = TaskStore()
@@ -96,11 +77,7 @@ def create_task(actor: str, args: dict[str, Any]) -> TaskToolError | dict[str, A
 
 
 def get_task(actor: str, args: dict[str, Any]) -> TaskToolError | dict[str, Any]:
-    """get_task（get task）的函数说明。
-
-    actor（参数）、args（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """读取task。"""
     if actor != "coordinator":
         return TaskToolError("tool_not_allowed", "get_task is coordinator-only")
     store = TaskStore()
@@ -111,11 +88,7 @@ def get_task(actor: str, args: dict[str, Any]) -> TaskToolError | dict[str, Any]
 
 
 def jump_to_phase_tool(actor: str, args: dict[str, Any]) -> TaskToolError | dict[str, Any]:
-    """jump_to_phase_tool（jump to phase tool）的函数说明。
-
-    actor（参数）、args（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """通过工具跳转 pipeline 阶段。"""
     if actor != "coordinator":
         return TaskToolError("tool_not_allowed", "jump_to_phase is coordinator-only")
     session_id = args.get("session_id")
@@ -136,11 +109,7 @@ def jump_to_phase_tool(actor: str, args: dict[str, Any]) -> TaskToolError | dict
 def advance_current_phase_tool(
     actor: str, args: dict[str, Any]
 ) -> TaskToolError | dict[str, Any]:
-    """advance_current_phase_tool（advance current phase tool）的函数说明。
-
-    actor（参数）、args（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """通过工具推进当前 pipeline 阶段。"""
     if actor != "coordinator":
         return TaskToolError(
             "tool_not_allowed", "advance_current_phase is coordinator-only"
@@ -163,11 +132,7 @@ def advance_current_phase_tool(
 def ensure_milestone_works_tool(
     actor: str, args: dict[str, Any]
 ) -> TaskToolError | dict[str, Any]:
-    """ensure_milestone_works_tool（ensure milestone works tool）的函数说明。
-
-    actor（参数）、args（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """通过工具确保阶段 work 存在。"""
     allowed = {"coordinator", "identity", "capability", "market", "opportunity", "strategy", "resume", "asset"}
     if actor not in allowed:
         return TaskToolError("tool_not_allowed", "ensure_milestone_works not allowed")
@@ -194,11 +159,7 @@ def ensure_milestone_works_tool(
 def apply_proposed_work_tasks_tool(
     actor: str, args: dict[str, Any]
 ) -> TaskToolError | dict[str, Any]:
-    """apply_proposed_work_tasks_tool（apply proposed work tasks tool）的函数说明。
-
-    actor（参数）、args（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """通过工具应用提议的 work 任务。"""
     if actor not in {"coordinator"}:
         return TaskToolError(
             "tool_not_allowed",
@@ -219,11 +180,7 @@ def apply_proposed_work_tasks_tool(
 
 
 def list_tasks(actor: str, args: dict[str, Any]) -> TaskToolError | dict[str, Any]:
-    """list_tasks（list tasks）的函数说明。
-
-    actor（参数）、args（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """列出tasks。"""
     if actor != "coordinator":
         return TaskToolError("tool_not_allowed", "list_tasks is coordinator-only")
     store = TaskStore()
@@ -240,11 +197,7 @@ def list_tasks(actor: str, args: dict[str, Any]) -> TaskToolError | dict[str, An
 
 
 def start_task_list(actor: str, args: dict[str, Any]) -> TaskToolError | dict[str, Any]:
-    """start_task_list（start task list）的函数说明。
-
-    actor（参数）、args（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """启动task list。"""
     if actor != "coordinator":
         return TaskToolError("tool_not_allowed", "start_task_list is coordinator-only")
     store = TaskStore()
@@ -263,11 +216,7 @@ def start_task_list(actor: str, args: dict[str, Any]) -> TaskToolError | dict[st
 
 
 def abandon_task_list(actor: str, args: dict[str, Any]) -> TaskToolError | dict[str, Any]:
-    """abandon_task_list（abandon task list）的函数说明。
-
-    actor（参数）、args（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """废弃task list。"""
     if actor != "coordinator":
         return TaskToolError("tool_not_allowed", "abandon_task_list is coordinator-only")
     store = TaskStore()
@@ -287,11 +236,7 @@ def abandon_task_list(actor: str, args: dict[str, Any]) -> TaskToolError | dict[
 
 
 def claim_task(actor: str, args: dict[str, Any]) -> TaskToolError | dict[str, Any]:
-    """claim_task（claim task）的函数说明。
-
-    actor（参数）、args（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """领取task。"""
     if actor != "coordinator":
         return TaskToolError("tool_not_allowed", "claim_task is coordinator-only")
     store = TaskStore()
@@ -302,11 +247,7 @@ def claim_task(actor: str, args: dict[str, Any]) -> TaskToolError | dict[str, An
 
 
 def complete_task(actor: str, args: dict[str, Any]) -> TaskToolError | dict[str, Any]:
-    """complete_task（complete task）的函数说明。
-
-    actor（参数）、args（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """完成task。"""
     if actor != "coordinator":
         return TaskToolError("tool_not_allowed", "complete_task is coordinator-only")
     store = TaskStore()
@@ -319,11 +260,7 @@ def complete_task(actor: str, args: dict[str, Any]) -> TaskToolError | dict[str,
 def apply_proposed_task_completions(
     actor: str, args: dict[str, Any]
 ) -> TaskToolError | dict[str, Any]:
-    """apply_proposed_task_completions（apply proposed task completions）的函数说明。
-
-    actor（参数）、args（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """应用提议的任务完成结果。"""
     if actor != "coordinator":
         return TaskToolError(
             "tool_not_allowed",

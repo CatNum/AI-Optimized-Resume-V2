@@ -9,11 +9,7 @@ from career_os.harness.executor import Harness
 
 @pytest.fixture
 def harness(tmp_path, monkeypatch):
-    """harness（harness）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """构造测试用 Harness。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     monkeypatch.setenv("OUTPUT_DIR", str(tmp_path / "output"))
     import career_os.config as config_mod
@@ -26,11 +22,7 @@ def harness(tmp_path, monkeypatch):
 
 @pytest.mark.llm
 def test_opportunity_not_always_recommended(harness):
-    """test_opportunity_not_always_recommended（测试 opportunity not always recommended）的函数说明。
-
-    harness（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 opportunity not always recommended 场景。"""
     if not llm_enabled():
         pytest.skip("LLM_API_KEY not configured")
 
@@ -60,11 +52,7 @@ def test_opportunity_not_always_recommended(harness):
 
 @pytest.mark.llm
 def test_market_topics_vary_with_jd(harness):
-    """test_market_topics_vary_with_jd（测试 market topics vary with jd）的函数说明。
-
-    harness（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 market topics vary with jd 场景。"""
     if not llm_enabled():
         pytest.skip("LLM_API_KEY not configured")
 

@@ -10,19 +10,11 @@ from tests.conftest import seed_jd_ready_profile
 
 
 def test_gate_prompt_stops_delegate_chain_c3(jd_ready_profile):
-    """test_gate_prompt_stops_delegate_chain_c3（测试 gate prompt stops delegate chain c3）的函数说明。
-
-    jd_ready_profile（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 gate prompt stops delegate chain c3 场景。"""
     harness = Harness()
 
     def runner(worker_id, goal, session_state, context):
-        """runner（runner）的函数说明。
-
-        worker_id（参数）、goal（参数）、session_state（参数）、context（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """构造测试用 Worker runner。"""
         if worker_id == "market":
             return {
                 "worker_id": worker_id,
@@ -63,20 +55,12 @@ def test_gate_prompt_stops_delegate_chain_c3(jd_ready_profile):
 
 
 def test_sequential_delegate_without_gate(jd_ready_profile):
-    """test_sequential_delegate_without_gate（测试 sequential delegate without gate）的函数说明。
-
-    jd_ready_profile（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 sequential delegate without gate 场景。"""
     harness = Harness()
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
-        """runner（runner）的函数说明。
-
-        worker_id（参数）、goal（参数）、session_state（参数）、context（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """构造测试用 Worker runner。"""
         calls.append(worker_id)
         return {
             "worker_id": worker_id,
@@ -109,9 +93,7 @@ def test_sequential_delegate_without_gate(jd_ready_profile):
 
 
 def test_worker_index_injected():
-    """test_worker_index_injected（测试 worker index injected）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 worker index injected 场景。"""
     harness = Harness()
     runner = build_stub_worker_runner({})
     state = run_coordinator_turn(

@@ -21,21 +21,14 @@ WORKER_SEGMENT_PHASE: dict[str, str] = {
 
 
 def structured_segment_complete(structured: dict[str, Any] | None) -> bool:
-    """判断 Worker 结构化输出是否表示阶段片段完成。
-
-    structured（结构化输出）提供 phase_status。返回值为 True 表示该 Worker 完成当前 segment。
-    """
+    """判断 Worker 结构化输出是否表示阶段片段完成。"""
     return explore_phase_status(structured) == PHASE_SEGMENT_COMPLETE
 
 
 def prior_worker_segment_complete(
     prior_results: dict[str, Any], worker_id: str
 ) -> bool:
-    """判断历史 Worker 结果中某个 Worker 是否已完成 segment。
-
-    prior_results（历史结果）来自 session_state；worker_id（工作者标识）定位具体 Worker。
-    返回值为 True 表示可据此推断后续 pipeline 阶段。
-    """
+    """判断历史 Worker 结果中某个 Worker 是否已完成 segment。"""
     structured = (prior_results or {}).get(worker_id)
     if not isinstance(structured, dict):
         return False
@@ -43,10 +36,7 @@ def prior_worker_segment_complete(
 
 
 def infer_phase_after_repeat_decline(prior_results: dict[str, Any]) -> str:
-    """推断用户拒绝重复初探后应停留的阶段。
-
-    prior_results（历史结果）用于判断 opportunity 是否已经完成。返回值为 jd_analysis 或 market。
-    """
+    """推断用户拒绝重复初探后应停留的阶段。"""
     # opportunity 已完成说明 JD 分析链路已经走过，拒绝重探后回到 jd_analysis。
     if prior_worker_segment_complete(prior_results, "opportunity"):
         return "jd_analysis"
@@ -55,23 +45,14 @@ def infer_phase_after_repeat_decline(prior_results: dict[str, Any]) -> str:
 
 
 def apply_list_phase(list_id: str, phase: str) -> TaskStoreError | None:
-    """更新任务列表当前阶段。
-
-    list_id（列表标识）定位 pipeline 任务列表；phase（阶段）是要写入的阶段名。
-    返回值是 TaskStoreError 或 None，表示阶段写入是否失败。
-    """
+    """更新任务列表当前阶段。"""
     return TaskStore().set_current_phase(list_id, phase)
 
 
 def phase_after_worker_segment_complete(
     worker_id: str, structured: dict[str, Any] | None
 ) -> str | None:
-    """根据 Worker 完成结果推断下一阶段。
-
-    worker_id（工作者标识）表示刚完成的 Worker；
-    structured（结构化输出）用于判断 phase_status 是否 segment_complete。
-    返回值是完成该 Worker 后应推进到的 pipeline 阶段；不满足完成条件时返回 None。
-    """
+    """根据 Worker 完成结果推断下一阶段。"""
     if not structured_segment_complete(structured):
         return None
     return WORKER_SEGMENT_PHASE.get(worker_id)
@@ -80,11 +61,7 @@ def phase_after_worker_segment_complete(
 def finalize_explore_path_exit(
     session_state: dict[str, Any], gates: dict[str, Any]
 ) -> None:
-    """确认退出探索阶段并固化完成状态。
-
-    session_state（会话状态）和 gates（门禁状态）会被原地更新：关闭 gate_pending、
-    标记 explore 完成，并把完成时间写入 SessionStore/ProfileStore。
-    """
+    """确认退出探索阶段并固化完成状态。"""
     # 先更新内存态闭环，表示完成 gate 已通过。
     explore = dict(session_state.get("explore_closure") or {})
     explore["gate_pending"] = False
@@ -128,11 +105,7 @@ def finalize_explore_path_exit(
 def reopen_explore_after_gate_reject(
     session_state: dict[str, Any], gates: dict[str, Any]
 ) -> None:
-    """用户拒绝探索完成 gate 后重新打开探索阶段。
-
-    session_state（会话状态）和 gates（门禁状态）会被原地更新：清空 pending gate、
-    重置 explore_closure，并把 pipeline 阶段切回 explore。
-    """
+    """用户拒绝探索完成 gate 后重新打开探索阶段。"""
     # 清空当前 gate，并记录用户希望继续探索。
     gates["pending"] = None
     flags = dict(gates.get("flags") or {})
@@ -162,10 +135,7 @@ def reopen_explore_after_gate_reject(
 
 
 def on_explore_complete_confirmed(list_id: str) -> str:
-    """用户确认完成初探后推进到市场阶段。
-
-    list_id（列表标识）定位 pipeline 任务列表。返回值固定为 market。
-    """
+    """用户确认完成初探后推进到市场阶段。"""
     apply_list_phase(list_id, "market")
     return "market"
 
@@ -173,11 +143,7 @@ def on_explore_complete_confirmed(list_id: str) -> str:
 def on_explore_repeat_declined(
     list_id: str, prior_results: dict[str, Any]
 ) -> str:
-    """用户拒绝重复初探后恢复到合适的后续阶段。
-
-    list_id（列表标识）定位 pipeline 任务列表；prior_results（历史结果）用于推断回到
-    market 还是 jd_analysis。返回值是最终写入的阶段。
-    """
+    """用户拒绝重复初探后恢复到合适的后续阶段。"""
     phase = infer_phase_after_repeat_decline(prior_results)
     apply_list_phase(list_id, phase)
     return phase

@@ -6,12 +6,13 @@ ToolHandler = Callable[[str, dict[str, Any]], Any]
 
 @dataclass
 class ToolDefinition:
-    """ToolDefinition（ToolDefinition）的项目代码结构说明。
+    """
+    ToolDefinition（工具定义）描述一个可被指定角色调用的工具。
+    """
 
-    该类封装当前模块中的一组相关状态或行为，供业务代码、测试代码或运行时流程复用。"""
-    name: str
-    actors: set[str]
-    handler: ToolHandler
+    name: str  # 名称
+    actors: set[str]  # 允许调用角色
+    handler: ToolHandler  # 工具处理函数
 
 
 COORDINATOR_TOOLS = {
@@ -48,42 +49,29 @@ WORKER_BUSINESS_TOOLS: dict[str, set[str]] = {
 
 
 class ToolRegistry:
-    """ToolRegistry（ToolRegistry）的项目代码结构说明。
+    """
+    ToolRegistry（工具注册表）负责保存工具定义并按角色执行权限校验。
+    """
 
-    该类封装当前模块中的一组相关状态或行为，供业务代码、测试代码或运行时流程复用。"""
     def __init__(self) -> None:
-        """__init__（初始化对象）的函数说明。
-
-        该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+        """初始化对象。"""
         self._handlers: dict[str, ToolDefinition] = {}
 
     def register(
         self, name: str, handler: ToolHandler, *, actors: set[str]
     ) -> None:
-        """register（register）的函数说明。
-
-        name（参数）、handler（参数）、actors（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """处理register。"""
         self._handlers[name] = ToolDefinition(name=name, actors=actors, handler=handler)
 
     def is_allowed(self, actor: str, tool_name: str) -> bool:
-        """is_allowed（is allowed）的函数说明。
-
-        actor（参数）、tool_name（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """判断allowed。"""
         tool = self._handlers.get(tool_name)
         if tool is None:
             return False
         return actor in tool.actors
 
     def execute(self, actor: str, tool_name: str, args: dict[str, Any]) -> Any:
-        """execute（execute）的函数说明。
-
-        actor（参数）、tool_name（参数）、args（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """处理execute。"""
         tool = self._handlers.get(tool_name)
         if tool is None:
             raise KeyError(tool_name)

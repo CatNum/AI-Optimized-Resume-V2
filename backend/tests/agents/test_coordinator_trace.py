@@ -10,11 +10,7 @@ from career_os.platform.trace.writer import TraceWriter
 
 @pytest.fixture
 def traced_harness(tmp_path, monkeypatch):
-    """traced_harness（traced harness）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """构造测试用 Harness。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.profile as profile_mod
@@ -28,11 +24,7 @@ def traced_harness(tmp_path, monkeypatch):
 
 
 def test_coordinator_analyze_emits_trace(traced_harness, monkeypatch):
-    """test_coordinator_analyze_emits_trace（测试 coordinator analyze emits trace）的函数说明。
-
-    traced_harness（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 coordinator analyze emits trace 场景。"""
     harness, writer = traced_harness
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(coordinator_llm_mod, "check_jd_prerequisites", lambda session_state: (True, None))
@@ -43,11 +35,7 @@ def test_coordinator_analyze_emits_trace(traced_harness, monkeypatch):
     )
 
     def runner(worker_id, goal, session_state, context):
-        """runner（runner）的函数说明。
-
-        worker_id（参数）、goal（参数）、session_state（参数）、context（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """构造测试用 Worker runner。"""
         return {
             "worker_id": worker_id,
             "status": "completed",
@@ -85,19 +73,11 @@ def test_coordinator_analyze_emits_trace(traced_harness, monkeypatch):
 
 
 def test_coordinator_preset_workers_emits_trace(traced_harness):
-    """test_coordinator_preset_workers_emits_trace（测试 coordinator preset workers emits trace）的函数说明。
-
-    traced_harness（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 coordinator preset workers emits trace 场景。"""
     harness, writer = traced_harness
 
     def runner(worker_id, goal, session_state, context):
-        """runner（runner）的函数说明。
-
-        worker_id（参数）、goal（参数）、session_state（参数）、context（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """构造测试用 Worker runner。"""
         return {
             "worker_id": worker_id,
             "status": "completed",

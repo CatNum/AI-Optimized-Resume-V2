@@ -13,17 +13,13 @@ from tests.conftest import seed_explore_intake_profile
 
 
 def test_rules_resume_question():
-    """test_rules_resume_question（测试 rules resume question）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 rules resume question 场景。"""
     sections = match_profile_memory_rules("你有我的简历吗")
     assert "resume" in sections
 
 
 def test_resolve_mandatory_resume_for_opportunity():
-    """test_resolve_mandatory_resume_for_opportunity（测试 resolve mandatory resume for opportunity）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 resolve mandatory resume for opportunity 场景。"""
     sections = resolve_profile_memory_sections(
         "继续",
         {"list_type": "pipeline", "list_id": "list_x"},
@@ -33,9 +29,7 @@ def test_resolve_mandatory_resume_for_opportunity():
 
 
 def test_all_jd_and_resume_workers_require_resume():
-    """test_all_jd_and_resume_workers_require_resume（测试 all jd and resume workers require resume）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 all jd and resume workers require resume 场景。"""
     assert WORKERS_REQUIRE_RESUME >= {
         "market",
         "opportunity",
@@ -46,11 +40,7 @@ def test_all_jd_and_resume_workers_require_resume():
 
 
 def test_profile_aware_draft_states_resume_on_file(tmp_path, monkeypatch):
-    """test_profile_aware_draft_states_resume_on_file（测试 profile aware draft states resume on file）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 profile aware draft states resume on file 场景。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.profile as profile_mod
@@ -72,11 +62,7 @@ def test_profile_aware_draft_states_resume_on_file(tmp_path, monkeypatch):
 
 
 def test_materialize_full_resume_for_worker(tmp_path, monkeypatch):
-    """test_materialize_full_resume_for_worker（测试 materialize full resume for worker）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 materialize full resume for worker 场景。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.profile as profile_mod
@@ -92,11 +78,7 @@ def test_materialize_full_resume_for_worker(tmp_path, monkeypatch):
 
 
 def test_materialize_market_and_strategy_from_session_state(tmp_path, monkeypatch):
-    """test_materialize_market_and_strategy_from_session_state（测试 materialize market and strategy from session state）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 materialize market and strategy from session state 场景。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.profile as profile_mod

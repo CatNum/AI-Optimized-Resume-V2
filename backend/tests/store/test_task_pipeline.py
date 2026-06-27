@@ -7,11 +7,7 @@ from career_os.platform.pipeline_template import instantiate_pipeline_for_sessio
 
 @pytest.fixture
 def stores(tmp_path, monkeypatch):
-    """stores（stores）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """构造测试环境和基础状态。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.session as session_mod
@@ -24,11 +20,7 @@ def stores(tmp_path, monkeypatch):
 
 
 def test_complete_task_rejects_pipeline_milestone(stores):
-    """test_complete_task_rejects_pipeline_milestone（测试 complete task rejects pipeline milestone）的函数说明。
-
-    stores（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 complete task rejects pipeline milestone 场景。"""
     task_store, session_store = stores
     session_id = session_store.create_session()
     list_id = instantiate_pipeline_for_session(session_id)
@@ -39,11 +31,7 @@ def test_complete_task_rejects_pipeline_milestone(stores):
 
 
 def test_clear_works_and_tree(stores):
-    """test_clear_works_and_tree（测试 clear works and tree）的函数说明。
-
-    stores（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 clear works and tree 场景。"""
     task_store, session_store = stores
     session_id = session_store.create_session()
     list_id = instantiate_pipeline_for_session(session_id)

@@ -19,11 +19,7 @@ from tests.conftest import explore_repeat_cleared_gates, seed_explore_intake_pro
 
 @pytest.fixture(autouse=True)
 def explore_intake_ready(tmp_path, monkeypatch):
-    """explore_intake_ready（explore intake ready）的函数说明。
-
-    tmp_path（参数）、monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """构造测试辅助数据。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.profile as profile_mod
@@ -34,11 +30,7 @@ def explore_intake_ready(tmp_path, monkeypatch):
 
 
 def _next_explore_phase_status(worker_id: str, session_state: dict) -> str:
-    """_next_explore_phase_status（内部函数 next explore phase status）的函数说明。
-
-    worker_id（参数）、session_state（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """构造测试辅助数据。"""
     prior = (session_state.get("prior_results") or {}).get(worker_id) or {}
     if prior.get("phase_status") == PHASE_IN_PROGRESS:
         return PHASE_SEGMENT_COMPLETE
@@ -46,11 +38,7 @@ def _next_explore_phase_status(worker_id: str, session_state: dict) -> str:
 
 
 def _explore_runner(worker_id, goal, session_state, context):
-    """_explore_runner（内部函数 explore runner）的函数说明。
-
-    worker_id（参数）、goal（参数）、session_state（参数）、context（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """构造测试用 Worker runner。"""
     phase_status = _next_explore_phase_status(worker_id, session_state)
     if worker_id == "identity":
         if phase_status == PHASE_IN_PROGRESS:
@@ -107,18 +95,12 @@ def _explore_runner(worker_id, goal, session_state, context):
 
 
 def test_explore_in_progress_stops_delegate_chain():
-    """test_explore_in_progress_stops_delegate_chain（测试 explore in progress stops delegate chain）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 explore in progress stops delegate chain 场景。"""
     harness = Harness()
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
-        """runner（runner）的函数说明。
-
-        worker_id（参数）、goal（参数）、session_state（参数）、context（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """构造测试用 Worker runner。"""
         calls.append(worker_id)
         return _explore_runner(worker_id, goal, session_state, context)
 
@@ -144,18 +126,12 @@ def test_explore_in_progress_stops_delegate_chain():
 
 
 def test_explore_segment_complete_can_chain_next_worker():
-    """test_explore_segment_complete_can_chain_next_worker（测试 explore segment complete can chain next worker）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 explore segment complete can chain next worker 场景。"""
     harness = Harness()
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
-        """runner（runner）的函数说明。
-
-        worker_id（参数）、goal（参数）、session_state（参数）、context（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """构造测试用 Worker runner。"""
         calls.append(worker_id)
         if worker_id == "identity":
             return {
@@ -191,11 +167,7 @@ def test_explore_segment_complete_can_chain_next_worker():
 
 
 def test_explore_continuation_when_llm_returns_empty_workers(monkeypatch):
-    """test_explore_continuation_when_llm_returns_empty_workers（测试 explore continuation when llm returns empty workers）的函数说明。
-
-    monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 explore continuation when llm returns empty workers 场景。"""
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(
         coordinator_llm_mod.lc_client,
@@ -207,11 +179,7 @@ def test_explore_continuation_when_llm_returns_empty_workers(monkeypatch):
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
-        """runner（runner）的函数说明。
-
-        worker_id（参数）、goal（参数）、session_state（参数）、context（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """构造测试用 Worker runner。"""
         calls.append(worker_id)
         return {
             "worker_id": worker_id,
@@ -252,9 +220,7 @@ def test_explore_continuation_when_llm_returns_empty_workers(monkeypatch):
 
 
 def test_identity_first_question_offers_options_without_listing_them():
-    """test_identity_first_question_offers_options_without_listing_them（测试 identity first question offers options without listing them）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 identity first question offers options without listing them 场景。"""
     harness = Harness()
 
     state = run_coordinator_turn(
@@ -281,18 +247,12 @@ def test_identity_first_question_offers_options_without_listing_them():
 
 
 def test_capability_first_question_offers_options_without_listing_them():
-    """test_capability_first_question_offers_options_without_listing_them（测试 capability first question offers options without listing them）的函数说明。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 capability first question offers options without listing them 场景。"""
     harness = Harness()
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
-        """runner（runner）的函数说明。
-
-        worker_id（参数）、goal（参数）、session_state（参数）、context（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """构造测试用 Worker runner。"""
         calls.append(worker_id)
         return _explore_runner(worker_id, goal, session_state, context)
 
@@ -327,11 +287,7 @@ def test_capability_first_question_offers_options_without_listing_them():
 
 
 def test_explore_guidance_reveal_skips_worker_when_options_pending(monkeypatch):
-    """test_explore_guidance_reveal_skips_worker_when_options_pending（测试 explore guidance reveal skips worker when options pending）的函数说明。
-
-    monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 explore guidance reveal skips worker when options pending 场景。"""
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(
         coordinator_llm_mod.lc_client,
@@ -343,11 +299,7 @@ def test_explore_guidance_reveal_skips_worker_when_options_pending(monkeypatch):
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
-        """runner（runner）的函数说明。
-
-        worker_id（参数）、goal（参数）、session_state（参数）、context（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """构造测试用 Worker runner。"""
         calls.append(worker_id)
         return {
             "worker_id": worker_id,

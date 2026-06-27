@@ -3,11 +3,7 @@ from career_os.harness.gate_llm import classify_gate_intent_llm
 
 
 def test_classify_mock_llm_reject(monkeypatch):
-    """test_classify_mock_llm_reject（测试 classify mock llm reject）的函数说明。
-
-    monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 classify mock llm reject 场景。"""
     monkeypatch.setattr("career_os.harness.micro_classifier.llm_enabled", lambda: True)
     monkeypatch.setattr(
         "career_os.harness.micro_classifier.invoke_json",
@@ -28,11 +24,7 @@ def test_classify_mock_llm_reject(monkeypatch):
 
 
 def test_low_confidence_unknown_source_llm(monkeypatch):
-    """test_low_confidence_unknown_source_llm（测试 low confidence unknown source llm）的函数说明。
-
-    monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 low confidence unknown source llm 场景。"""
     monkeypatch.setattr("career_os.harness.micro_classifier.llm_enabled", lambda: True)
     monkeypatch.setattr(
         "career_os.harness.micro_classifier.invoke_json",
@@ -52,19 +44,11 @@ def test_low_confidence_unknown_source_llm(monkeypatch):
 
 
 def test_rule_hit_skips_llm(monkeypatch):
-    """test_rule_hit_skips_llm（测试 rule hit skips llm）的函数说明。
-
-    monkeypatch（参数）用于向该函数传入运行所需的数据。
-
-    该函数用于验证对应业务场景的行为是否符合预期。"""
+    """验证 rule hit skips llm 场景。"""
     called = []
 
     def fake_llm(*args, **kwargs):
-        """fake_llm（fake llm）的函数说明。
-
-        *args（参数）、**kwargs（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """构造测试替身函数。"""
         called.append(True)
         return {"matched": True, "intent": "confirm", "confidence": 0.9, "source": "llm"}
 

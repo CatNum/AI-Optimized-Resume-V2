@@ -20,11 +20,7 @@ def _rule_hit(
     *,
     pattern: str | None = None,
 ) -> dict[str, Any]:
-    """_rule_hit（内部函数 rule hit）的函数说明。
-
-    gate_name（参数）、intent（参数）、pattern（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """处理rule hit。"""
     out: dict[str, Any] = {
         "matched": True,
         "gate_name": gate_name,
@@ -38,11 +34,7 @@ def _rule_hit(
 
 
 def _unknown(pending_name: str | None) -> dict[str, Any]:
-    """_unknown（内部函数 unknown）的函数说明。
-
-    pending_name（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """处理unknown。"""
     if pending_name:
         return {
             "matched": False,
@@ -61,11 +53,7 @@ def _unknown(pending_name: str | None) -> dict[str, Any]:
 
 
 def _explore_repeat_confirm_blocked(message: str) -> bool:
-    """_explore_repeat_confirm_blocked（内部函数 explore repeat confirm blocked）的函数说明。
-
-    message（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """处理explore repeat confirm blocked。"""
     if matches_explore_complete_affirmative(message):
         return True
     blocked = (
@@ -81,11 +69,7 @@ def match_gate_intent_rules(
     user_message: str,
     pending_gate: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """match_gate_intent_rules（match gate intent rules）的函数说明。
-
-    user_message（参数）、pending_gate（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """处理match gate intent rules。"""
     message = user_message.strip()
     pending_name = (pending_gate or {}).get("name")
 
@@ -108,9 +92,5 @@ def match_gate_intent_rules(
 
 
 def is_rule_clear_hit(result: dict[str, Any]) -> bool:
-    """is_rule_clear_hit（is rule clear hit）的函数说明。
-
-    result（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """判断rule clear hit。"""
     return bool(result.get("matched") and result.get("source") == "rule")

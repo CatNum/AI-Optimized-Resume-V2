@@ -34,47 +34,29 @@ _SESSION_ID_RE = re.compile(r"^sess_[0-9a-f]{32}$")
 
 
 def _validate_session_id(session_id: str) -> None:
-    """_validate_session_id（内部函数 validate session id）的函数说明。
-
-    session_id（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """校验session id。"""
     if not session_id.startswith("sess_") or not _SESSION_ID_RE.match(session_id):
         raise HTTPException(status_code=400, detail="invalid_session_id")
 
 
 def _task_error(status: int, code: str, message: str) -> HTTPException:
-    """_task_error（内部函数 task error）的函数说明。
-
-    status（参数）、code（参数）、message（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """处理task error。"""
     return HTTPException(status_code=status, detail={"code": code, "message": message})
 
 
 def _validate_session_id_for_tasks(session_id: str) -> None:
-    """_validate_session_id_for_tasks（内部函数 validate session id for tasks）的函数说明。
-
-    session_id（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """校验session id for tasks。"""
     if not session_id.startswith("sess_") or not _SESSION_ID_RE.match(session_id):
         raise _task_error(400, "invalid_session_id", "Invalid session_id")
 
 
 def _session_not_found() -> HTTPException:
-    """_session_not_found（内部函数 session not found）的函数说明。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """处理session not found。"""
     return HTTPException(status_code=404, detail="session_not_found")
 
 
 def _enrich_row(store: SessionStore, row: dict[str, Any]) -> dict[str, Any]:
-    """_enrich_row（内部函数 enrich row）的函数说明。
-
-    store（参数）、row（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """处理enrich row。"""
     state = store.get_state(row["session_id"])
     activity = build_session_activity(state)
     return {
@@ -85,11 +67,7 @@ def _enrich_row(store: SessionStore, row: dict[str, Any]) -> dict[str, Any]:
 
 
 def _index_row(store: SessionStore, session_id: str) -> dict[str, Any] | None:
-    """_index_row（内部函数 index row）的函数说明。
-
-    store（参数）、session_id（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """处理index row。"""
     if not store.session_exists(session_id):
         return None
     index = store.load_index()
@@ -108,17 +86,9 @@ def _index_row(store: SessionStore, session_id: str) -> dict[str, Any] | None:
 
 
 def _sort_sessions(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """_sort_sessions（内部函数 sort sessions）的函数说明。
-
-    rows（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """排序sessions。"""
     def activity_key(row: dict[str, Any]) -> str:
-        """activity_key（activity key）的函数说明。
-
-        row（参数）用于向该函数传入运行所需的数据。
-
-        返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+        """生成活跃时间排序键。"""
         return row.get("last_activity_at") or ""
 
     non_archived = [r for r in rows if not r.get("archived")]
@@ -129,35 +99,39 @@ def _sort_sessions(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 class NewSessionResponse(BaseModel):
-    """NewSessionResponse（NewSessionResponse）的项目代码结构说明。
+    """
+    NewSessionResponse（新会话响应）承载创建会话接口返回的会话标识。
+    """
 
-    该类封装当前模块中的一组相关状态或行为，供业务代码、测试代码或运行时流程复用。"""
-    session_id: str
+    session_id: str  # 会话标识
 
 
 class PingResponse(BaseModel):
-    """PingResponse（PingResponse）的项目代码结构说明。
+    """
+    PingResponse（心跳响应）承载会话心跳接口返回的活跃状态。
+    """
 
-    该类封装当前模块中的一组相关状态或行为，供业务代码、测试代码或运行时流程复用。"""
-    session_id: str
-    last_activity_at: str
+    session_id: str  # 会话标识
+    last_activity_at: str  # 最后活跃时间
 
 
 class OnboardingRequest(BaseModel):
-    """OnboardingRequest（OnboardingRequest）的项目代码结构说明。
+    """
+    OnboardingRequest（引导请求）承载用户首次补充画像和求职意图的数据。
+    """
 
-    该类封装当前模块中的一组相关状态或行为，供业务代码、测试代码或运行时流程复用。"""
-    basic: dict[str, Any] | None = None
-    intent: dict[str, Any] | None = None
-    preference_tags: dict[str, Any] | None = None
+    basic: dict[str, Any] | None = None  # 基础画像
+    intent: dict[str, Any] | None = None  # 求职意图
+    preference_tags: dict[str, Any] | None = None  # 偏好标签
 
 
 class PatchSessionRequest(BaseModel):
-    """PatchSessionRequest（PatchSessionRequest）的项目代码结构说明。
+    """
+    PatchSessionRequest（会话更新请求）承载修改会话标题或归档状态的数据。
+    """
 
-    该类封装当前模块中的一组相关状态或行为，供业务代码、测试代码或运行时流程复用。"""
-    title: str | None = Field(default=None, min_length=1, max_length=32)
-    archived: bool | None = None
+    title: str | None = Field(default=None, min_length=1, max_length=32)  # 标题
+    archived: bool | None = None  # 是否归档
 
 
 @router.get("/sessions")
@@ -165,11 +139,7 @@ def list_sessions(
     q: str | None = None,
     archived: str | None = Query(default="false"),
 ):
-    """list_sessions（list sessions）的函数说明。
-
-    q（参数）、archived（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """列出sessions。"""
     store = SessionStore()
     index = store.load_index()
     if not index.get("sessions"):
@@ -198,11 +168,7 @@ def list_sessions(
 
 @router.get("/sessions/{session_id}")
 def get_session(session_id: str):
-    """get_session（get session）的函数说明。
-
-    session_id（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """读取session。"""
     _validate_session_id(session_id)
     store = SessionStore()
     row = _index_row(store, session_id)
@@ -214,11 +180,7 @@ def get_session(session_id: str):
 
 @router.get("/sessions/{session_id}/messages")
 def get_session_messages(session_id: str):
-    """get_session_messages（get session messages）的函数说明。
-
-    session_id（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """读取session messages。"""
     _validate_session_id(session_id)
     store = SessionStore()
     if not store.session_exists(session_id):
@@ -231,11 +193,7 @@ def generate_session_title(
     session_id: str,
     force: bool = Query(default=False),
 ):
-    """generate_session_title（generate session title）的函数说明。
-
-    session_id（参数）、force（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """处理generate session title。"""
     from career_os.agents.lc.client import llm_enabled
     from career_os.platform.store.session_title import maybe_generate_title
 
@@ -258,11 +216,7 @@ def generate_session_title(
 
 @router.patch("/sessions/{session_id}")
 def patch_session(session_id: str, body: PatchSessionRequest):
-    """patch_session（patch session）的函数说明。
-
-    session_id（参数）、body（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """补丁更新session。"""
     _validate_session_id(session_id)
     if body.title is None and body.archived is None:
         raise HTTPException(status_code=400, detail="empty_patch_body")
@@ -285,11 +239,7 @@ def patch_session(session_id: str, body: PatchSessionRequest):
 
 @router.delete("/sessions/{session_id}")
 def delete_session(session_id: str):
-    """delete_session（delete session）的函数说明。
-
-    session_id（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """删除session。"""
     _validate_session_id(session_id)
     store = SessionStore()
     if not store.session_exists(session_id):
@@ -302,9 +252,7 @@ def delete_session(session_id: str):
 
 @router.post("/sessions/new", response_model=NewSessionResponse)
 def new_session():
-    """new_session（new session）的函数说明。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """创建session。"""
     store = SessionStore()
     session_id = store.create_session()
     result = instantiate_pipeline_for_session(session_id)
@@ -318,11 +266,7 @@ def new_session():
 
 @router.post("/sessions/{session_id}/ping", response_model=PingResponse)
 def ping_session(session_id: str):
-    """ping_session（ping session）的函数说明。
-
-    session_id（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """处理ping session。"""
     from datetime import UTC, datetime
 
     _validate_session_id(session_id)
@@ -337,11 +281,7 @@ def ping_session(session_id: str):
 
 @router.get("/sessions/{session_id}/context")
 def session_context(session_id: str):
-    """session_context（session context）的函数说明。
-
-    session_id（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """处理session context。"""
     _validate_session_id(session_id)
     store = SessionStore()
     state = store.get_state(session_id)
@@ -356,21 +296,13 @@ def session_context(session_id: str):
 
 @router.get("/profile/explore-intake/status")
 def explore_intake_status(session_id: str | None = Query(default=None)):
-    """explore_intake_status（explore intake status）的函数说明。
-
-    session_id（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """处理explore intake status。"""
     return get_explore_intake_status(session_id)
 
 
 @router.post("/profile/explore-intake")
 def explore_intake(body: ExploreIntakeRequest):
-    """explore_intake（explore intake）的函数说明。
-
-    body（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """处理explore intake。"""
     try:
         return submit_explore_intake(body)
     except ValueError as exc:
@@ -387,11 +319,7 @@ def explore_intake(body: ExploreIntakeRequest):
 
 @router.post("/profile/onboarding")
 def profile_onboarding(body: OnboardingRequest):
-    """profile_onboarding（profile onboarding）的函数说明。
-
-    body（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """处理profile onboarding。"""
     store = ProfileStore()
     patches: list[dict[str, Any]] = []
     if body.basic:
@@ -411,9 +339,7 @@ def profile_onboarding(body: OnboardingRequest):
 
 @router.get("/profile")
 def get_profile():
-    """get_profile（get profile）的函数说明。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """读取profile。"""
     store = ProfileStore()
     return store.get(
         ["basic", "intent", "exploration", "career", "strategy", "preference_tags"]
@@ -421,11 +347,7 @@ def get_profile():
 
 
 def _format_task_list_row(store: TaskStore, row: dict[str, Any]) -> dict[str, Any]:
-    """_format_task_list_row（内部函数 format task list row）的函数说明。
-
-    store（参数）、row（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """格式化task list row。"""
     list_id = row["list_id"]
     if row.get("list_type") == "pipeline":
         tree = store.list_tasks_tree(list_id)
@@ -443,11 +365,7 @@ def _format_task_list_row(store: TaskStore, row: dict[str, Any]) -> dict[str, An
 
 @router.get("/tasks")
 def get_tasks(session_id: str | None = Query(default=None)):
-    """get_tasks（get tasks）的函数说明。
-
-    session_id（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """读取tasks。"""
     if session_id is None:
         raise _task_error(
             400,
@@ -512,11 +430,7 @@ def list_outputs(
     session_id: str | None = Query(default=None),
     kind: str | None = Query(default=None),
 ):
-    """list_outputs（list outputs）的函数说明。
-
-    session_id（参数）、kind（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """列出outputs。"""
     profile = ProfileStore()
     raw = profile.get(["outputs_index"]).get("outputs_index", [])
     deduped = dedupe_outputs_index(raw)
@@ -535,11 +449,7 @@ def list_outputs(
 
 @router.delete("/outputs/{encoded_path:path}")
 def delete_output(encoded_path: str):
-    """delete_output（delete output）的函数说明。
-
-    encoded_path（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """删除output。"""
     from pathlib import Path
 
     path = Path(encoded_path)

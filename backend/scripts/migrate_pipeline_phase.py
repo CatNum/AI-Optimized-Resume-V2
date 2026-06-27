@@ -24,11 +24,7 @@ PHASE_ORDER = list(PIPELINE_PHASES)
 
 
 def _phase_rank(phase: str) -> int:
-    """_phase_rank（内部函数 phase rank）的函数说明。
-
-    phase（参数）用于向该函数传入运行所需的数据。
-
-    该函数属于模块内部辅助逻辑，返回值供同模块或调用方继续处理。"""
+    """处理phase rank。"""
     try:
         return PHASE_ORDER.index(phase)
     except ValueError:
@@ -44,11 +40,7 @@ def _prior_worker_legacy_complete(prior_results: dict[str, Any], worker_id: str)
 
 
 def infer_phase_after_repeat_decline_legacy(prior_results: dict[str, Any]) -> str:
-    """infer_phase_after_repeat_decline_legacy（infer phase after repeat decline legacy）的函数说明。
-
-    prior_results（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """推断phase after repeat decline legacy。"""
     if _prior_worker_legacy_complete(prior_results, "opportunity"):
         return "jd_analysis"
     return "market"
@@ -83,11 +75,7 @@ def infer_target_phase(
 def migrate_list(
     list_dir: Path, *, data_dir: Path, apply: bool
 ) -> dict[str, Any] | None:
-    """migrate_list（migrate list）的函数说明。
-
-    list_dir（参数）、data_dir（参数）、apply（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """迁移list。"""
     meta_path = list_dir / "meta.json"
     if not meta_path.exists():
         return None
@@ -159,9 +147,7 @@ def migrate_list(
 
 
 def main() -> int:
-    """main（main）的函数说明。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """执行脚本入口。"""
     parser = argparse.ArgumentParser(description="Migrate pipeline current_phase state")
     parser.add_argument(
         "--data-dir",

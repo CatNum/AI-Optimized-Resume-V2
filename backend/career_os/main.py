@@ -35,11 +35,7 @@ if _output_mount.exists():
 
 @app.get("/v1/outputs/view")
 def view_output(path: str):
-    """view_output（view output）的函数说明。
-
-    path（参数）用于向该函数传入运行所需的数据。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """查看指定输出文件。"""
     resolved = resolve_output_file(path)
     if resolved is None:
         from fastapi import HTTPException
@@ -50,7 +46,5 @@ def view_output(path: str):
 
 @app.get("/healthz")
 def healthz():
-    """healthz（healthz）的函数说明。
-
-    返回值会根据当前业务逻辑返回处理结果，或通过副作用更新相关状态。"""
+    """返回健康检查结果。"""
     return {"status": "ok"}
