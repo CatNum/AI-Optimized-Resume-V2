@@ -204,6 +204,9 @@ venv.bak/
 # mkdocs documentation
 /site
 
+# 本地面试问题记录
+docs/面试问题/
+
 # mypy
 .mypy_cache/
 .dmypy.json
