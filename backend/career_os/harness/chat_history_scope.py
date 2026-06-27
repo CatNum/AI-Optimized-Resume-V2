@@ -1,4 +1,4 @@
-"""Select chat history window for Worker delegation."""
+"""为 Worker 委托选择聊天历史窗口。"""
 
 from __future__ import annotations
 

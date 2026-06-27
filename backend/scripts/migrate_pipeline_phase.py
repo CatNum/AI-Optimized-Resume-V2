@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One-time migration: align pipeline meta.current_phase and explore_closure with state."""
+"""一次性迁移：对齐 pipeline meta.current_phase、explore_closure 和 state。"""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# Allow running from repo root or backend/
+# 允许从仓库根目录或 backend/ 目录运行。
 _BACKEND = Path(__file__).resolve().parents[1]
 if str(_BACKEND) not in sys.path:
     sys.path.insert(0, str(_BACKEND))
@@ -36,7 +36,7 @@ def _phase_rank(phase: str) -> int:
 
 
 def _prior_worker_legacy_complete(prior_results: dict[str, Any], worker_id: str) -> bool:
-    """Migration: old prior_results may lack phase_status but have user_visible_summary."""
+    """迁移兼容：旧 prior_results 可能没有 phase_status，但包含 user_visible_summary。"""
     if prior_worker_segment_complete(prior_results, worker_id):
         return True
     blob = (prior_results or {}).get(worker_id)
@@ -57,7 +57,7 @@ def infer_phase_after_repeat_decline_legacy(prior_results: dict[str, Any]) -> st
 def infer_target_phase(
     meta: dict[str, Any], state: dict[str, Any] | None
 ) -> tuple[str, bool]:
-    """Return (target_phase, explore_closure_completed)."""
+    """返回 (target_phase, explore_closure_completed)。"""
     state = state or {}
     prior = state.get("prior_results") or {}
     flags = (state.get("gates") or {}).get("flags") or {}

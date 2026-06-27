@@ -1,4 +1,4 @@
-"""Hard rules for micro_classifier tasks (no IO)."""
+"""micro_classifier 任务的硬规则，不执行 IO。"""
 
 from __future__ import annotations
 
@@ -109,7 +109,7 @@ def match_history_scope_rules(user_message: str) -> dict[str, Any] | None:
 
 
 def match_profile_memory_rules(user_message: str) -> set[str]:
-    """Return profile section ids suggested by hard rules."""
+    """返回硬规则建议加载的 profile section id 列表。"""
     text = (user_message or "").strip()
     if not text:
         return set()
@@ -225,7 +225,7 @@ def _declares_agent_project(text: str, lower: str) -> bool:
 
 
 def match_pipeline_intent_rule_ids(user_message: str) -> list[str]:
-    """Return matched intent rule ids in priority order (highest phase first)."""
+    """按优先级返回命中的意图规则 id，越靠前表示阶段优先级越高。"""
     text = (user_message or "").strip()
     if not text:
         return []

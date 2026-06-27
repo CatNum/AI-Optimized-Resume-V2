@@ -7,7 +7,7 @@ from career_os.platform.tool.handlers.outputs import normalize_output_path, reso
 def build_request_context_from_attachments(
     attachments: list[dict[str, Any]] | None,
 ) -> dict[str, Any]:
-    """Resolve B05 file_ref attachments into coordinator/worker context."""
+    """将 B05 file_ref 附件解析到 Coordinator 和 Worker 上下文中。"""
     if not attachments:
         return {}
 
@@ -44,7 +44,7 @@ def enrich_user_message_with_attachments(
     message: str,
     attachments: list[dict[str, Any]] | None,
 ) -> str:
-    """Append a stable, human-readable reference block for chat history / LLM."""
+    """为聊天历史和 LLM 追加稳定且可读的引用信息块。"""
     ctx = build_request_context_from_attachments(attachments)
     refs = ctx.get("resume_file_refs") or []
     if not refs:

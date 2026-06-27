@@ -65,7 +65,7 @@ def test_jd_ready_when_only_global_exploration_completed(profile_env):
     profile_env.patch([{"path": "basic.name", "value": "测试", "op": "set"}])
     raw = profile_env.get(["meta", "exploration", "basic", "intent", "resume", "outputs_index", "skills", "constraints", "career", "capability", "market", "strategy", "preference_tags"])
     raw.setdefault("exploration", {})["completed_at"] = "2026-05-31T00:00:00Z"
-    profile_path = profile_env._profile_path  # test-only direct write for legacy data simulation
+    profile_path = profile_env._profile_path  # 仅测试使用：直接写入以模拟旧数据。
     profile_path.write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
     ready, reason = check_jd_prerequisites({"prior_results": {}})
     assert ready is True

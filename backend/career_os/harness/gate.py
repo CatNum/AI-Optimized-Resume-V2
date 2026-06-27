@@ -1,4 +1,4 @@
-"""Gate intent matching: hard rules first, then LLM fallback."""
+"""闸门意图匹配：先走硬规则，再回退到 LLM。"""
 
 from __future__ import annotations
 
@@ -143,6 +143,6 @@ def match_gate_intent(
     return llm_result
 
 
-# Re-export for tests / legacy imports
+# 为测试和旧导入路径重新导出。
 _matches_explore_complete_affirmative = matches_explore_complete_affirmative
 _EXPLORE_COMPLETE_AFFIRMATIVE = EXPLORE_COMPLETE_AFFIRMATIVE

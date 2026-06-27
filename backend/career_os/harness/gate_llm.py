@@ -1,4 +1,4 @@
-"""LLM fallback for gate intent — delegates to micro_classifier."""
+"""闸门意图的 LLM 回退逻辑，委托给 micro_classifier。"""
 
 from __future__ import annotations
 

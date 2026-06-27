@@ -60,7 +60,7 @@ def slice_chat_rounds(
 def slice_synthesize_chat_history(
     messages: list[dict[str, str]],
 ) -> list[dict[str, str]]:
-    """Last dialogue beat: prior assistant (if any) + current user message."""
+    """最后一段对话：上一条 assistant 消息（如果存在）加当前 user 消息。"""
     if not messages:
         return []
     if messages[-1].get("role") != "user":

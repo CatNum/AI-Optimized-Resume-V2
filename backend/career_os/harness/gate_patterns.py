@@ -1,4 +1,4 @@
-"""Shared gate pattern tables."""
+"""共享的闸门匹配模式表。"""
 
 import re
 

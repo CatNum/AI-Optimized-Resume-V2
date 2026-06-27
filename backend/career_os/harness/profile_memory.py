@@ -1,4 +1,4 @@
-"""Resolve which profile (long-term memory) sections apply to a turn and materialize for LLM calls."""
+"""解析本轮适用的 profile 长期记忆分区，并为 LLM 调用物化内容。"""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from career_os.harness.pipeline_routing import get_current_phase
 from career_os.platform.store.profile import ProfileStore
 from career_os.platform.store.session import SessionStore
 
-# Logical section id -> ProfileStore.get path prefixes
+# 逻辑分区 id -> ProfileStore.get 路径前缀
 SECTION_PATHS: dict[str, tuple[str, ...]] = {
     "resume": ("resume", "exploration"),
     "basic_intent": ("basic", "intent"),
@@ -48,7 +48,7 @@ def resolve_profile_memory_sections(
     *,
     worker_id: str | None = None,
 ) -> list[str]:
-    """Return ordered section ids to load for this turn (rules + classifier + mandatory resume)."""
+    """返回本轮需要加载的有序分区 id，来源包括规则、分类器和必需简历。"""
     found: set[str] = set(match_profile_memory_rules(user_message))
 
     if worker_id and worker_id in WORKERS_REQUIRE_RESUME:
@@ -164,7 +164,7 @@ def _session_artifact_memory(session_state: dict[str, Any] | None) -> dict[str, 
             exploration[worker_id] = blob
     if exploration:
         out["exploration"] = exploration
-    # Explicit references only; do not auto-load historical sessions.
+    # 仅处理显式引用，不自动加载历史会话。
     for ref_blob in ref_artifacts:
         if not out.get("market") and isinstance(ref_blob.get("market"), dict):
             out["market"] = ref_blob.get("market") or {}
@@ -291,7 +291,7 @@ def build_profile_aware_chat_draft(
     user_message: str,
     session_state: dict[str, Any],
 ) -> str:
-    """Build synthesis draft before synthesize LLM; embeds profile facts for this turn."""
+    """在 synthesize LLM 前构建合成草稿，并嵌入本轮相关的 profile 事实。"""
     from career_os.agents.lc.coordinator_llm import chat_only_synthesis_draft
 
     sections = resolve_profile_memory_sections(user_message, session_state)

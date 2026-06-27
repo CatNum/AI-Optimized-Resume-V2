@@ -26,7 +26,7 @@ def _output_root() -> Path:
 
 
 def canonical_output_prefix() -> str:
-    """Logical URL/index prefix (e.g. output/demo), not an absolute filesystem path."""
+    """逻辑 URL 或索引前缀，例如 output/demo，不是绝对文件系统路径。"""
     configured = Path(settings.output_dir)
     if not configured.is_absolute():
         return configured.as_posix().removeprefix("./")

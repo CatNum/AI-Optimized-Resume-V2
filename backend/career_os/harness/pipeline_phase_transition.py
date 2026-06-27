@@ -118,7 +118,7 @@ def finalize_explore_path_exit(
     try:
         ProfileStore().patch(patches)
     except ValueError:
-        # Keep session completion even if profile persistence is temporarily unavailable.
+    # 即使 profile 持久化暂时不可用，也保留当前会话的完成状态。
         pass
 
 

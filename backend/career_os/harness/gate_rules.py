@@ -1,4 +1,4 @@
-"""Hard-rule gate intent matching (no IO)."""
+"""基于硬规则的闸门意图匹配，不执行 IO。"""
 
 from __future__ import annotations
 

@@ -18,7 +18,7 @@ _RE_DOC_START = re.compile(r"<(!DOCTYPE|html|head|body)\b", re.IGNORECASE)
 
 
 def validate_resume_html_content(content: str) -> tuple[bool, str]:
-    """Return (ok, message). Reject plain-text/markdown resumes masquerading as .html."""
+    """返回 (ok, message)，拒绝伪装成 .html 的纯文本或 Markdown 简历。"""
     stripped = (content or "").strip()
     if not stripped:
         return False, "简历 HTML 内容为空"

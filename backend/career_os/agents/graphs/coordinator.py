@@ -165,12 +165,15 @@ def build_coordinator_graph(
         state（协调器状态）包含用户消息、会话状态、待执行 Worker 队列等。
         返回值是更新后的 CoordinatorState：可能设置 current_worker_id，也可能直接进入合成。
         """
+        # 如果 停止委派
         if state.get("stop_delegate"):
             return state
         pending = list(state.get("pending_workers") or [])
         session_state = dict(state.get("session_state") or {})
         from career_os.harness.pipeline_routing import maybe_apply_jd_fingerprint_from_message
 
+        # 先把本轮用户消息中可能携带的 JD 指纹合并进 session_state（会话状态），
+        # 再清理上一轮遗留的临时阻断标记，避免旧 gate 影响新一轮路由。
         session_state = maybe_apply_jd_fingerprint_from_message(
             state.get("session_id"),
             session_state,
@@ -178,10 +181,12 @@ def build_coordinator_graph(
         )
         session_state.pop("jd_prerequisite_blocked", None)
         session_state.pop("jd_block_reason", None)
+        # 不需要重新填写初探 intake
         if not needs_repeat_intake(session_state):
             session_state.pop("explore_intake_blocked", None)
         session_state.pop("explore_guidance_reveal_pending", None)
 
+        # chat_only_requested（仅聊天请求）用于绕过 Worker 调度，直接进入 synthesize。
         if is_chat_only_intent(state.get("user_message", "")):
             session_state["chat_only_requested"] = True
             session_state.pop("gate_clarify_pending", None)
@@ -193,6 +198,8 @@ def build_coordinator_graph(
                 "stop_delegate": True,
             }
 
+        # explore_guidance_reveal_pending（探索指引待展示）由 synthesize 消费，
+        # 判断是否只展示可选项。
         if should_reveal_explore_guidance(state.get("user_message", ""), session_state):
             mark_explore_guidance_revealed(session_state)
             return {
@@ -203,18 +210,26 @@ def build_coordinator_graph(
                 "stop_delegate": True,
             }
 
+        # history_analyze（分析用聊天历史）只保留最近若干轮对话，
+        # 给意图识别使用，避免完整历史过长影响路由判断。
         history_analyze = slice_chat_rounds(
             state.get("messages") or [],
             max_rounds=settings.coordinator_analyze_max_rounds,
         )
+        # apply_intent_phase_transition（应用意图阶段切换）根据用户本轮消息和短历史，
+        # 判断是否需要切换 pipeline 阶段，并把阶段结果写回 session_state（会话状态）。
         intent_transition = apply_intent_phase_transition(
             state.get("user_message", ""),
             session_state,
             chat_history=history_analyze,
         )
+        # applied（已应用）为 True 时，说明 session_state 已被阶段切换逻辑更新，
+        # 这里把更新后的 session_state 放回 CoordinatorState（协调器状态）。
         if intent_transition.get("applied"):
             state = {**state, "session_state": session_state}
 
+        # analysis（路由分析结果）保存 LLM 或 fallback 的 Worker 选择结果；
+        # source（来源）记录结果来自 llm、fallback、queue、continuation 等路径。
         analysis: dict[str, Any] | None = None
         source: str | None = None
 
@@ -244,6 +259,8 @@ def build_coordinator_graph(
             _sync_session_list_type_from_analysis(session_state, result)
             return workers
 
+        # pending_workers（待执行 Worker 队列）优先级最高；没有预置队列时，
+        # 再按闲聊、LLM 路由、fallback 路由的顺序决定本轮 workers。
         if pending:
             source = "queue" if state.get("delegate_count", 0) > 0 else "preset"
         elif is_small_talk(state.get("user_message", "")):
@@ -272,6 +289,8 @@ def build_coordinator_graph(
                     source = "none"
                     pending = []
 
+        # explore_continuation_analyze（探索续跑分析）用于补齐尚未完成的探索段：
+        # 当主路由没有给出 Worker 时，根据 explore_closure（探索闭环状态）继续派发。
         if (
             not pending
             and not session_state.get("explore_intake_blocked")
@@ -283,6 +302,8 @@ def build_coordinator_graph(
                 _sync_session_list_type_from_analysis(session_state, continued)
                 source = "continuation" if source in (None, "llm", "none", "fallback") else source
 
+        # enforce_explore_intake（强制探索信息收集）会在 Worker 执行前拦截：
+        # 如果基础信息不足，清空 pending，让 synthesize 输出引导用户补信息的回复。
         if pending and not session_state.get("explore_intake_blocked"):
             intake_payload: dict[str, Any] = {"workers": pending}
             if session_state.get("list_type"):
@@ -312,6 +333,7 @@ def build_coordinator_graph(
 
         planned = plan_explore_worker_dispatch(pending, session_state)
 
+        # planned（计划调度结果）为空时不立即委托 Worker，保留 pending_workers 给后续轮次或合成逻辑处理。
         if not pending:
             return {
                 **state,
@@ -346,6 +368,8 @@ def build_coordinator_graph(
 
         session_state = dict(state.get("session_state") or {})
         full_history = state.get("messages") or []
+        # select_worker_chat_history（选择 Worker 聊天历史）会裁剪上下文，
+        # 避免把无关历史全部塞给下游 Worker。
         worker_history, scope_label = select_worker_chat_history(
             full_history,
             state.get("user_message", ""),
@@ -386,6 +410,8 @@ def build_coordinator_graph(
                 "last_worker_result": {"status": "failed", "error": result.message},
             }
 
+        # runner（工作者运行函数）负责真正执行 Worker；harness.delegate_worker
+        # 返回的 context（上下文）已经包含权限检查和委托层补充信息。
         worker_result = runner(
             worker_id,
             state.get("user_message", ""),
@@ -393,6 +419,7 @@ def build_coordinator_graph(
             result.get("context") or {},
         )
         prior_results = dict(session_state.get("prior_results") or {})
+        # prior_results（历史 Worker 结果）只保存压缩摘要，供后续 Worker 和合成阶段引用。
         if worker_result.get("status") == "completed":
             prior_results[worker_id] = _compact_prior_result(
                 worker_id, worker_result.get("structured_output") or {}
@@ -401,6 +428,8 @@ def build_coordinator_graph(
         if worker_result.get("status") == "completed" and state.get("session_id"):
             structured_out = worker_result.get("structured_output") or {}
             artifact_patches: list[dict[str, Any]] = []
+            # artifact_patches（产物补丁）把关键 Worker 结果同步到会话产物区，
+            # 便于页面或后续流程读取结构化成果。
             if worker_id in {"market", "opportunity", "strategy"}:
                 artifact_patches.append(
                     {"path": worker_id, "value": structured_out, "op": "set"}
@@ -445,6 +474,8 @@ def build_coordinator_graph(
                     apply_list_phase(list_id, advanced)
                     session_state["pipeline_phase"] = advanced
 
+        # stop_delegate（停止委托）控制是否继续派发下一个 Worker：
+        # 有 gate_prompt、探索段未完成、或探索闭环需要用户确认时都必须先停下来合成回复。
         stop_delegate = bool(gate_prompt)
         if (
             worker_id in EXPLORE_WORKERS
@@ -482,6 +513,8 @@ def build_coordinator_graph(
         last = state.get("last_worker_result") or {}
         structured = last.get("structured_output") or {}
 
+        # gate_clarify_pending（门禁澄清待处理）优先级最高：
+        # 用户需要先确认关键决策，不能被普通 Worker 摘要覆盖。
         if session_state.get("gate_clarify_pending"):
             pending_gate = (session_state.get("gates") or {}).get("pending") or {}
             text = build_gate_clarify_text(pending_gate)
@@ -494,6 +527,7 @@ def build_coordinator_graph(
                 "last_worker_result": last or state.get("last_worker_result"),
             }
 
+        # chat_only_requested（仅聊天请求）由 analyze 设置，这里生成不依赖 Worker 的闲聊回复。
         if session_state.pop("chat_only_requested", False):
             text = chat_only_synthesis_draft(session_state)
             return {
@@ -513,6 +547,8 @@ def build_coordinator_graph(
         list_type = session_state.get("list_type")
         offer_explore, _diag = can_offer_explore_complete(profile, session_state)
         text: str | None = None
+        # 以下分支按业务优先级合成回复：探索完成 gate、Worker 自带 gate、
+        # JD 前置阻断、探索信息补齐、探索指引展示，最后才回落到普通摘要。
         if (
             list_type == "pipeline"
             and offer_explore
@@ -614,6 +650,8 @@ def build_coordinator_graph(
         return "analyze"
 
     graph = StateGraph(CoordinatorState)
+    # analyze（分析节点）负责路由决策；delegate（委托节点）执行 Worker；
+    # synthesize（合成节点）生成最终回复。条件边让图在多 Worker 队列中循环，直到需要回复用户。
     graph.add_node("analyze", analyze)
     graph.add_node("delegate", delegate)
     graph.add_node("synthesize", synthesize)

@@ -8,7 +8,7 @@ def run_depth_judge(
     profile: dict[str, Any],
     messages: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Harness depth judge stub; replace with LLM call in production."""
+    """Harness 探索深度判断占位实现，生产环境可替换为 LLM 调用。"""
     _ = messages
     exploration = profile.get("exploration") or {}
     rounds = (exploration.get("depth_rounds") or {}).get(track, 0)

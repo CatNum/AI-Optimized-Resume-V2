@@ -1,10 +1,10 @@
-"""SPIKE acceptance (architecture 07 §9).
+"""SPIKE 验收测试（architecture 07 §9）。
 
-1. Coordinator delegate without skill_name; Worker receives skill_index via
-   capability_bundle — see ``tests/harness/test_delegate_capability_bundle.py``.
-2. Worker ReAct loads two skills; audit trace has >=2 ``tool.call`` for
-   ``load_skill`` (and optionally ``skill.load``).
-3. Harness rejects wrong worker loading skill — see
+1. Coordinator 委托时不传 skill_name；Worker 通过 capability_bundle 接收 skill_index，
+   见 ``tests/harness/test_delegate_capability_bundle.py``。
+2. Worker ReAct 加载两个 skill；审计 trace 中针对 ``load_skill`` 的 ``tool.call``
+   至少出现 2 次（也可以包含 ``skill.load``）。
+3. Harness 拒绝错误 Worker 加载 skill，见
    ``tests/harness/test_load_skill.py::test_load_skill_rejects_wrong_worker``.
 """
 
@@ -139,7 +139,7 @@ def test_react_loads_two_skills_trace(harness, monkeypatch):
 
 @pytest.mark.llm
 def test_worker_loads_skill_twice_trace_llm(harness):
-    """Optional real-LLM SPIKE; skipped without API key."""
+    """可选的真实 LLM SPIKE；没有 API key 时跳过。"""
     pytest.importorskip("litellm")
     import os
 

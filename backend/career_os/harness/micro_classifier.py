@@ -1,4 +1,4 @@
-"""Lightweight LLM classifiers: gate_intent, history_scope."""
+"""轻量级 LLM 分类器，覆盖 gate_intent 和 history_scope。"""
 
 from __future__ import annotations
 

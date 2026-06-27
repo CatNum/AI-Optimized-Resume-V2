@@ -1,4 +1,4 @@
-"""Async / on-demand LLM session titles (D7)."""
+"""异步或按需生成的 LLM 会话标题，关联 D7。"""
 
 from __future__ import annotations
 
@@ -94,7 +94,7 @@ def maybe_generate_title(
     *,
     force: bool = False,
 ) -> bool:
-    """Generate LLM title when allowed. Returns True if index title was updated to auto."""
+    """在允许时生成 LLM 标题；如果索引标题被更新为 auto，则返回 True。"""
     if not llm_enabled():
         return False
 

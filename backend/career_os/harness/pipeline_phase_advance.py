@@ -1,4 +1,4 @@
-"""Forward pipeline phase from coordinator analyze output (LLM-primary)."""
+"""根据 Coordinator 分析输出向前推进 pipeline 阶段，优先采用 LLM 判断。"""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def can_enter_pipeline_phase(
     session_state: dict[str, Any],
     user_message: str,
 ) -> bool:
-    """Guardrails for analyze-declared forward phase (B: loose JD context)."""
+    """校验分析阶段声明的前进目标阶段，B 表示宽松 JD 上下文。"""
     if target_phase not in PIPELINE_PHASES:
         return False
     if target_phase == "explore":
@@ -52,7 +52,7 @@ def resolve_analyze_target_phase(
     result: dict[str, Any],
     session_state: dict[str, Any],
 ) -> str | None:
-    """Merge declared pipeline_phase and workers-inferred phase; take the later step."""
+    """合并声明的 pipeline_phase 和由 workers 推断出的阶段，选择更靠后的阶段。"""
     from career_os.harness.pipeline_routing import (
         get_current_phase,
         infer_pipeline_phase_from_workers,
@@ -82,7 +82,7 @@ def maybe_advance_phase_from_analyze(
     session_state: dict[str, Any],
     user_message: str,
 ) -> str:
-    """Persist forward phase when analyze requests it; return phase used for worker filter."""
+    """当分析结果请求前进时持久化阶段，并返回用于 Worker 过滤的阶段。"""
     from career_os.harness.pipeline_routing import get_current_phase, is_pipeline_session
 
     current = get_current_phase(session_state) or "explore"

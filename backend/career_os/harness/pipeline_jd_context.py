@@ -1,4 +1,4 @@
-"""Shared JD / pipeline context helpers (no routing imports)."""
+"""共享的 JD 和 pipeline 上下文辅助函数，不引入路由模块。"""
 
 from __future__ import annotations
 

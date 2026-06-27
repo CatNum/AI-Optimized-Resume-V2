@@ -46,7 +46,7 @@ def _parse_sections(body: str) -> dict[str, str]:
 
 @lru_cache(maxsize=32)
 def load_worker_system_prompt(worker_id: str) -> str:
-    """Load worker agent prompt from platform/prompt/{worker_id}/system.md."""
+    """从 platform/prompt/{worker_id}/system.md 加载 Worker agent prompt。"""
     md_path = _PROMPT_DIR / worker_id / "system.md"
     if md_path.exists():
         return _read_system_document(md_path)
@@ -72,13 +72,13 @@ def load_prompt(worker_id: str, name: str = "default") -> str:
 
 
 def load_worker_llm_prompt(name: str) -> str:
-    """Load shared worker LLM prompt from platform/prompt/worker/{name}.tmpl."""
+    """从 platform/prompt/worker/{name}.tmpl 加载共享 Worker LLM prompt。"""
     path = _PROMPT_DIR / "worker" / f"{name}.tmpl"
     return path.read_text(encoding="utf-8")
 
 
 def render_prompt(template: str, **replacements: str) -> str:
-    """Replace __KEY__ placeholders without interpreting JSON braces."""
+    """替换 __KEY__ 占位符，但不解析 JSON 大括号。"""
     result = template
     for key, value in replacements.items():
         result = result.replace(f"__{key.upper()}__", value)
@@ -87,7 +87,7 @@ def render_prompt(template: str, **replacements: str) -> str:
 
 @dataclass(frozen=True)
 class CoordinatorPrompt:
-    """Structured entry-router agent prompt (platform/prompt/coordinator/system.md)."""
+    """结构化入口路由 Agent prompt，来源于 platform/prompt/coordinator/system.md。"""
 
     system: str
     chat_only_draft: str

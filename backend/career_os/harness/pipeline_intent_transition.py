@@ -1,4 +1,4 @@
-"""Pipeline phase transitions driven by user intent (table-driven, precondition B)."""
+"""由用户意图驱动的 pipeline 阶段切换，采用规则表并满足前置条件 B。"""
 
 from __future__ import annotations
 
@@ -71,7 +71,7 @@ class IntentTransition:
     suggested_workers: tuple[str, ...]
 
 
-# Table order: when multiple rules match, pick highest PHASE_RANK[to_phase].
+# 规则表顺序：多个规则命中时，选择 PHASE_RANK[to_phase] 最高的目标阶段。
 INTENT_TRANSITIONS: tuple[IntentTransition, ...] = (
     IntentTransition(
         frozenset({"resume_strategy"}),
@@ -270,7 +270,7 @@ def resolve_intent_phase_transition(
     *,
     chat_history: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
-    """Return transition metadata; does not write disk."""
+    """返回阶段切换元数据，不写入磁盘。"""
     current = get_current_phase(session_state) or "explore"
     empty: dict[str, Any] = {
         "applied": False,
@@ -329,7 +329,7 @@ def apply_intent_phase_transition(
     *,
     chat_history: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
-    """Resolve and persist phase when preconditions pass."""
+    """在前置条件满足时解析并持久化目标阶段。"""
     resolved = resolve_intent_phase_transition(
         user_message, session_state, chat_history=chat_history
     )

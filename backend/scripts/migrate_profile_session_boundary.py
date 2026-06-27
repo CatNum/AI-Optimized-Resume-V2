@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One-time migration: move session-scoped fields out of profile.json."""
+"""一次性迁移：将会话级字段从 profile.json 中迁出。"""
 
 from __future__ import annotations
 
@@ -225,4 +225,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

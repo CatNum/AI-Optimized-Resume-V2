@@ -1,4 +1,4 @@
-"""Deterministic ReAct stand-ins for L1 tests when LLM_API_KEY is absent."""
+"""缺少 LLM_API_KEY 时供 L1 测试使用的确定性 ReAct 替身实现。"""
 import hashlib
 from typing import Any
 

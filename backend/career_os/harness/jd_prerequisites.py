@@ -50,7 +50,7 @@ def _explore_completed(profile: dict[str, Any], session_state: dict[str, Any]) -
 
 
 def check_jd_prerequisites(session_state: dict[str, Any]) -> tuple[bool, str | None]:
-    """Return (ready, block_reason). block_reason is onboarding | explore."""
+    """返回 (ready, block_reason)，block_reason 表示 onboarding 或 explore 阻断原因。"""
     profile = ProfileStore().get(
         ["basic", "capability", "exploration", "intent", "resume"]
     )

@@ -172,7 +172,7 @@ def _validate_patch_path(path: str, value: Any) -> None:
         raise ValueError(f"profile_path_forbidden:{path}")
     if path.startswith(_ALLOWED_PREFIXES):
         return
-    # Allow exact roots for limited updates.
+        # 允许对白名单根路径进行有限更新。
     if path in {"basic", "skills", "intent", "constraints", "capability", "preference_tags"}:
         return
     if path in {"resume.source_text", "resume.source_path"}:
