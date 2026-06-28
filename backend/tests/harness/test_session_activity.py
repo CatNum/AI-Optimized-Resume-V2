@@ -20,7 +20,7 @@ def explore_intake_ready(tmp_path, monkeypatch):
 
 
 def test_build_session_activity_shows_explore_in_progress():
-    """验证 build session activity shows explore in progress 场景。"""
+    """验证构建会话活动信息展示 explore 在进行中的处理符合预期。"""
     state = {
         "list_type": "pipeline",
         "explore_closure": init_explore_closure(),
@@ -38,7 +38,7 @@ def test_build_session_activity_shows_explore_in_progress():
 
 
 def test_explore_flow_active_when_identity_in_progress():
-    """验证 explore flow active when identity in progress 场景。"""
+    """验证 identity Worker 进行中时 explore pipeline 保持活跃。"""
     state = {
         "list_type": "pipeline",
         "explore_closure": init_explore_closure(),
@@ -48,7 +48,7 @@ def test_explore_flow_active_when_identity_in_progress():
 
 
 def test_build_session_activity_hides_intake_for_fresh_profile(monkeypatch):
-    """验证 build session activity hides intake for fresh profile 场景。"""
+    """验证新建 profile 时会话活动信息会隐藏 intake。"""
     import career_os.platform.store.profile as profile_mod
     import career_os.platform.store.session as session_mod
     import career_os.platform.pipeline_template as pipeline_mod
@@ -56,7 +56,7 @@ def test_build_session_activity_hides_intake_for_fresh_profile(monkeypatch):
     profile = profile_mod.ProfileStore()
     raw = profile.get(["meta", "basic", "skills", "intent", "constraints", "exploration", "career", "capability", "market", "strategy", "resume", "preference_tags", "outputs_index"])
     raw.setdefault("exploration", {})["completed_at"] = "2026-05-31T00:00:00Z"
-    profile._profile_path.write_text(  # noqa: SLF001 - test-only fixture
+    profile._profile_path.write_text(  # noqa: SLF001 - 测试专用 fixture
         __import__("json").dumps(raw, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )

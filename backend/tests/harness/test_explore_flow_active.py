@@ -3,7 +3,7 @@ from career_os.harness.session_activity import explore_flow_active
 
 
 def test_explore_flow_inactive_when_gate_confirmed():
-    """验证 explore flow inactive when gate confirmed 场景。"""
+    """验证 gate 已确认时，explore pipeline 未激活的处理符合预期。"""
     session_state = {
         "list_type": "pipeline",
         "explore_gate_confirmed": True,
@@ -14,7 +14,7 @@ def test_explore_flow_inactive_when_gate_confirmed():
 
 
 def test_explore_flow_inactive_when_repeat_declined():
-    """验证 explore flow inactive when repeat declined 场景。"""
+    """验证重复探索已拒绝时，explore pipeline 未激活的处理符合预期。"""
     session_state = {
         "list_type": "pipeline",
         "explore_closure": init_explore_closure(),
@@ -24,7 +24,7 @@ def test_explore_flow_inactive_when_repeat_declined():
 
 
 def test_explore_flow_active_when_closure_incomplete():
-    """验证 explore flow active when closure incomplete 场景。"""
+    """验证收口未完成时，explore pipeline 活跃的处理符合预期。"""
     session_state = {
         "list_type": "pipeline",
         "explore_closure": init_explore_closure(),

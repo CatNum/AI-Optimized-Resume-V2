@@ -28,7 +28,7 @@ def _seed_jd_ready(profile: ProfileStore) -> None:
 
 
 def test_jd_request_blocked_without_prerequisites(env, monkeypatch):
-    """验证 jd request blocked without prerequisites 场景。"""
+    """验证缺少前置条件时，JD 请求被拦截的处理符合预期。"""
     harness = Harness()
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(
@@ -40,7 +40,7 @@ def test_jd_request_blocked_without_prerequisites(env, monkeypatch):
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
-        """构造测试用 Worker runner。"""
+        """构造测试用 Worker 调度器。"""
         calls.append(worker_id)
         return {"worker_id": worker_id, "status": "completed", "structured_output": {}}
 
@@ -59,7 +59,7 @@ def test_jd_request_blocked_without_prerequisites(env, monkeypatch):
 
 
 def test_jd_request_allowed_when_prerequisites_met(env, monkeypatch):
-    """验证 jd request allowed when prerequisites met 场景。"""
+    """验证前置条件满足时，JD 请求允许的处理符合预期。"""
     _seed_jd_ready(ProfileStore())
     harness = Harness()
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
@@ -72,7 +72,7 @@ def test_jd_request_allowed_when_prerequisites_met(env, monkeypatch):
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
-        """构造测试用 Worker runner。"""
+        """构造测试用 Worker 调度器。"""
         calls.append(worker_id)
         return {
             "worker_id": worker_id,
@@ -101,11 +101,11 @@ def test_jd_request_allowed_when_prerequisites_met(env, monkeypatch):
 
 
 def test_preset_queue_blocked_at_harness_delegate(env, monkeypatch):
-    """验证 preset queue blocked at harness delegate 场景。"""
+    """验证预设队列被拦截在 Harness 委派的处理符合预期。"""
     harness = Harness()
 
     def runner(worker_id, goal, session_state, context):
-        """构造测试用 Worker runner。"""
+        """构造测试用 Worker 调度器。"""
         return {"worker_id": worker_id, "status": "completed", "structured_output": {}}
 
     state = run_coordinator_turn(

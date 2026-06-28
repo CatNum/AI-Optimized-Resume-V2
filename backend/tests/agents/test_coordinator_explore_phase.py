@@ -38,7 +38,7 @@ def _next_explore_phase_status(worker_id: str, session_state: dict) -> str:
 
 
 def _explore_runner(worker_id, goal, session_state, context):
-    """构造测试用 Worker runner。"""
+    """构造测试用 Worker 调度器。"""
     phase_status = _next_explore_phase_status(worker_id, session_state)
     if worker_id == "identity":
         if phase_status == PHASE_IN_PROGRESS:
@@ -95,12 +95,12 @@ def _explore_runner(worker_id, goal, session_state, context):
 
 
 def test_explore_in_progress_stops_delegate_chain():
-    """验证 explore in progress stops delegate chain 场景。"""
+    """验证 explore 在进行中停止委派链路的处理符合预期。"""
     harness = Harness()
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
-        """构造测试用 Worker runner。"""
+        """构造测试用 Worker 调度器。"""
         calls.append(worker_id)
         return _explore_runner(worker_id, goal, session_state, context)
 
@@ -126,12 +126,12 @@ def test_explore_in_progress_stops_delegate_chain():
 
 
 def test_explore_segment_complete_can_chain_next_worker():
-    """验证 explore segment complete can chain next worker 场景。"""
+    """验证 explore 分段完成可以链路下一个 Worker。"""
     harness = Harness()
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
-        """构造测试用 Worker runner。"""
+        """构造测试用 Worker 调度器。"""
         calls.append(worker_id)
         if worker_id == "identity":
             return {
@@ -167,7 +167,7 @@ def test_explore_segment_complete_can_chain_next_worker():
 
 
 def test_explore_continuation_when_llm_returns_empty_workers(monkeypatch):
-    """验证 explore continuation when llm returns empty workers 场景。"""
+    """验证 LLM 返回空 Worker 列表时，explore 续跑的处理符合预期。"""
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(
         coordinator_llm_mod.lc_client,
@@ -179,7 +179,7 @@ def test_explore_continuation_when_llm_returns_empty_workers(monkeypatch):
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
-        """构造测试用 Worker runner。"""
+        """构造测试用 Worker 调度器。"""
         calls.append(worker_id)
         return {
             "worker_id": worker_id,
@@ -220,7 +220,7 @@ def test_explore_continuation_when_llm_returns_empty_workers(monkeypatch):
 
 
 def test_identity_first_question_offers_options_without_listing_them():
-    """验证 identity first question offers options without listing them 场景。"""
+    """验证缺少列出这些选项时，identity Worker 首次提问提供选项的处理符合预期。"""
     harness = Harness()
 
     state = run_coordinator_turn(
@@ -247,12 +247,12 @@ def test_identity_first_question_offers_options_without_listing_them():
 
 
 def test_capability_first_question_offers_options_without_listing_them():
-    """验证 capability first question offers options without listing them 场景。"""
+    """验证缺少列出这些选项时，capability Worker 首次提问提供选项的处理符合预期。"""
     harness = Harness()
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
-        """构造测试用 Worker runner。"""
+        """构造测试用 Worker 调度器。"""
         calls.append(worker_id)
         return _explore_runner(worker_id, goal, session_state, context)
 
@@ -287,7 +287,7 @@ def test_capability_first_question_offers_options_without_listing_them():
 
 
 def test_explore_guidance_reveal_skips_worker_when_options_pending(monkeypatch):
-    """验证 explore guidance reveal skips worker when options pending 场景。"""
+    """验证选项待处理项时，explore 引导展示跳过 Worker 的处理符合预期。"""
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(
         coordinator_llm_mod.lc_client,
@@ -299,7 +299,7 @@ def test_explore_guidance_reveal_skips_worker_when_options_pending(monkeypatch):
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
-        """构造测试用 Worker runner。"""
+        """构造测试用 Worker 调度器。"""
         calls.append(worker_id)
         return {
             "worker_id": worker_id,

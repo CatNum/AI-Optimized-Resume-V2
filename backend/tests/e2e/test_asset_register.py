@@ -25,7 +25,7 @@ def harness(tmp_path, monkeypatch):
 
 
 def test_asset_registers_resume_deliveries(harness):
-    """验证 asset registers resume deliveries 场景。"""
+    """验证 asset Worker 会登记 resume Worker 交付物。"""
     session_state = {
         "session_id": "sess_asset",
         "gates": {"flags": {"optimize_confirmed": True}},

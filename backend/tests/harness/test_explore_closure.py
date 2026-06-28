@@ -13,7 +13,7 @@ from career_os.harness.explore_closure import (
 
 
 def test_default_required_workers():
-    """验证 default required workers 场景。"""
+    """验证默认必需 Worker 列表的处理符合预期。"""
     state = init_explore_closure()
     assert state["required_workers"] == ["identity", "capability"]
     assert state["worker_done"]["identity"] is False
@@ -21,7 +21,7 @@ def test_default_required_workers():
 
 
 def test_single_worker_other_done():
-    """验证 single worker other done 场景。"""
+    """验证单个 Worker 其他完成的处理符合预期。"""
     state = init_explore_closure(required_workers=["identity"])
     assert state["worker_done"]["capability"] is True
     state = mark_worker_done(
@@ -33,7 +33,7 @@ def test_single_worker_other_done():
 
 
 def test_in_progress_does_not_mark_worker_done():
-    """验证 in progress does not mark worker done 场景。"""
+    """验证在进行中不会标记 Worker 完成。"""
     state = init_explore_closure()
     state = mark_worker_done(
         state,
@@ -49,7 +49,7 @@ def test_in_progress_does_not_mark_worker_done():
 
 
 def test_both_done_allows_gate_pending():
-    """验证 both done allows gate pending 场景。"""
+    """验证两个完成会允许 gate 待处理项。"""
     state = init_explore_closure()
     state = mark_worker_done(
         state,
@@ -66,7 +66,7 @@ def test_both_done_allows_gate_pending():
 
 
 def test_completed_explore_does_not_reopen_gate():
-    """验证 completed explore does not reopen gate 场景。"""
+    """验证已完成 explore 不会重新打开 gate。"""
     state = init_explore_closure()
     state = mark_worker_done(
         state,
@@ -83,14 +83,14 @@ def test_completed_explore_does_not_reopen_gate():
 
 
 def test_plan_explore_dispatch_one_worker_at_a_time():
-    """验证 plan explore dispatch one worker at a time 场景。"""
+    """验证计划型 explore 会一次只分派一个 Worker。"""
     session_state = {"explore_closure": init_explore_closure()}
     planned = plan_explore_worker_dispatch(["identity", "capability"], session_state)
     assert planned == ["identity"]
 
 
 def test_identity_explore_gate_prompt_fails_validation():
-    """验证 identity explore gate prompt fails validation 场景。"""
+    """验证 identity Worker 探索 gate 提示失败校验的处理符合预期。"""
     err = validate_worker_structured_output(
         "identity",
         {"gate_prompt": {"name": "explore_complete", "prompt": "确认？"}},

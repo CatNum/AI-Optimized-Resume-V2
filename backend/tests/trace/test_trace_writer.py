@@ -20,7 +20,7 @@ def traced_harness(tmp_path, monkeypatch):
 
 
 def test_execute_tool_writes_tool_call_event(traced_harness):
-    """验证 execute tool writes tool call event 场景。"""
+    """验证执行工具会写入工具调用事件。"""
     harness, writer = traced_harness
     harness.execute_tool(
         "identity",
@@ -43,7 +43,7 @@ def test_execute_tool_writes_tool_call_event(traced_harness):
 
 
 def test_trace_zh_summary_for_skill_load(traced_harness):
-    """验证 trace zh summary for skill load 场景。"""
+    """验证 trace 中文摘要针对 Skill 加载的处理符合预期。"""
     _, writer = traced_harness
     writer.emit(
         "skill.load",
@@ -62,7 +62,7 @@ def test_trace_zh_summary_for_skill_load(traced_harness):
 
 
 def test_delegate_worker_writes_agent_run_start(traced_harness, jd_ready_profile):
-    """验证 delegate worker writes agent run start 场景。"""
+    """验证委派 Worker 会写入智能体运行启动。"""
     harness, writer = traced_harness
     harness.delegate_worker(
         "coordinator",

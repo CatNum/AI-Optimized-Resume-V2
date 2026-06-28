@@ -5,7 +5,7 @@ from career_os.platform.store.session import slice_chat_rounds, slice_synthesize
 
 
 def test_analyze_payload_uses_six_round_window(monkeypatch):
-    """验证 analyze payload uses six round window 场景。"""
+    """验证分析 phase 载荷会使用六轮窗口。"""
     captured: dict = {}
 
     def fake_invoke(_s, user, **kw):
@@ -35,7 +35,7 @@ def test_analyze_payload_uses_six_round_window(monkeypatch):
 
 
 def test_synthesis_payload_uses_one_round_window():
-    """验证 synthesis payload uses one round window 场景。"""
+    """验证汇总 phase 载荷会使用一轮窗口。"""
     messages = [
         {"role": "user", "content": "u1"},
         {"role": "assistant", "content": "a1"},

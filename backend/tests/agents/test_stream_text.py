@@ -4,7 +4,7 @@ from career_os.agents.lc.client import stream_text
 
 
 def test_stream_text_yields_deltas(monkeypatch):
-    """验证 stream text yields deltas 场景。"""
+    """验证流式输出文本会产出增量。"""
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     import career_os.agents.lc.models as models_mod
 

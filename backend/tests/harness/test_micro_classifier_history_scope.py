@@ -3,7 +3,7 @@ from career_os.harness.micro_classifier_rules import match_history_scope_rules
 
 
 def test_rule_full_history_phrases():
-    """验证 rule full history phrases 场景。"""
+    """验证规则完整历史话术的处理符合预期。"""
     r = match_history_scope_rules("请根据我们完整对话里贴的 JD 分析")
     assert r is not None
     assert r["needs_full_history"] is True
@@ -11,14 +11,14 @@ def test_rule_full_history_phrases():
 
 
 def test_classify_history_scope_rule_path():
-    """验证 classify history scope rule path 场景。"""
+    """验证分类历史范围规则路径的处理符合预期。"""
     out = classify("history_scope", "检查上下文里之前的内容", {})
     assert out["needs_full_history"] is True
     assert out["source"] == "rule"
 
 
 def test_classify_history_scope_mock_llm(monkeypatch):
-    """验证 classify history scope mock llm 场景。"""
+    """验证 mock LLM 分类历史范围 的处理符合预期。"""
     monkeypatch.setattr("career_os.harness.micro_classifier.llm_enabled", lambda: True)
     monkeypatch.setattr(
         "career_os.harness.micro_classifier.invoke_json",

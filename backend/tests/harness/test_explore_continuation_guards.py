@@ -11,20 +11,20 @@ def _base_session() -> dict:
 
 
 def test_continuation_none_when_gate_confirmed():
-    """验证 continuation none when gate confirmed 场景。"""
+    """验证 gate 已确认时，续跑不触发的处理符合预期。"""
     state = {**_base_session(), "explore_gate_confirmed": True}
     assert explore_continuation_analyze(state) is None
 
 
 def test_continuation_none_when_repeat_declined():
-    """验证 continuation none when repeat declined 场景。"""
+    """验证重复探索已拒绝时，续跑不触发的处理符合预期。"""
     state = _base_session()
     state["gates"] = {"flags": {"explore_repeat_declined": True}}
     assert explore_continuation_analyze(state) is None
 
 
 def test_continuation_none_when_closure_completed():
-    """验证 continuation none when closure completed 场景。"""
+    """验证收口已完成时，续跑不触发的处理符合预期。"""
     closure = init_explore_closure()
     closure["completed"] = True
     state = {**_base_session(), "explore_closure": closure}
@@ -32,7 +32,7 @@ def test_continuation_none_when_closure_completed():
 
 
 def test_continuation_dispatches_when_incomplete():
-    """验证 continuation dispatches when incomplete 场景。"""
+    """验证未完成时，续跑分派的处理符合预期。"""
     state = _base_session()
     result = explore_continuation_analyze(state)
     assert result is not None

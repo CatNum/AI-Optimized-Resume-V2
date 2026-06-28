@@ -3,7 +3,7 @@ from career_os.harness.gate_llm import classify_gate_intent_llm
 
 
 def test_classify_mock_llm_reject(monkeypatch):
-    """验证 classify mock llm reject 场景。"""
+    """验证 mock LLM 分类拒绝的处理符合预期。"""
     monkeypatch.setattr("career_os.harness.micro_classifier.llm_enabled", lambda: True)
     monkeypatch.setattr(
         "career_os.harness.micro_classifier.invoke_json",
@@ -24,7 +24,7 @@ def test_classify_mock_llm_reject(monkeypatch):
 
 
 def test_low_confidence_unknown_source_llm(monkeypatch):
-    """验证 low confidence unknown source llm 场景。"""
+    """验证低置信度未知来源 LLM 的处理符合预期。"""
     monkeypatch.setattr("career_os.harness.micro_classifier.llm_enabled", lambda: True)
     monkeypatch.setattr(
         "career_os.harness.micro_classifier.invoke_json",
@@ -44,7 +44,7 @@ def test_low_confidence_unknown_source_llm(monkeypatch):
 
 
 def test_rule_hit_skips_llm(monkeypatch):
-    """验证 rule hit skips llm 场景。"""
+    """验证规则命中会跳过 LLM。"""
     called = []
 
     def fake_llm(*args, **kwargs):

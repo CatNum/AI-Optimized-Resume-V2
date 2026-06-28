@@ -9,7 +9,7 @@ from career_os.platform.store.profile import ProfileStore
 
 
 def explore_repeat_cleared_gates() -> dict[str, Any]:
-    """为全局 intake 提交后可能进入 explore 的会话准备 gates flags。"""
+    """为全局 intake 提交后可能进入 explore 的会话准备 gate flags。"""
     return {
         "flags": {
             "explore_repeat_accepted": True,
@@ -35,7 +35,7 @@ def seed_explore_intake_profile(store: ProfileStore | None = None) -> ProfileSto
             {"path": "intent.target_role", "value": "后端工程师", "op": "set"},
         ]
     )
-    # 兼容仍读取全局 exploration intake 的旧测试。
+    # 兼容仍读取全局 explore intake 结果的旧测试。
     raw = profile.get(
         [
             "meta",
@@ -128,13 +128,13 @@ def jd_ready_profile(tmp_path, monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _reset_llm_settings_for_l1(request, monkeypatch):
-    """避免 LLM 单元测试中的旧 model_settings.llm_api_key 泄漏到其他测试。"""
+    """避免 LLM 单元测试中的旧密钥配置泄漏到其他测试。"""
     if request.node.get_closest_marker("llm"):
         yield
         return
     from career_os.agents.lc import models as models_mod
 
-    # 空环境变量会覆盖 backend/.env，让 L1 继续使用 react_mocks，而不调用真实 API。
+    # 空环境变量会覆盖后端配置文件，让 L1 继续使用 mock 链路，而不调用真实接口。
     monkeypatch.setenv("LLM_API_KEY", "")
     models_mod.model_settings.__init__()
     yield

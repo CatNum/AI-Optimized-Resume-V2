@@ -19,7 +19,7 @@ def harness(tmp_path, monkeypatch):
 
 @pytest.mark.no_llm
 def test_profile_patch_whitelist_rejects_asset(harness):
-    """验证 profile patch whitelist rejects asset 场景。"""
+    """验证 profile 更新白名单会拒绝 asset Worker。"""
     err = harness.execute_tool(
         "asset",
         "profile_patch",
@@ -30,7 +30,7 @@ def test_profile_patch_whitelist_rejects_asset(harness):
 
 @pytest.mark.no_llm
 def test_jd_r1_blocks_opportunity(harness, jd_ready_profile):
-    """验证 jd r1 blocks opportunity 场景。"""
+    """验证 JD 第一条规则会拦截 opportunity Worker。"""
     err = harness.delegate_worker(
         "coordinator",
         "opportunity",
@@ -43,7 +43,7 @@ def test_jd_r1_blocks_opportunity(harness, jd_ready_profile):
 
 @pytest.mark.no_llm
 def test_explore_gate_intent():
-    """验证 explore gate intent 场景。"""
+    """验证探索 gate 意图的处理符合预期。"""
     result = match_gate_intent("确认完成初探")
     assert result["gate_name"] == "explore_complete"
     assert result["intent"] == "confirm"
@@ -51,7 +51,7 @@ def test_explore_gate_intent():
 
 @pytest.mark.no_llm
 def test_load_chat_history_no_trim(tmp_path, monkeypatch):
-    """验证 load chat history no trim 场景。"""
+    """验证加载聊天历史不裁剪的处理符合预期。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.session as session_mod
@@ -69,6 +69,6 @@ def test_load_chat_history_no_trim(tmp_path, monkeypatch):
 
 @pytest.mark.no_llm
 def test_b3_worker_no_complete(harness):
-    """验证 b3 worker no complete 场景。"""
+    """验证第三条基线 Worker 不完成的处理符合预期。"""
     err = harness.execute_tool("identity", "complete_task", {"task_id": "m1"})
     assert err.code == "tool_not_allowed"

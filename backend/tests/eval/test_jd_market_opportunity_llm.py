@@ -22,7 +22,7 @@ def harness(tmp_path, monkeypatch):
 
 @pytest.mark.llm
 def test_opportunity_not_always_recommended(harness):
-    """验证 opportunity not always recommended 场景。"""
+    """验证 opportunity Worker 不总是推荐的处理符合预期。"""
     if not llm_enabled():
         pytest.skip("LLM_API_KEY not configured")
 
@@ -52,7 +52,7 @@ def test_opportunity_not_always_recommended(harness):
 
 @pytest.mark.llm
 def test_market_topics_vary_with_jd(harness):
-    """验证 market topics vary with jd 场景。"""
+    """验证市场主题变化具备 JD 的处理符合预期。"""
     if not llm_enabled():
         pytest.skip("LLM_API_KEY not configured")
 

@@ -1,5 +1,5 @@
 def test_touch_index_on_create(tmp_path, monkeypatch):
-    """验证 touch index on create 场景。"""
+    """验证更新索引在创建的处理符合预期。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -23,7 +23,7 @@ def test_touch_index_on_create(tmp_path, monkeypatch):
 
 
 def test_touch_index_updates_preview_and_count(tmp_path, monkeypatch):
-    """验证 touch index updates preview and count 场景。"""
+    """验证更新索引会更新预览和数量。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -68,7 +68,7 @@ def _reload_session_store(tmp_path, monkeypatch):
 
 
 def test_rebuild_index_from_disk_dirs(tmp_path, monkeypatch):
-    """验证 rebuild index from disk dirs 场景。"""
+    """验证重建索引从磁盘目录的处理符合预期。"""
     s = _reload_session_store(tmp_path, monkeypatch)
     session_id = "sess_" + "a" * 32
     session_dir = tmp_path / "sessions" / session_id
@@ -94,7 +94,7 @@ def test_rebuild_index_from_disk_dirs(tmp_path, monkeypatch):
 
 
 def test_rebuild_prunes_orphan_index_entries(tmp_path, monkeypatch):
-    """验证 rebuild prunes orphan index entries 场景。"""
+    """验证重建清理孤儿索引条目的处理符合预期。"""
     s = _reload_session_store(tmp_path, monkeypatch)
     orphan_id = "sess_" + "0" * 32
     real_id = "sess_" + "1" * 32
@@ -138,7 +138,7 @@ def test_rebuild_prunes_orphan_index_entries(tmp_path, monkeypatch):
 
 
 def test_delete_session_removes_dir_index_and_tasks(tmp_path, monkeypatch):
-    """验证 delete session removes dir index and tasks 场景。"""
+    """验证删除会话会删除目录索引和任务。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 

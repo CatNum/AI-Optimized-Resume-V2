@@ -1,9 +1,10 @@
-"""Eval 分类覆盖率（architecture 12 §3.2 ≥20 case 分布）."""
+"""eval 分类覆盖率要求。"""
 
 import pytest
 
-# 每条为 pytest node 后缀（唯一标识）；允许跨层重复计数见 CASES.md
+# 每条为测试节点后缀（唯一标识）；允许跨层重复计数。
 EVAL_INVENTORY: dict[str, list[str]] = {
+    # 闸门
     "gate": [
         "test_explore_complete_confirm",
         "test_optimize_confirm_reject",
@@ -14,6 +15,7 @@ EVAL_INVENTORY: dict[str, list[str]] = {
         "test_strategy_no_optimize_gate_on_plan",
         "test_identity_explore_gate_prompt_fails_validation",
     ],
+    # Worker 派工 trace
     "trajectory": [
         "test_jd_chain_market_then_opportunity",
         "test_market_before_opportunity_order",
@@ -23,6 +25,7 @@ EVAL_INVENTORY: dict[str, list[str]] = {
         "test_explore_workers_set_closure_ready",
         "test_chat_jd_gate_chain",
     ],
+    # 工具与存储
     "tool_storage": [
         "test_profile_patch_whitelist_rejects_asset",
         "test_asset_cannot_patch_exploration",
@@ -37,6 +40,7 @@ EVAL_INVENTORY: dict[str, list[str]] = {
         "test_jd_r1_blocks_opportunity",
         "test_b3_worker_no_complete",
     ],
+    # HTML 交付
     "html_delivery": [
         "test_resume_writes_multiple_levels",
         "test_golden_jd_to_html_structure",
@@ -45,6 +49,7 @@ EVAL_INVENTORY: dict[str, list[str]] = {
         "test_eval_html_delivery_contract",
         "test_resume_generates_html_deliveries",
     ],
+    # 降级能力
     "degrade": [
         "test_browser_fetch_degrades_without_api_key",
         "test_worker_can_complete_despite_browser_fetch_failure",
@@ -65,21 +70,21 @@ MINIMUMS = {
 @pytest.mark.no_llm
 @pytest.mark.parametrize("category", list(MINIMUMS.keys()))
 def test_eval_category_meets_minimum(category: str):
-    """验证 eval category meets minimum 场景。"""
+    """验证 eval 分类会达到最低要求。"""
     count = len(EVAL_INVENTORY[category])
     assert count >= MINIMUMS[category], f"{category}: {count} < {MINIMUMS[category]}"
 
 
 @pytest.mark.no_llm
 def test_eval_total_distinct_cases_at_least_twenty():
-    """验证 eval total distinct cases at least twenty 场景。"""
+    """验证 eval 总数不同用例在不少于二十的处理符合预期。"""
     distinct = {name for cases in EVAL_INVENTORY.values() for name in cases}
     assert len(distinct) >= 20
 
 
 @pytest.mark.no_llm
 def test_eval_html_delivery_contract():
-    """三档 HTML：optimization_level 字段 + 文件路径前缀 output/.。"""
+    """验证三档 HTML 交付契约符合预期。"""
     from career_os.platform.tool.handlers.resume_html import sort_optimization_levels
 
     levels = sort_optimization_levels(["进取", "保守", "标准"])

@@ -29,7 +29,7 @@ def output_env(tmp_path, monkeypatch):
 
 
 def test_build_request_context_resolves_file_ref(output_env):
-    """验证 build request context resolves file ref 场景。"""
+    """验证构建请求上下文会解析文件引用。"""
     ctx = build_request_context_from_attachments(
         [{"type": "file_ref", "path": output_env, "optimization_level": "保守"}]
     )
@@ -40,7 +40,7 @@ def test_build_request_context_resolves_file_ref(output_env):
 
 
 def test_build_request_context_skips_missing_file(tmp_path):
-    """验证 build request context skips missing file 场景。"""
+    """验证构建请求上下文会跳过缺失文件。"""
     ctx = build_request_context_from_attachments(
         [{"type": "file_ref", "path": "output/demo/missing.html"}]
     )
@@ -48,7 +48,7 @@ def test_build_request_context_skips_missing_file(tmp_path):
 
 
 def test_enrich_user_message_appends_block(output_env):
-    """验证 enrich user message appends block 场景。"""
+    """验证增强用户消息会追加块。"""
     text = enrich_user_message_with_attachments(
         "请复用这份简历",
         [{"type": "file_ref", "path": output_env}],

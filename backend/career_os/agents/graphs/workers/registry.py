@@ -19,7 +19,8 @@ def build_harness_worker_runner(
     use_react: bool = True,
     use_react_mocks: bool | None = None,
 ) -> Callable[[str, str, dict[str, Any], dict[str, Any]], dict[str, Any]]:
-    """构造基于 Harness 的 Worker 调度函数。"""
+    """构造基于 Harness 的 Worker 调度器。"""
+    # mock 开关未显式传入时，根据 LLM 是否可用自动选择。
     react_mocks = use_react_mocks if use_react_mocks is not None else not llm_enabled()
 
     def runner(
@@ -29,9 +30,11 @@ def build_harness_worker_runner(
         context: dict[str, Any],
     ) -> dict[str, Any]:
         """运行一个指定 Worker。"""
+        # 白名单限制可调度的 Worker 类型。
         if not use_react or worker_id not in REACT_REQUIRED_WORKERS:
             return {"worker_id": worker_id, "status": "failed", "error": "unknown worker"}
 
+        # 无 LLM 环境下使用确定性替身执行。
         if react_mocks:
             return mock_run_worker_react(
                 harness,
@@ -41,6 +44,7 @@ def build_harness_worker_runner(
                 context=context,
             )
 
+        # 真实 ReAct 调用前做运行期保护。
         if not llm_enabled():
             return {
                 "worker_id": worker_id,
@@ -48,6 +52,7 @@ def build_harness_worker_runner(
                 "error": f"LLM_API_KEY is required for {worker_id} ReAct worker",
             }
 
+        # 进入真实执行链路，负责模型推理和工具调用。
         return run_worker_react(
             harness,
             worker_id=worker_id,
@@ -56,4 +61,5 @@ def build_harness_worker_runner(
             context=context,
         )
 
+    # 返回调度器，供 Coordinator 按 worker_id 分派。
     return runner

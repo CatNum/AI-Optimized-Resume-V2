@@ -16,19 +16,19 @@ def task_store(tmp_path, monkeypatch):
 
 
 def test_create_task_list_rejects_explore(task_store):
-    """验证 create task list rejects explore 场景。"""
+    """验证创建任务列表时会拒绝 explore。"""
     err = task_store.create_task_list("sess_a", list_type="explore", status="ready")
     assert err.code == "list_type_deprecated"
 
 
 def test_create_task_list_rejects_jd(task_store):
-    """验证 create task list rejects jd 场景。"""
+    """验证创建任务列表会拒绝 JD。"""
     err = task_store.create_task_list("sess_a", list_type="jd", status="ready")
     assert err.code == "list_type_deprecated"
 
 
 def test_create_task_list_accepts_pipeline_and_plan(task_store):
-    """验证 create task list accepts pipeline and plan 场景。"""
+    """验证创建任务列表接受 pipeline 和计划的处理符合预期。"""
     pipeline_id = task_store.create_task_list("sess_a", list_type="pipeline", status="ready")
     plan_id = task_store.create_task_list("sess_b", list_type="plan", status="ready")
     assert isinstance(pipeline_id, str)

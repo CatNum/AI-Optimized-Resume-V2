@@ -20,19 +20,19 @@ def _reload_session_store(tmp_path, monkeypatch):
 
 
 def test_fallback_title_from_first_user():
-    """验证 fallback title from first user 场景。"""
+    """验证兜底标题从首次用户的处理符合预期。"""
     messages = [{"role": "assistant", "content": "hi"}, {"role": "user", "content": "hello world"}]
     assert fallback_title_from_messages(messages) == "hello world"
 
 
 def test_fallback_title_empty_user_defaults():
-    """验证 fallback title empty user defaults 场景。"""
+    """验证兜底标题为空用户默认使用的处理符合预期。"""
     assert fallback_title_from_messages([]) == "未命名会话"
     assert fallback_title_from_messages([{"role": "user", "content": ""}]) == "未命名会话"
 
 
 def test_maybe_generate_title_after_first_user(tmp_path, monkeypatch):
-    """验证 maybe generate title after first user 场景。"""
+    """验证尝试生成标题之后首次用户的处理符合预期。"""
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     from career_os.agents.lc import models as models_mod
 
@@ -54,7 +54,7 @@ def test_maybe_generate_title_after_first_user(tmp_path, monkeypatch):
 
 
 def test_maybe_generate_title_skips_user_locked(tmp_path, monkeypatch):
-    """验证 maybe generate title skips user locked 场景。"""
+    """验证尝试生成标题会跳过用户锁定。"""
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     from career_os.agents.lc import models as models_mod
 
@@ -77,7 +77,7 @@ def test_maybe_generate_title_skips_user_locked(tmp_path, monkeypatch):
 
 
 def test_append_first_user_sets_fallback_then_auto(tmp_path, monkeypatch):
-    """验证 append first user sets fallback then auto 场景。"""
+    """验证追加首次用户设置兜底再自动的处理符合预期。"""
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     from career_os.agents.lc import models as models_mod
 

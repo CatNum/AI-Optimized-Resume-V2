@@ -8,25 +8,25 @@ from career_os.harness.pipeline_phase_transition import (
 
 
 def test_structured_segment_complete():
-    """验证 structured segment complete 场景。"""
+    """验证结构化分段完成的处理符合预期。"""
     assert structured_segment_complete({"phase_status": PHASE_SEGMENT_COMPLETE})
     assert not structured_segment_complete({"phase_status": "in_progress"})
 
 
 def test_infer_phase_after_repeat_decline_empty_prior():
-    """验证 infer phase after repeat decline empty prior 场景。"""
+    """验证推断 phase 后重复探索拒绝为空 prior_results 的处理符合预期。"""
     assert infer_phase_after_repeat_decline({}) == "market"
 
 
 def test_infer_phase_after_repeat_decline_market_only():
-    """验证 infer phase after repeat decline market only 场景。"""
+    """验证推断 phase 后重复探索拒绝仅含 market Worker 的处理符合预期。"""
     prior = {"market": {"phase_status": PHASE_SEGMENT_COMPLETE}}
     assert infer_phase_after_repeat_decline(prior) == "market"
     assert prior_worker_segment_complete(prior, "market")
 
 
 def test_infer_phase_after_repeat_decline_with_opportunity():
-    """验证 infer phase after repeat decline with opportunity 场景。"""
+    """验证推断 phase 后重复探索拒绝具备 opportunity Worker 的处理符合预期。"""
     prior = {
         "market": {"phase_status": PHASE_SEGMENT_COMPLETE},
         "opportunity": {"phase_status": PHASE_SEGMENT_COMPLETE},
@@ -35,7 +35,7 @@ def test_infer_phase_after_repeat_decline_with_opportunity():
 
 
 def test_phase_after_worker_segment_complete():
-    """验证 phase after worker segment complete 场景。"""
+    """验证 phase 推进后 Worker 分段完成的处理符合预期。"""
     assert (
         phase_after_worker_segment_complete(
             "market", {"phase_status": PHASE_SEGMENT_COMPLETE}

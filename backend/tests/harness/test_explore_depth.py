@@ -5,14 +5,14 @@ from career_os.harness.explore_depth import (
 
 
 def test_should_run_depth_judge_rhythm():
-    """验证 should run depth judge rhythm 场景。"""
+    """验证应当运行深度判断节奏的处理符合预期。"""
     assert should_run_depth_judge("personal", 6) is True
     assert should_run_depth_judge("personal", 5) is False
     assert should_run_depth_judge("personal", 8) is True
 
 
 def test_can_offer_explore_complete_requires_closure():
-    """验证 can offer explore complete requires closure 场景。"""
+    """验证可以提供探索完成要求收口。"""
     profile = {
         "exploration": {
             "intake": {"submitted_at": "2026-01-01T00:00:00Z"},

@@ -33,13 +33,13 @@ def session_id(harness, tmp_path, monkeypatch):
 
 
 def test_start_task_list_tool_registered(harness):
-    """验证 start task list tool registered 场景。"""
+    """验证启动任务列表工具已注册的处理符合预期。"""
     assert harness.tools.is_allowed("coordinator", "start_task_list")
     assert harness.tools.is_allowed("coordinator", "abandon_task_list")
 
 
 def test_create_task_list_updates_state_list_id(harness, session_id):
-    """验证 create task list updates state list id 场景。"""
+    """验证创建任务列表会更新状态列表标识。"""
     result = harness.execute_tool(
         "coordinator",
         "create_task_list",
@@ -51,7 +51,7 @@ def test_create_task_list_updates_state_list_id(harness, session_id):
 
 
 def test_list_tasks_defaults_to_state_list_id(harness, session_id):
-    """验证 list tasks defaults to state list id 场景。"""
+    """验证列表任务默认使用到状态列表标识的处理符合预期。"""
     created = harness.execute_tool(
         "coordinator",
         "create_task_list",

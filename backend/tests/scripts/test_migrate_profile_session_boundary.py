@@ -14,7 +14,7 @@ def _load_module():
 
 
 def test_migrate_profile_into_single_session(tmp_path):
-    """验证 migrate profile into single session 场景。"""
+    """验证迁移 profile 到单个会话的处理符合预期。"""
     data = tmp_path
     (data / "sessions" / "sess_1").mkdir(parents=True)
     (data / "sessions" / "sess_1" / "state.json").write_text(
@@ -58,7 +58,7 @@ def test_migrate_profile_into_single_session(tmp_path):
 
 
 def test_migrate_to_orphan_when_multi_sessions(tmp_path):
-    """验证 migrate to orphan when multi sessions 场景。"""
+    """验证多个会话时，迁移到孤儿的处理符合预期。"""
     data = tmp_path
     (data / "sessions" / "sess_a").mkdir(parents=True)
     (data / "sessions" / "sess_b").mkdir(parents=True)

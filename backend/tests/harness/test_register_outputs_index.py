@@ -26,7 +26,7 @@ def harness(tmp_path, monkeypatch):
 
 
 def test_dedupe_outputs_index_keeps_first_entry():
-    """验证 dedupe outputs index keeps first entry 场景。"""
+    """验证去重 outputs_index 会保持首次条目。"""
     entries = [
         {"path": "output/2026-05-31/resume_标准.html", "optimization_level": "标准"},
         {"path": "output/2026-05-31/resume_标准.html", "optimization_level": "标准"},
@@ -35,7 +35,7 @@ def test_dedupe_outputs_index_keeps_first_entry():
 
 
 def test_register_outputs_index_skips_duplicate_path(harness, tmp_path):
-    """验证 register outputs index skips duplicate path 场景。"""
+    """验证登记 outputs_index 会跳过重复路径。"""
     from datetime import date
 
     day = date(2026, 5, 31)

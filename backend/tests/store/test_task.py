@@ -17,7 +17,7 @@ def task_store(tmp_path, monkeypatch):
 
 
 def test_create_task_list_writes_files(task_store, tmp_path):
-    """验证 create task list writes files 场景。"""
+    """验证创建任务列表会写入文件。"""
     list_id = task_store.create_task_list("sess_test", list_type="plan")
     assert isinstance(list_id, str)
     list_dir = tmp_path / "tasks" / list_id
@@ -28,7 +28,7 @@ def test_create_task_list_writes_files(task_store, tmp_path):
 
 
 def test_create_task_list_writes_created_and_updated_at(task_store):
-    """验证 create task list writes created and updated at 场景。"""
+    """验证创建任务列表会写入已创建和更新时间在。"""
     list_id = task_store.create_task_list("sess_test", list_type="pipeline", status="ready")
     assert isinstance(list_id, str)
     meta = task_store.get_task_list(list_id)
@@ -37,7 +37,7 @@ def test_create_task_list_writes_created_and_updated_at(task_store):
 
 
 def test_complete_task_deletes_file(task_store, tmp_path):
-    """验证 complete task deletes file 场景。"""
+    """验证完成任务会删除文件。"""
     list_id = task_store.create_task_list("sess_test", list_type="plan")
     task_store.create_task(list_id, "milestone_1", "JD 录入")
     task_path = tmp_path / "tasks" / list_id / "milestone_1.json"
@@ -49,7 +49,7 @@ def test_complete_task_deletes_file(task_store, tmp_path):
 
 
 def test_ready_list_blocks_claim_and_complete(task_store):
-    """验证 ready list blocks claim and complete 场景。"""
+    """验证待启动列表会拦截领取和完成。"""
     list_id = task_store.create_task_list("sess_test", list_type="plan", status="ready")
     task_store.create_task(list_id, "milestone_1", "Plan step")
 
@@ -61,7 +61,7 @@ def test_ready_list_blocks_claim_and_complete(task_store):
 
 
 def test_create_second_active_same_session_returns_error(task_store):
-    """验证 create second active same session returns error 场景。"""
+    """验证创建第二个活跃同一会话会返回错误。"""
     assert isinstance(
         task_store.create_task_list("sess_a", list_type="plan", status="active"), str
     )
@@ -70,14 +70,14 @@ def test_create_second_active_same_session_returns_error(task_store):
 
 
 def test_cross_session_parallel_active_ok(task_store):
-    """验证 cross session parallel active ok 场景。"""
+    """验证跨会话并行活跃可行的处理符合预期。"""
     a = task_store.create_task_list("sess_a", list_type="pipeline", status="active")
     b = task_store.create_task_list("sess_b", list_type="pipeline", status="active")
     assert isinstance(a, str) and isinstance(b, str)
 
 
 def test_start_task_list_ready_to_active(task_store):
-    """验证 start task list ready to active 场景。"""
+    """验证启动任务列表待启动到活跃的处理符合预期。"""
     list_id = task_store.create_task_list("sess_a", list_type="pipeline", status="ready")
     assert isinstance(list_id, str)
     assert task_store.start_task_list(list_id) is None
@@ -87,14 +87,14 @@ def test_start_task_list_ready_to_active(task_store):
 
 
 def test_start_task_list_rejects_non_ready(task_store):
-    """验证 start task list rejects non ready 场景。"""
+    """验证启动任务列表会拒绝非待启动。"""
     list_id = task_store.create_task_list("sess_a", list_type="pipeline", status="active")
     err = task_store.start_task_list(list_id)
     assert err.code == "list_not_ready"
 
 
 def test_start_task_list_rejects_when_other_active(task_store):
-    """验证 start task list rejects when other active 场景。"""
+    """验证其他活跃时，启动任务列表拒绝的处理符合预期。"""
     assert isinstance(
         task_store.create_task_list("sess_a", list_type="pipeline", status="active"), str
     )
@@ -104,7 +104,7 @@ def test_start_task_list_rejects_when_other_active(task_store):
 
 
 def test_abandon_task_list_deletes_files(task_store, tmp_path):
-    """验证 abandon task list deletes files 场景。"""
+    """验证放弃任务列表会删除文件。"""
     list_id = task_store.create_task_list("sess_a", list_type="pipeline", status="ready")
     task_store.create_task(list_id, "identity", "内心探索", kind="milestone")
     assert task_store.abandon_task_list(list_id) is None
@@ -112,7 +112,7 @@ def test_abandon_task_list_deletes_files(task_store, tmp_path):
 
 
 def test_normalize_multi_active_keeps_newest(task_store, tmp_path, caplog):
-    """验证 normalize multi active keeps newest 场景。"""
+    """验证规范化多个活跃会保持最新项。"""
     id_old = task_store.create_task_list("sess_a", list_type="pipeline", status="active")
     assert isinstance(id_old, str)
     id_new = task_store.create_task_list("sess_a", list_type="plan", status="ready")
@@ -132,7 +132,7 @@ def test_normalize_multi_active_keeps_newest(task_store, tmp_path, caplog):
 
 
 def test_list_lists_for_session_orders_active_then_ready(task_store):
-    """验证 list lists for session orders active then ready 场景。"""
+    """验证列表列表针对会话排序活跃再待启动的处理符合预期。"""
     active = task_store.create_task_list("sess_a", list_type="pipeline", status="active")
     ready = task_store.create_task_list("sess_a", list_type="plan", status="ready")
     rows = task_store.list_lists_for_session("sess_a")
@@ -142,7 +142,7 @@ def test_list_lists_for_session_orders_active_then_ready(task_store):
 
 
 def test_list_lists_for_session_ready_sorted_by_updated_at(task_store, tmp_path):
-    """验证 list lists for session ready sorted by updated at 场景。"""
+    """验证列表列表针对会话待启动排序按更新时间在的处理符合预期。"""
     older = task_store.create_task_list("sess_a", list_type="plan", status="ready")
     newer = task_store.create_task_list("sess_a", list_type="plan", status="ready")
     older_meta_path = tmp_path / "tasks" / older / "meta.json"
@@ -159,7 +159,7 @@ def test_list_lists_for_session_ready_sorted_by_updated_at(task_store, tmp_path)
 
 
 def test_list_lists_for_session_filters_other_sessions(task_store):
-    """验证 list lists for session filters other sessions 场景。"""
+    """验证列表列表针对会话会过滤其他会话。"""
     task_store.create_task_list("sess_a", list_type="pipeline", status="active")
     task_store.create_task_list("sess_b", list_type="pipeline", status="active")
     rows = task_store.list_lists_for_session("sess_a")
@@ -167,7 +167,7 @@ def test_list_lists_for_session_filters_other_sessions(task_store):
 
 
 def test_delete_lists_for_session(task_store, tmp_path):
-    """验证 delete lists for session 场景。"""
+    """验证删除列表针对会话的处理符合预期。"""
     list_id = task_store.create_task_list("sess_a", list_type="plan")
     task_store.create_task(list_id, "milestone_1", "Step")
     other_id = task_store.create_task_list("sess_b", list_type="plan")
@@ -180,7 +180,7 @@ def test_delete_lists_for_session(task_store, tmp_path):
 
 
 def test_get_active_list_id_for_session(task_store):
-    """验证 get active list id for session 场景。"""
+    """验证获取活跃列表标识针对会话的处理符合预期。"""
     list_id = task_store.create_task_list("sess_a", list_type="pipeline", status="active")
     assert isinstance(list_id, str)
     assert task_store.get_active_list_id_for_session("sess_a") == list_id

@@ -6,7 +6,7 @@ from career_os.platform.tool.handlers.resume_html import ensure_html_filename
 
 
 def test_ensure_html_filename_appends_suffix():
-    """验证 ensure html filename appends suffix 场景。"""
+    """验证确保 HTML 文件名会追加后缀。"""
     assert ensure_html_filename("resume_进取_AI_Agent") == "resume_进取_AI_Agent.html"
     assert ensure_html_filename("resume.html") == "resume.html"
 
@@ -27,7 +27,7 @@ def _reload_output_modules(tmp_path, monkeypatch, *, output_subdir: str):
 
 
 def test_merge_outputs_index_includes_disk_files(tmp_path, monkeypatch):
-    """验证 merge outputs index includes disk files 场景。"""
+    """验证合并 outputs_index 会包含磁盘文件。"""
     output_mod, outputs_mod = _reload_output_modules(tmp_path, monkeypatch, output_subdir="output")
 
     day = date(2026, 6, 1)
@@ -49,7 +49,7 @@ def test_merge_outputs_index_includes_disk_files(tmp_path, monkeypatch):
 
 
 def test_normalize_output_path_idempotent_for_demo_env(tmp_path, monkeypatch):
-    """验证 normalize output path idempotent for demo env 场景。"""
+    """验证规范化输出路径幂等针对演示环境的处理符合预期。"""
     output_mod, outputs_mod = _reload_output_modules(
         tmp_path, monkeypatch, output_subdir="output/demo"
     )
@@ -67,7 +67,7 @@ def test_normalize_output_path_idempotent_for_demo_env(tmp_path, monkeypatch):
 
 
 def test_resolve_doubled_canonical_prefix(tmp_path, monkeypatch):
-    """验证 resolve doubled canonical prefix 场景。"""
+    """验证解析重复规范前缀的处理符合预期。"""
     output_mod, outputs_mod = _reload_output_modules(
         tmp_path, monkeypatch, output_subdir="output/demo"
     )
@@ -84,7 +84,7 @@ def test_resolve_doubled_canonical_prefix(tmp_path, monkeypatch):
 
 
 def test_validate_resume_html_rejects_plain_text():
-    """验证 validate resume html rejects plain text 场景。"""
+    """验证校验简历 HTML 会拒绝纯文本。"""
     import career_os.platform.tool.handlers.resume_html as resume_mod
 
     plain = "苑晓龙\nGo 后端工程师\nEXPERIENCE\n..."
@@ -94,7 +94,7 @@ def test_validate_resume_html_rejects_plain_text():
 
 
 def test_write_resume_html_rejects_invalid_content(tmp_path, monkeypatch):
-    """验证 write resume html rejects invalid content 场景。"""
+    """验证写入简历 HTML 会拒绝非法内容。"""
     _reload_output_modules(tmp_path, monkeypatch, output_subdir="output/demo")
     import career_os.platform.tool.handlers.resume_html as resume_mod
 
@@ -107,7 +107,7 @@ def test_write_resume_html_rejects_invalid_content(tmp_path, monkeypatch):
 
 
 def test_write_resume_html_uses_prd_filename_template(tmp_path, monkeypatch):
-    """验证 write resume html uses prd filename template 场景。"""
+    """验证写入简历 HTML 会使用产品需求文件名模板。"""
     _reload_output_modules(tmp_path, monkeypatch, output_subdir="output/demo")
     import career_os.platform.tool.handlers.resume_html as resume_mod
 
@@ -127,7 +127,7 @@ def test_write_resume_html_uses_prd_filename_template(tmp_path, monkeypatch):
 
 
 def test_write_resume_html_auto_derives_tags_from_role_and_stack(tmp_path, monkeypatch):
-    """验证 write resume html auto derives tags from role and stack 场景。"""
+    """验证写入简历 HTML 自动会推导标签从角色和技术栈。"""
     _reload_output_modules(tmp_path, monkeypatch, output_subdir="output/demo")
     import career_os.platform.tool.handlers.resume_html as resume_mod
 

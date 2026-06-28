@@ -8,7 +8,7 @@ from career_os.harness.explore_closure import PHASE_SEGMENT_COMPLETE
 
 
 def test_build_synthesis_includes_pipeline_phase(monkeypatch, tmp_path):
-    """验证 build synthesis includes pipeline phase 场景。"""
+    """验证构建汇总 phase 会包含 pipeline phase。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -51,7 +51,7 @@ def test_build_synthesis_includes_pipeline_phase(monkeypatch, tmp_path):
 
 
 def test_chat_only_draft_mentions_jd_when_phase_migrated(monkeypatch, tmp_path):
-    """验证 chat only draft mentions jd when phase migrated 场景。"""
+    """验证 phase 迁移后仅聊天草稿提及 JD 的处理符合预期。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 

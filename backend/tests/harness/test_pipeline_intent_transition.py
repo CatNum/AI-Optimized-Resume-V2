@@ -69,13 +69,13 @@ def _mock_classifier(monkeypatch, target_phase: str):
 
 
 def test_has_jd_context_from_prior(pipeline_env):
-    """验证 has jd context from prior 场景。"""
+    """验证存在 JD 上下文从 prior_results 的处理符合预期。"""
     state = {"list_id": "list_x", "prior_results": {"opportunity": {}}}
     assert has_jd_context(state, "你好")
 
 
 def test_jd_analysis_to_resume_strategy_b(pipeline_env):
-    """验证 jd analysis to resume strategy b 场景。"""
+    """验证 JD 分析到 resume_strategy phase 的处理符合预期。"""
     session_id = "sess_intent01"
     list_id = instantiate_pipeline_for_session(session_id)
     state = _session_state(list_id, "jd_analysis")
@@ -92,7 +92,7 @@ def test_jd_analysis_to_resume_strategy_b(pipeline_env):
 
 
 def test_no_intent_when_gate_pending(pipeline_env):
-    """验证 no intent when gate pending 场景。"""
+    """验证 gate 待处理项时，不意图的处理符合预期。"""
     session_id = "sess_intent02"
     list_id = instantiate_pipeline_for_session(session_id)
     state = _session_state(
@@ -105,7 +105,7 @@ def test_no_intent_when_gate_pending(pipeline_env):
 
 
 def test_chat_only_intent_does_not_transition(pipeline_env):
-    """验证 chat only intent does not transition 场景。"""
+    """验证仅聊天意图不会流转。"""
     session_id = "sess_intent_chat_only"
     list_id = instantiate_pipeline_for_session(session_id)
     state = _session_state(
@@ -120,7 +120,7 @@ def test_chat_only_intent_does_not_transition(pipeline_env):
 
 
 def test_intent_suggested_workers_fallback(pipeline_env):
-    """验证 intent suggested workers fallback 场景。"""
+    """验证意图建议 Worker 列表兜底的处理符合预期。"""
     session_id = "sess_intent03"
     list_id = instantiate_pipeline_for_session(session_id)
     state = _session_state(list_id, "resume_strategy")
@@ -132,7 +132,7 @@ def test_intent_suggested_workers_fallback(pipeline_env):
 
 
 def test_phase_after_strategy_complete():
-    """验证 phase after strategy complete 场景。"""
+    """验证 phase 推进后 strategy Worker 完成的处理符合预期。"""
     assert (
         phase_after_worker_segment_complete(
             "strategy", {"phase_status": PHASE_SEGMENT_COMPLETE}
@@ -142,7 +142,7 @@ def test_phase_after_strategy_complete():
 
 
 def test_match_rule_ids_strategy_message():
-    """验证 match rule ids strategy message 场景。"""
+    """验证匹配规则标识 strategy Worker 消息的处理符合预期。"""
     from career_os.harness.micro_classifier_rules import match_pipeline_intent_rule_ids
 
     ids = match_pipeline_intent_rule_ids("简历优化策略是什么")
@@ -150,7 +150,7 @@ def test_match_rule_ids_strategy_message():
 
 
 def test_declare_career_agent_project_advances_phase(pipeline_env):
-    """验证 declare career agent project advances phase 场景。"""
+    """验证声明职业智能体项目会推进 phase。"""
     session_id = "sess_intent05"
     list_id = instantiate_pipeline_for_session(session_id)
     state = _session_state(list_id, "jd_analysis")
@@ -162,7 +162,7 @@ def test_declare_career_agent_project_advances_phase(pipeline_env):
 
 
 def test_build_phase_draft_resume_strategy_no_chat_only(pipeline_env):
-    """验证 build phase draft resume strategy no chat only 场景。"""
+    """验证构建 resume_strategy phase 草稿时不走仅聊天分支的处理符合预期。"""
     from career_os.agents.lc.coordinator_llm import build_phase_synthesis_draft
 
     session_id = "sess_intent04"
@@ -175,7 +175,7 @@ def test_build_phase_draft_resume_strategy_no_chat_only(pipeline_env):
 
 
 def test_nl_jump_to_explore_from_market(pipeline_env, monkeypatch):
-    """验证 nl jump to explore from market 场景。"""
+    """验证自然语言可以从 market 跳转到 explore。"""
     _mock_classifier(monkeypatch, "explore")
     session_id = "sess_jump_explore"
     list_id = instantiate_pipeline_for_session(session_id)
@@ -194,7 +194,7 @@ def test_nl_jump_to_explore_from_market(pipeline_env, monkeypatch):
 
 
 def test_nl_jump_to_market_from_jd_analysis(pipeline_env, monkeypatch):
-    """验证 nl jump to market from jd analysis 场景。"""
+    """验证自然语言跳转到 market Worker 从 JD 分析的处理符合预期。"""
     _mock_classifier(monkeypatch, "market")
     session_id = "sess_jump_market"
     list_id = instantiate_pipeline_for_session(session_id)
@@ -213,7 +213,7 @@ def test_nl_jump_to_market_from_jd_analysis(pipeline_env, monkeypatch):
 
 
 def test_nl_jump_to_explore_ignores_explore_gate(pipeline_env, monkeypatch):
-    """验证 nl jump to explore ignores explore gate 场景。"""
+    """验证自然语言跳转到 explore 时会忽略 explore gate。"""
     _mock_classifier(monkeypatch, "explore")
     session_id = "sess_jump_explore_no_gate"
     list_id = instantiate_pipeline_for_session(session_id)
@@ -232,7 +232,7 @@ def test_nl_jump_to_explore_ignores_explore_gate(pipeline_env, monkeypatch):
 
 
 def test_nl_jump_to_market_requires_explore_complete(pipeline_env, monkeypatch):
-    """验证 nl jump to market requires explore complete 场景。"""
+    """验证自然语言跳转到 market Worker 会要求探索完成。"""
     _mock_classifier(monkeypatch, "market")
     session_id = "sess_jump_market_blocked"
     list_id = instantiate_pipeline_for_session(session_id)
@@ -252,7 +252,7 @@ def test_nl_jump_to_market_requires_explore_complete(pipeline_env, monkeypatch):
 
 
 def test_nl_jump_blocks_gate_pending(pipeline_env, monkeypatch):
-    """验证 nl jump blocks gate pending 场景。"""
+    """验证自然语言跳转会拦截 gate 待处理项。"""
     _mock_classifier(monkeypatch, "explore")
     session_id = "sess_jump_gate"
     list_id = instantiate_pipeline_for_session(session_id)
@@ -267,7 +267,7 @@ def test_nl_jump_blocks_gate_pending(pipeline_env, monkeypatch):
 
 
 def test_vague_followup_does_not_transition_to_any_jump_phase(pipeline_env, monkeypatch):
-    """验证 vague followup does not transition to any jump phase 场景。"""
+    """验证模糊追问不会流转到任意跳转 phase。"""
     _mock_classifier(monkeypatch, "market")
     session_id = "sess_jump_vague"
     list_id = instantiate_pipeline_for_session(session_id)

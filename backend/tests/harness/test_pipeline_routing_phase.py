@@ -4,7 +4,7 @@ from career_os.harness.pipeline_routing import enforce_pipeline_phase_rules
 
 
 def test_enforce_uses_disk_phase_for_jd_workers_when_gate_confirmed():
-    """验证 enforce uses disk phase for jd workers when gate confirmed 场景。"""
+    """验证 gate 已确认时，强制规则 phase 使用磁盘 phase 针对 JD Worker 列表的处理符合预期。"""
     session_state = {
         "list_type": "pipeline",
         "explore_gate_confirmed": True,
@@ -19,7 +19,7 @@ def test_enforce_uses_disk_phase_for_jd_workers_when_gate_confirmed():
 
 
 def test_enforce_blocks_inferred_leave_explore_without_gate(tmp_path, monkeypatch):
-    """验证 enforce blocks inferred leave explore without gate 场景。"""
+    """验证缺少 gate 时会拦截推断离开 explore 的请求。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.profile as profile_mod

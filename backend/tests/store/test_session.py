@@ -15,7 +15,7 @@ def _reload_store(tmp_path, monkeypatch, **env):
 
 
 def test_load_chat_history_full_count(tmp_path, monkeypatch):
-    """验证 load chat history full count 场景。"""
+    """验证加载聊天历史完整数量的处理符合预期。"""
     SessionStore = _reload_store(tmp_path, monkeypatch, CHAT_HISTORY_MAX_TOKENS="200000")
     s = SessionStore()
     sid = s.create_session()
@@ -30,7 +30,7 @@ def test_load_chat_history_full_count(tmp_path, monkeypatch):
 
 
 def test_usage_ratio_is_token_based(tmp_path, monkeypatch):
-    """验证 usage ratio is token based 场景。"""
+    """验证使用量比例是否词元基于的处理符合预期。"""
     SessionStore = _reload_store(tmp_path, monkeypatch, CHAT_HISTORY_MAX_TOKENS="12000")
     s = SessionStore()
     sid = s.create_session()
@@ -43,7 +43,7 @@ def test_usage_ratio_is_token_based(tmp_path, monkeypatch):
 
 
 def test_reset_session_clears_messages_and_state(tmp_path, monkeypatch):
-    """验证 reset session clears messages and state 场景。"""
+    """验证重置会话清空消息和状态的处理符合预期。"""
     SessionStore = _reload_store(tmp_path, monkeypatch)
     s = SessionStore()
     sid = s.create_session()
@@ -58,7 +58,7 @@ def test_reset_session_clears_messages_and_state(tmp_path, monkeypatch):
 
 
 def test_session_artifacts_default_and_patch(tmp_path, monkeypatch):
-    """验证 session artifacts default and patch 场景。"""
+    """验证会话产物默认和更新的处理符合预期。"""
     SessionStore = _reload_store(tmp_path, monkeypatch)
     s = SessionStore()
     sid = s.create_session()

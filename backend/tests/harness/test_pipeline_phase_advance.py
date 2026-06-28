@@ -28,7 +28,7 @@ def pipeline_env(tmp_path, monkeypatch, jd_ready_profile):
 
 
 def test_resolve_target_phase_from_workers():
-    """验证 resolve target phase from workers 场景。"""
+    """验证能根据待调度 Worker 推断更靠后的目标 phase。"""
     state = {"list_type": "pipeline", "list_id": "list_x"}
     target = resolve_analyze_target_phase(
         {"workers": ["strategy"], "pipeline_phase": "jd_analysis"},
@@ -38,7 +38,7 @@ def test_resolve_target_phase_from_workers():
 
 
 def test_analyze_advance_jd_to_strategy(pipeline_env):
-    """验证 analyze advance jd to strategy 场景。"""
+    """验证分析结果可以把 jd_analysis phase 推进到 resume_strategy phase。"""
     session_id = "sess_adv01"
     list_id = instantiate_pipeline_for_session(session_id)
     task_mod.TaskStore().set_current_phase(list_id, "jd_analysis")
@@ -62,7 +62,7 @@ def test_analyze_advance_jd_to_strategy(pipeline_env):
 
 
 def test_analyze_advance_infers_phase_when_only_workers(pipeline_env):
-    """验证 analyze advance infers phase when only workers 场景。"""
+    """验证只有 Worker 列表时也能推断并推进目标 phase。"""
     session_id = "sess_adv02"
     list_id = instantiate_pipeline_for_session(session_id)
     task_mod.TaskStore().set_current_phase(list_id, "jd_analysis")
@@ -83,7 +83,7 @@ def test_analyze_advance_infers_phase_when_only_workers(pipeline_env):
 
 
 def test_analyze_does_not_auto_advance_ready_pipeline(pipeline_env):
-    """验证 analyze does not auto advance ready pipeline 场景。"""
+    """验证待启动 pipeline 不会被分析结果自动推进。"""
     session_id = "sess_adv03"
     list_id = instantiate_pipeline_for_session(session_id)
     state = {

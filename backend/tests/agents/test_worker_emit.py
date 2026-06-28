@@ -3,7 +3,7 @@ from career_os.agents.schemas.workers import validate_structured_output
 
 
 def test_opportunity_missing_recommendation_fails():
-    """验证 opportunity missing recommendation fails 场景。"""
+    """验证 opportunity Worker 缺失推荐结论失败的处理符合预期。"""
     validated, error = validate_structured_output(
         "opportunity",
         {"user_visible_summary": "评估完成"},
@@ -13,7 +13,7 @@ def test_opportunity_missing_recommendation_fails():
 
 
 def test_identity_explore_gate_prompt_fails():
-    """验证 identity explore gate prompt fails 场景。"""
+    """验证 identity Worker 探索 gate 提示失败的处理符合预期。"""
     validated, error = validate_structured_output(
         "identity",
         {
@@ -27,7 +27,7 @@ def test_identity_explore_gate_prompt_fails():
 
 
 def test_strategy_nested_gate_prompt_normalizes():
-    """验证 strategy nested gate prompt normalizes 场景。"""
+    """验证 strategy Worker 嵌套 gate 提示会规范化。"""
     validated, error = validate_structured_output(
         "strategy",
         {
@@ -48,7 +48,7 @@ def test_strategy_nested_gate_prompt_normalizes():
 
 
 def test_opportunity_gate_prompt_string_value_normalizes():
-    """验证 opportunity gate prompt string value normalizes 场景。"""
+    """验证 opportunity Worker 的 gate 提示字符串值会规范化。"""
     validated, error = validate_structured_output(
         "opportunity",
         {
@@ -64,7 +64,7 @@ def test_opportunity_gate_prompt_string_value_normalizes():
 
 
 def test_opportunity_valid_output_passes():
-    """验证 opportunity valid output passes 场景。"""
+    """验证 opportunity Worker 合法输出通过的处理符合预期。"""
     validated, error = validate_structured_output(
         "opportunity",
         {
@@ -78,7 +78,7 @@ def test_opportunity_valid_output_passes():
 
 
 def test_worker_emit_marks_failed_on_invalid_output():
-    """验证 worker emit marks failed on invalid output 场景。"""
+    """验证 Worker 输出标记失败在非法输出的处理符合预期。"""
     state = run_worker_emit(
         {
             "worker_id": "identity",

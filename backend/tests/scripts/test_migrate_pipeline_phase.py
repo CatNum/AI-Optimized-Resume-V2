@@ -17,7 +17,7 @@ def _load_migrate_module():
 
 
 def test_migrate_advances_explore_with_jd_prior(tmp_path, monkeypatch):
-    """验证 migrate advances explore with jd prior 场景。"""
+    """验证具备 JD prior_results 时迁移会推进 explore。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
 

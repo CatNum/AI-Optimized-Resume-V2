@@ -31,21 +31,21 @@ def session_state():
 
 
 def test_market_blocked_without_jd_prerequisites(harness, session_state):
-    """验证 market blocked without jd prerequisites 场景。"""
+    """验证缺少 JD 前置条件时，market Worker 被拦截的处理符合预期。"""
     err = harness.delegate_worker("coordinator", "market", "research jd", session_state)
     assert err.code == "delegate_blocked"
     assert err.message.startswith("JD-B1:")
 
 
 def test_market_allowed_with_jd_prerequisites(harness, session_state):
-    """验证 market allowed with jd prerequisites 场景。"""
+    """验证 market Worker 允许具备 JD 前置条件的处理符合预期。"""
     seed_jd_ready_profile(ProfileStore())
     result = harness.delegate_worker("coordinator", "market", "research jd", session_state)
     assert result["status"] == "delegated"
 
 
 def test_opportunity_blocked_without_market(harness, session_state, jd_ready_profile):
-    """验证 opportunity blocked without market 场景。"""
+    """验证缺少 market Worker 时，opportunity Worker 被拦截的处理符合预期。"""
     session_state["list_type"] = "pipeline"
     session_state["prior_results"] = {}
     err = harness.delegate_worker(
@@ -56,7 +56,7 @@ def test_opportunity_blocked_without_market(harness, session_state, jd_ready_pro
 
 
 def test_opportunity_allowed_with_market(harness, session_state, jd_ready_profile):
-    """验证 opportunity allowed with market 场景。"""
+    """验证 opportunity Worker 允许具备 market Worker 的处理符合预期。"""
     session_state["prior_results"] = {"market": {"topics": ["cloud"]}}
     result = harness.delegate_worker(
         "coordinator", "opportunity", "eval jd", session_state
@@ -65,7 +65,7 @@ def test_opportunity_allowed_with_market(harness, session_state, jd_ready_profil
 
 
 def test_resume_blocked_without_optimize_confirmed(harness, session_state):
-    """验证 resume blocked without optimize confirmed 场景。"""
+    """验证缺少优化已确认时，resume Worker 被拦截的处理符合预期。"""
     session_state["gates"]["flags"]["optimize_confirmed"] = False
     err = harness.delegate_worker(
         "coordinator", "resume", "optimize resume", session_state
@@ -74,7 +74,7 @@ def test_resume_blocked_without_optimize_confirmed(harness, session_state):
 
 
 def test_resume_allowed_with_optimize_confirmed(harness, session_state):
-    """验证 resume allowed with optimize confirmed 场景。"""
+    """验证 resume Worker 允许具备优化已确认的处理符合预期。"""
     session_state["gates"]["flags"]["optimize_confirmed"] = True
     result = harness.delegate_worker(
         "coordinator", "resume", "optimize resume", session_state
@@ -83,7 +83,7 @@ def test_resume_allowed_with_optimize_confirmed(harness, session_state):
 
 
 def test_worker_cannot_complete_task(harness):
-    """验证 worker cannot complete task 场景。"""
+    """验证 Worker 不能完成任务。"""
     err = harness.execute_tool(
         "identity", "complete_task", {"task_id": "milestone_1"}
     )
@@ -91,7 +91,7 @@ def test_worker_cannot_complete_task(harness):
 
 
 def test_worker_cannot_delegate(harness, session_state):
-    """验证 worker cannot delegate 场景。"""
+    """验证 Worker 不能委派。"""
     err = harness.delegate_worker(
         "identity", "market", "research", session_state
     )

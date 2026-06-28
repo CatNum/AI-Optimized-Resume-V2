@@ -15,7 +15,7 @@ def harness(tmp_path, monkeypatch):
 
 
 def test_react_emits_valid_market_output(harness, monkeypatch):
-    """验证 react emits valid market output 场景。"""
+    """验证 ReAct 会输出合法 market Worker 输出。"""
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     tool_call = MagicMock()
     tool_call.function.name = "profile_patch"

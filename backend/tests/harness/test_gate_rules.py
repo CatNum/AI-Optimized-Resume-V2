@@ -9,7 +9,7 @@ from career_os.harness.gate_rules import match_gate_intent_rules
     ["无需", "推进下一步", "已经完成初探 下一步", "先看看市场"],
 )
 def test_explore_repeat_reject_phrases(message: str):
-    """验证 explore repeat reject phrases 场景。"""
+    """验证 explore 拒绝重复探索话术的处理符合预期。"""
     pending = {"name": "explore_repeat", "prompt": "是否需要再次初探？"}
     result = match_gate_intent_rules(message, pending)
     assert result["matched"] is True
@@ -18,14 +18,14 @@ def test_explore_repeat_reject_phrases(message: str):
 
 
 def test_explore_repeat_confirm_complete_phrase_not_confirm():
-    """验证 explore repeat confirm complete phrase not confirm 场景。"""
+    """验证 explore 重复探索确认完成话术不确认的处理符合预期。"""
     pending = {"name": "explore_repeat", "prompt": "是否需要再次初探？"}
     result = match_gate_intent_rules("确认完成初探", pending)
     assert result["intent"] != "confirm" or not result.get("matched")
 
 
 def test_explore_repeat_willing_again_confirm():
-    """验证 explore repeat willing again confirm 场景。"""
+    """验证 explore 重复探索愿意再次确认的处理符合预期。"""
     pending = {"name": "explore_repeat", "prompt": "是否需要再次初探？"}
     result = match_gate_intent_rules("愿意再次初探", pending)
     assert result["matched"] is True
@@ -33,7 +33,7 @@ def test_explore_repeat_willing_again_confirm():
 
 
 def test_explore_repeat_wuxu_via_orchestrator(monkeypatch):
-    """验证 explore repeat wuxu via orchestrator 场景。"""
+    """验证 explore 重复探索“无需”表达通过编排器的处理符合预期。"""
     monkeypatch.setattr(
         "career_os.harness.gate.classify_gate_intent_llm",
         lambda *a, **k: {"matched": False, "intent": "unknown", "source": "llm"},

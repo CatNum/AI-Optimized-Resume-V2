@@ -5,7 +5,7 @@ from career_os.agents.lc.models import LLMRole
 
 
 def test_invoke_text_uses_litellm(monkeypatch):
-    """验证 invoke text uses litellm 场景。"""
+    """验证调用文本会使用 LiteLLM。"""
     monkeypatch.setenv("LLM_PROVIDER", "deepseek")
     monkeypatch.setenv("LLM_API_KEY", "test-key")
 

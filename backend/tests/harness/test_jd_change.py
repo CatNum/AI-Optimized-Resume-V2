@@ -6,7 +6,7 @@ from career_os.platform.pipeline_template import instantiate_pipeline_for_sessio
 
 
 def test_jd_fingerprint_change(tmp_path, monkeypatch):
-    """验证 jd fingerprint change 场景。"""
+    """验证 JD 指纹变更的处理符合预期。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import career_os.config as config_mod
     import career_os.platform.store.session as session_mod

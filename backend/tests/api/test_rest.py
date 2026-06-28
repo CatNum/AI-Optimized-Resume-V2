@@ -27,21 +27,21 @@ def client(tmp_path, monkeypatch):
 
 
 def test_new_session(client):
-    """验证 new session 场景。"""
+    """验证新会话的处理符合预期。"""
     r = client.post("/v1/sessions/new")
     assert r.status_code == 200
     assert r.json()["session_id"].startswith("sess_")
 
 
 def test_list_sessions_empty_rebuilds(client):
-    """验证 list sessions empty rebuilds 场景。"""
+    """验证列表会话为空会重建。"""
     r = client.get("/v1/sessions")
     assert r.status_code == 200
     assert r.json()["sessions"] == []
 
 
 def test_new_session_does_not_delete_old(client):
-    """验证 new session does not delete old 场景。"""
+    """验证新会话不会删除过期。"""
     a = client.post("/v1/sessions/new").json()["session_id"]
     from career_os.platform.store.session import SessionStore
 
@@ -53,7 +53,7 @@ def test_new_session_does_not_delete_old(client):
 
 
 def test_get_messages_returns_history(client):
-    """验证 get messages returns history 场景。"""
+    """验证获取消息会返回历史记录。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     from career_os.platform.store.session import SessionStore
 
@@ -70,7 +70,7 @@ def test_get_messages_returns_history(client):
 
 
 def test_generate_title_without_llm_returns_503(client):
-    """验证 generate title without llm returns 503 场景。"""
+    """验证缺少 LLM 返回五零三时，生成标题的处理符合预期。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     r = client.post(f"/v1/sessions/{sid}/generate-title")
     assert r.status_code == 503
@@ -78,7 +78,7 @@ def test_generate_title_without_llm_returns_503(client):
 
 
 def test_generate_title_locked_when_user_title(client, monkeypatch):
-    """验证 generate title locked when user title 场景。"""
+    """验证用户标题时，生成标题锁定的处理符合预期。"""
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     import career_os.agents.lc.models as models_mod
 
@@ -92,7 +92,7 @@ def test_generate_title_locked_when_user_title(client, monkeypatch):
 
 
 def test_generate_title_force_overrides_user(client, monkeypatch):
-    """验证 generate title force overrides user 场景。"""
+    """验证生成标题强制覆盖用户的处理符合预期。"""
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     import career_os.agents.lc.models as models_mod
 
@@ -118,7 +118,7 @@ def test_generate_title_force_overrides_user(client, monkeypatch):
 
 
 def test_patch_title_and_archived(client):
-    """验证 patch title and archived 场景。"""
+    """验证更新标题和归档状态的处理符合预期。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     r = client.patch(
         f"/v1/sessions/{sid}",
@@ -140,7 +140,7 @@ def test_patch_title_and_archived(client):
 
 
 def test_delete_session_404_after(client):
-    """验证 delete session 404 after 场景。"""
+    """验证删除会话四零四之后的处理符合预期。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     assert client.delete(f"/v1/sessions/{sid}").status_code == 200
     assert client.get(f"/v1/sessions/{sid}/messages").status_code == 404
@@ -148,7 +148,7 @@ def test_delete_session_404_after(client):
 
 
 def test_delete_session_409_when_chat_in_progress(client):
-    """验证 delete session 409 when chat in progress 场景。"""
+    """验证聊天在进行中时，删除会话四零九的处理符合预期。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     import career_os.harness.orchestrator as orch_mod
 
@@ -163,14 +163,14 @@ def test_delete_session_409_when_chat_in_progress(client):
 
 
 def test_invalid_session_id_format_400(client):
-    """验证 invalid session id format 400 场景。"""
+    """验证非法会话标识格式四百的处理符合预期。"""
     r = client.get("/v1/sessions/not-a-valid-id/messages")
     assert r.status_code == 400
     assert r.json()["detail"] == "invalid_session_id"
 
 
 def test_profile_onboarding(client):
-    """验证 profile onboarding 场景。"""
+    """验证 profile 初始化的处理符合预期。"""
     r = client.post(
         "/v1/profile/onboarding",
         json={"basic": {"name": "测试"}, "intent": {"target_city": "上海"}},
@@ -181,7 +181,7 @@ def test_profile_onboarding(client):
 
 
 def test_explore_intake_submit(client):
-    """验证 explore intake submit 场景。"""
+    """验证 exploration 收集提交的处理符合预期。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     payload = {
         "session_id": sid,
@@ -203,7 +203,7 @@ def test_explore_intake_submit(client):
 
 
 def test_explore_intake_status_falls_back_to_global_profile_for_new_session(client):
-    """验证 explore intake status falls back to global profile for new session 场景。"""
+    """验证 exploration 收集状态会回退回退到全局 profile 针对新会话。"""
     sid_a = client.post("/v1/sessions/new").json()["session_id"]
     sid_b = client.post("/v1/sessions/new").json()["session_id"]
     payload = {
@@ -224,7 +224,7 @@ def test_explore_intake_status_falls_back_to_global_profile_for_new_session(clie
 
 
 def test_explore_intake_submit_persists_global_intake_to_profile(client):
-    """验证 explore intake submit persists global intake to profile 场景。"""
+    """验证 exploration intake 提交后会持久化全局 intake 到 profile。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     payload = {
         "session_id": sid,
@@ -240,7 +240,7 @@ def test_explore_intake_submit_persists_global_intake_to_profile(client):
 
 
 def test_new_session_creates_pipeline_list(client):
-    """验证 new session creates pipeline list 场景。"""
+    """验证新会话会创建 pipeline 列表。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     body = client.get("/v1/tasks", params={"session_id": sid}).json()
     assert len(body["lists"]) == 1
@@ -253,7 +253,7 @@ def test_new_session_creates_pipeline_list(client):
 
 
 def test_get_tasks_auto_promotes_started_pipeline_from_explore_to_market(client):
-    """验证 get tasks auto promotes started pipeline from explore to market 场景。"""
+    """验证获取任务时会把已启动 pipeline 从 explore 自动推进到 market。"""
     from career_os.platform.store.profile import ProfileStore
     from career_os.platform.store.task import TaskStore
 
@@ -281,7 +281,7 @@ def test_get_tasks_auto_promotes_started_pipeline_from_explore_to_market(client)
 
 
 def test_get_tasks_keeps_explicit_explore_jump_from_auto_promoting(client):
-    """验证 get tasks keeps explicit explore jump from auto promoting 场景。"""
+    """验证显式 explore 跳转不会被获取任务时的自动推进覆盖。"""
     from career_os.harness.pipeline_gates import jump_to_phase
     from career_os.platform.store.profile import ProfileStore
     from career_os.platform.store.session import SessionStore
@@ -313,7 +313,7 @@ def test_get_tasks_keeps_explicit_explore_jump_from_auto_promoting(client):
 
 
 def test_explore_intake_submit_keeps_single_pipeline_list(client):
-    """验证 explore intake submit keeps single pipeline list 场景。"""
+    """验证 exploration 收集提交会保持单个 pipeline 列表。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     payload = {
         "session_id": sid,
@@ -335,7 +335,7 @@ def test_explore_intake_submit_keeps_single_pipeline_list(client):
 
 
 def test_chat_explore_intake_event(client):
-    """验证 chat explore intake event 场景。"""
+    """验证聊天 exploration 收集事件的处理符合预期。"""
     session = client.post("/v1/sessions/new").json()["session_id"]
 
     with client.stream(
@@ -351,7 +351,7 @@ def test_chat_explore_intake_event(client):
 
 
 def test_chat_continues_explore_after_current_session_intake_submitted(client):
-    """验证 chat continues explore after current session intake submitted 场景。"""
+    """验证聊天继续 explore 之后当前会话 intake 已提交的处理符合预期。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     payload = {
         "session_id": sid,
@@ -377,7 +377,7 @@ def test_chat_continues_explore_after_current_session_intake_submitted(client):
 
 
 def test_chat_jd_gate_chain(client):
-    """验证 chat jd gate chain 场景。"""
+    """验证聊天 JD gate 链路的处理符合预期。"""
     session = client.post("/v1/sessions/new").json()["session_id"]
     client.post(
         "/v1/profile/onboarding",
@@ -422,7 +422,7 @@ def test_chat_jd_gate_chain(client):
 
 
 def test_chat_sse_events(client):
-    """验证 chat sse events 场景。"""
+    """验证聊天 SSE 事件的处理符合预期。"""
     with client.stream(
         "POST",
         "/v1/chat",
@@ -437,7 +437,7 @@ def test_chat_sse_events(client):
 
 
 def test_ping_refreshes_idle_session(client):
-    """验证 ping refreshes idle session 场景。"""
+    """验证心跳会刷新空闲会话。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     from datetime import UTC, datetime, timedelta
 
@@ -456,7 +456,7 @@ def test_ping_refreshes_idle_session(client):
 
 
 def test_chat_without_session_id_creates_and_indexes(client):
-    """验证 chat without session id creates and indexes 场景。"""
+    """验证缺少会话标识创建和写入索引时，聊天的处理符合预期。"""
     with client.stream(
         "POST",
         "/v1/chat",
@@ -473,7 +473,7 @@ def test_chat_without_session_id_creates_and_indexes(client):
 
 
 def test_get_tasks_by_session_id(client):
-    """验证 get tasks by session id 场景。"""
+    """验证获取任务按会话标识的处理符合预期。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     r = client.get("/v1/tasks", params={"session_id": sid})
     assert r.status_code == 200
@@ -489,7 +489,7 @@ def test_get_tasks_by_session_id(client):
 
 
 def test_get_tasks_normalizes_ready_pipeline_phase_to_explore(client):
-    """验证 get tasks normalizes ready pipeline phase to explore 场景。"""
+    """验证获取任务时会把待启动 pipeline phase 规范化到 explore。"""
     from career_os.platform.store.task import TaskStore
 
     sid = client.post("/v1/sessions/new").json()["session_id"]
@@ -506,7 +506,7 @@ def test_get_tasks_normalizes_ready_pipeline_phase_to_explore(client):
 
 
 def test_get_tasks_by_session_id_all_completed(client):
-    """验证 get tasks by session id all completed 场景。"""
+    """验证获取任务按会话标识全部已完成的处理符合预期。"""
     sid = client.post("/v1/sessions/new").json()["session_id"]
     from career_os.platform.store.task import TaskStore
 
@@ -527,21 +527,21 @@ def test_get_tasks_by_session_id_all_completed(client):
 
 
 def test_get_tasks_without_session_id_returns_400_object(client):
-    """验证 get tasks without session id returns 400 object 场景。"""
+    """验证缺少会话标识返回四百对象时，获取任务的处理符合预期。"""
     r = client.get("/v1/tasks")
     assert r.status_code == 400
     assert r.json()["detail"]["code"] == "session_id_required"
 
 
 def test_get_tasks_invalid_session_id_400_object(client):
-    """验证 get tasks invalid session id 400 object 场景。"""
+    """验证获取任务非法会话标识四百对象的处理符合预期。"""
     r = client.get("/v1/tasks", params={"session_id": "bad-id"})
     assert r.status_code == 400
     assert r.json()["detail"]["code"] == "invalid_session_id"
 
 
 def test_chat_sse_llm_stream_multiple_tokens(client, monkeypatch):
-    """验证 chat sse llm stream multiple tokens 场景。"""
+    """验证聊天 SSE 中的 LLM 流式输出多个词元的处理符合预期。"""
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     import career_os.agents.lc.models as models_mod
 

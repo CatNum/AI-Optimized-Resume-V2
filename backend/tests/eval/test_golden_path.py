@@ -26,7 +26,7 @@ def harness(tmp_path, monkeypatch):
 
 @pytest.mark.llm
 def test_golden_jd_to_html_structure(harness):
-    """黄金路径结构：market→opportunity→strategy gate→resume→asset。"""
+    """验证 JD 到简历 HTML 的黄金路径结构符合预期。"""
     seed_jd_ready_profile(ProfileStore())
     runner = build_harness_worker_runner(harness)
     session_state = {

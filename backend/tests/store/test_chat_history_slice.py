@@ -17,7 +17,7 @@ def _reload_store(tmp_path, monkeypatch, **env):
 
 
 def test_slice_one_round_current_user_only(tmp_path, monkeypatch):
-    """验证 slice one round current user only 场景。"""
+    """验证截取一轮当前用户仅的处理符合预期。"""
     _, session_mod = _reload_store(tmp_path, monkeypatch)
     messages = [{"role": "user", "content": "a"}]
     got = session_mod.slice_chat_rounds(messages, max_rounds=1)
@@ -25,7 +25,7 @@ def test_slice_one_round_current_user_only(tmp_path, monkeypatch):
 
 
 def test_slice_one_user_round_is_current_user_only(tmp_path, monkeypatch):
-    """验证 slice one user round is current user only 场景。"""
+    """验证截取一用户轮是否当前用户仅的处理符合预期。"""
     _, session_mod = _reload_store(tmp_path, monkeypatch)
     messages = [
         {"role": "user", "content": "u1"},
@@ -37,7 +37,7 @@ def test_slice_one_user_round_is_current_user_only(tmp_path, monkeypatch):
 
 
 def test_slice_synthesize_includes_prior_assistant(tmp_path, monkeypatch):
-    """验证 slice synthesize includes prior assistant 场景。"""
+    """验证截取汇总 phase 会包含 prior_results 助手。"""
     _, session_mod = _reload_store(tmp_path, monkeypatch)
     messages = [
         {"role": "user", "content": "u1"},
@@ -49,7 +49,7 @@ def test_slice_synthesize_includes_prior_assistant(tmp_path, monkeypatch):
 
 
 def test_slice_six_rounds_from_tail(tmp_path, monkeypatch):
-    """验证 slice six rounds from tail 场景。"""
+    """验证截取六轮从尾部的处理符合预期。"""
     SessionStore, session_mod = _reload_store(tmp_path, monkeypatch)
     messages = []
     for i in range(8):
@@ -57,6 +57,6 @@ def test_slice_six_rounds_from_tail(tmp_path, monkeypatch):
         messages.append({"role": "assistant", "content": f"a{i}"})
     messages.append({"role": "user", "content": "u8"})
     got = session_mod.slice_chat_rounds(messages, max_rounds=6)
-    # 8 轮完整 + 第9轮仅 user；取最近6轮应从 u3 开始
+    # 八轮完整对话加第九轮仅用户消息；取最近六轮应从第三轮用户消息开始
     assert got[0]["content"] == "u3"
     assert got[-1]["content"] == "u8"

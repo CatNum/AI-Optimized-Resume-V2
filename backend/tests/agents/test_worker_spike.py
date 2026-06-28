@@ -1,11 +1,8 @@
-"""SPIKE 验收测试（architecture 07 §9）。
+"""尖峰验收测试。
 
-1. Coordinator 委托时不传 skill_name；Worker 通过 capability_bundle 接收 skill_index，
-   见 ``tests/harness/test_delegate_capability_bundle.py``。
-2. Worker ReAct 加载两个 skill；审计 trace 中针对 ``load_skill`` 的 ``tool.call``
-   至少出现 2 次（也可以包含 ``skill.load``）。
-3. Harness 拒绝错误 Worker 加载 skill，见
-   ``tests/harness/test_load_skill.py::test_load_skill_rejects_wrong_worker``.
+1. Coordinator 委托时不直接传 Skill 名，Worker 通过 capability_bundle 接收 Skill 索引。
+2. ReAct 链路会加载两个 Skill，并在 trace 中记录工具调用。
+3. Harness 会拒绝错误 Worker 加载 Skill。
 """
 
 import importlib
@@ -43,7 +40,7 @@ def _tool_call(name: str, arguments: str, call_id: str) -> MagicMock:
 
 
 def test_react_loads_two_skills_trace(harness, monkeypatch):
-    """验证 react loads two skills trace 场景。"""
+    """验证 ReAct 会加载两个 Skill 并写入 trace。"""
     monkeypatch.setenv("LLM_API_KEY", "test-key")
 
     delegated = harness.delegate_worker(
@@ -127,7 +124,7 @@ def test_react_loads_two_skills_trace(harness, monkeypatch):
 
 @pytest.mark.llm
 def test_worker_loads_skill_twice_trace_llm(harness):
-    """可选的真实 LLM SPIKE；没有 API key 时跳过。"""
+    """验证真实 LLM 链路会两次加载 Skill 并记录跟踪信息。"""
     pytest.importorskip("litellm")
     import os
 

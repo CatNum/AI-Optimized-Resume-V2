@@ -27,7 +27,7 @@ def session_id():
 
 
 def test_asset_cannot_patch_exploration(harness, session_id):
-    """验证 asset cannot patch exploration 场景。"""
+    """验证 asset Worker 不能更新 exploration。"""
     err = harness.execute_tool(
         "asset",
         "profile_patch",
@@ -37,7 +37,7 @@ def test_asset_cannot_patch_exploration(harness, session_id):
 
 
 def test_identity_can_patch_exploration(harness, session_id):
-    """验证 identity can patch exploration 场景。"""
+    """验证 identity Worker 可以更新 exploration。"""
     result = harness.execute_tool(
         "identity",
         "profile_patch",
@@ -48,7 +48,7 @@ def test_identity_can_patch_exploration(harness, session_id):
 
 
 def test_market_rejects_strategy_path(harness, session_id):
-    """验证 market rejects strategy path 场景。"""
+    """验证 market Worker 会拒绝 strategy Worker 路径。"""
     err = harness.execute_tool(
         "market",
         "profile_patch",
@@ -58,7 +58,7 @@ def test_market_rejects_strategy_path(harness, session_id):
 
 
 def test_coordinator_profile_get(harness, session_id):
-    """验证 coordinator profile get 场景。"""
+    """验证 Coordinator 获取 profile 的处理符合预期。"""
     harness.execute_tool(
         "identity",
         "profile_patch",

@@ -13,7 +13,7 @@ def orchestrator():
 
 
 def test_chat_in_progress(orchestrator):
-    """验证 chat in progress 场景。"""
+    """验证聊天在进行中的处理符合预期。"""
     session_id = "sess_1"
     state = {"last_activity_at": datetime.now(UTC).isoformat()}
     meta = {"usage_ratio": 0.1, "over_limit": False}
@@ -26,7 +26,7 @@ def test_chat_in_progress(orchestrator):
 
 
 def test_idle_session_can_begin_chat(orchestrator):
-    """验证 idle session can begin chat 场景。"""
+    """验证空闲会话可以开始聊天。"""
     old = "2026-06-01T10:28:43.542993+00:00"
     state = {"last_activity_at": old}
     result = orchestrator.begin_chat("sess_old", state, {})
@@ -35,7 +35,7 @@ def test_idle_session_can_begin_chat(orchestrator):
 
 
 def test_recommend_new_session_near_limit(orchestrator):
-    """验证 recommend new session near limit 场景。"""
+    """验证推荐新会话接近限制的处理符合预期。"""
     state = {"last_activity_at": datetime.now(UTC).isoformat()}
     meta = {
         "usage_ratio": 0.96,
@@ -51,7 +51,7 @@ def test_recommend_new_session_near_limit(orchestrator):
 
 
 def test_no_recommend_at_low_usage(orchestrator):
-    """验证 no recommend at low usage 场景。"""
+    """验证不推荐在低使用量的处理符合预期。"""
     state = {"last_activity_at": datetime.now(UTC).isoformat()}
     meta = {"usage_ratio": 0.1, "total_count": 4, "over_limit": False}
     result = orchestrator.begin_chat("sess_low", state, meta)
@@ -60,7 +60,7 @@ def test_no_recommend_at_low_usage(orchestrator):
 
 
 def test_recommend_new_session_on_over_limit(orchestrator):
-    """验证 recommend new session on over limit 场景。"""
+    """验证推荐新会话在高于限制的处理符合预期。"""
     state = {"last_activity_at": datetime.now(UTC).isoformat()}
     meta = {"over_limit": True, "usage_ratio": 0.5}
     result = orchestrator.begin_chat("sess_over", state, meta)

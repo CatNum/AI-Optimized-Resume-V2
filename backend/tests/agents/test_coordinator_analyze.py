@@ -5,7 +5,7 @@ from career_os.platform.worker.registry import WorkerRegistry
 
 
 def test_analyze_workers_returns_workers_and_pipeline(monkeypatch):
-    """验证 analyze workers returns workers and pipeline 场景。"""
+    """验证分析结果会返回 Worker 列表和 pipeline。"""
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(coordinator_llm_mod, "check_jd_prerequisites", lambda session_state: (True, None))
     monkeypatch.setattr(
@@ -33,7 +33,7 @@ def test_analyze_workers_returns_workers_and_pipeline(monkeypatch):
 
 
 def test_coordinator_analyze_node_uses_llm_when_pending_empty(jd_ready_profile, monkeypatch):
-    """验证 coordinator analyze node uses llm when pending empty 场景。"""
+    """验证待处理项为空时，Coordinator 分析节点使用 LLM 的处理符合预期。"""
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(
         coordinator_llm_mod.lc_client,
@@ -45,7 +45,7 @@ def test_coordinator_analyze_node_uses_llm_when_pending_empty(jd_ready_profile, 
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
-        """构造测试用 Worker runner。"""
+        """构造测试用 Worker 调度器。"""
         calls.append(worker_id)
         return {
             "worker_id": worker_id,

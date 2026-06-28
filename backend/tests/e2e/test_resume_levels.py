@@ -24,7 +24,7 @@ def harness(tmp_path, monkeypatch):
 
 
 def test_resume_writes_multiple_levels(harness, tmp_path):
-    """验证 resume writes multiple levels 场景。"""
+    """验证 resume Worker 会写入多个档位。"""
     session_state = {
         "session_id": "sess_resume",
         "gates": {"flags": {"optimize_confirmed": True}},

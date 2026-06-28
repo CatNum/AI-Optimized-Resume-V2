@@ -29,7 +29,7 @@ def isolated_stores(tmp_path, monkeypatch):
 def test_instantiate_pipeline_creates_five_milestone_files(
     isolated_stores, tmp_path, monkeypatch
 ):
-    """验证 instantiate pipeline creates five milestone files 场景。"""
+    """验证实例化 pipeline 会创建五个里程碑文件。"""
     pipeline_mod, profile_mod, session_mod, _task_mod = isolated_stores
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     session_id = session_mod.SessionStore().create_session()
@@ -47,7 +47,7 @@ def test_instantiate_pipeline_creates_five_milestone_files(
 def test_instantiate_pipeline_remains_in_explore_when_profile_is_fresh(
     isolated_stores, tmp_path, monkeypatch
 ):
-    """验证 instantiate pipeline remains in explore when profile is fresh 场景。"""
+    """验证新建 profile 时实例化 pipeline 会保持在 explore。"""
     pipeline_mod, profile_mod, session_mod, _task_mod = isolated_stores
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     profile = seed_explore_intake_profile(profile_mod.ProfileStore())

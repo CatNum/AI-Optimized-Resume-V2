@@ -4,7 +4,7 @@ from career_os.harness.gate import match_gate_intent
 
 
 def test_explore_complete_confirm():
-    """验证 explore complete confirm 场景。"""
+    """验证探索完成确认的处理符合预期。"""
     result = match_gate_intent("确认完成初探")
     assert result["matched"] is True
     assert result["gate_name"] == "explore_complete"
@@ -12,7 +12,7 @@ def test_explore_complete_confirm():
 
 
 def test_explore_complete_confirm_natural_phrases():
-    """验证 explore complete confirm natural phrases 场景。"""
+    """验证探索完成确认自然表达的处理符合预期。"""
     pending = {"name": "explore_complete", "prompt": "请确认是否完成初探？"}
     for message in ("确认完成", "足够完整梳理了", "到位了", "初探已经到位"):
         result = match_gate_intent(message, pending_gate=pending)
@@ -21,7 +21,7 @@ def test_explore_complete_confirm_natural_phrases():
 
 
 def test_optimize_confirm_reject():
-    """验证 optimize confirm reject 场景。"""
+    """验证优化确认拒绝的处理符合预期。"""
     result = match_gate_intent(
         "先不优化",
         pending_gate={"name": "optimize_confirm", "prompt": "是否确认优化？"},
@@ -32,7 +32,7 @@ def test_optimize_confirm_reject():
 
 
 def test_unknown_when_no_match(monkeypatch):
-    """验证 unknown when no match 场景。"""
+    """验证不匹配时，未知的处理符合预期。"""
     monkeypatch.setattr("career_os.harness.micro_classifier.llm_enabled", lambda: False)
     result = match_gate_intent(
         "随便聊聊",
@@ -43,7 +43,7 @@ def test_unknown_when_no_match(monkeypatch):
 
 
 def test_explore_complete_with_next_step_pending(monkeypatch):
-    """验证 explore complete with next step pending 场景。"""
+    """验证探索完成具备下一步待处理项的处理符合预期。"""
     monkeypatch.setattr("career_os.harness.micro_classifier.llm_enabled", lambda: False)
     result = match_gate_intent(
         "已经完成初探 下一步",
@@ -54,7 +54,7 @@ def test_explore_complete_with_next_step_pending(monkeypatch):
 
 
 def test_explore_complete_question_does_not_fallback_to_llm_confirm(monkeypatch):
-    """验证 explore complete question does not fallback to llm confirm 场景。"""
+    """验证探索完成问题不会兜底到 LLM 确认。"""
     def fake_llm(*args, **kwargs):
         """构造测试替身函数。"""
         return {
@@ -76,7 +76,7 @@ def test_explore_complete_question_does_not_fallback_to_llm_confirm(monkeypatch)
 
 
 def test_explore_complete_continue_more_is_reject():
-    """验证 explore complete continue more is reject 场景。"""
+    """验证探索完成继续继续补充是否拒绝的处理符合预期。"""
     result = match_gate_intent(
         "还要继续聊聊",
         pending_gate={"name": "explore_complete", "prompt": "请确认完成初探"},

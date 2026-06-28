@@ -12,7 +12,7 @@ def _long_session(n_users: int) -> list[dict[str, str]]:
 
 
 def test_worker_default_ten_rounds():
-    """验证 worker default ten rounds 场景。"""
+    """验证 Worker 默认十轮的处理符合预期。"""
     full = _long_session(20)
     window, scope = select_worker_chat_history(full, "继续分析", {})
     assert scope == "recent_10"
@@ -22,7 +22,7 @@ def test_worker_default_ten_rounds():
 
 
 def test_worker_full_when_rule_matches():
-    """验证 worker full when rule matches 场景。"""
+    """验证规则匹配时，Worker 完整的处理符合预期。"""
     full = _long_session(5)
     window, scope = select_worker_chat_history(full, "请根据完整对话分析", {})
     assert scope == "full"

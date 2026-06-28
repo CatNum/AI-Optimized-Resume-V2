@@ -28,7 +28,7 @@ def harness(tmp_path, monkeypatch, explore_intake_profile):
 
 
 def test_explore_first_turn_in_progress_no_gate(harness):
-    """验证 explore first turn in progress no gate 场景。"""
+    """验证 explore 首次轮次在进行中不 gate 的处理符合预期。"""
     runner = build_harness_worker_runner(harness)
     session_state = {
         "session_id": "sess_exp",
@@ -57,7 +57,7 @@ def test_explore_first_turn_in_progress_no_gate(harness):
 
 
 def test_explore_gate_after_both_segments_complete(harness):
-    """验证 explore gate after both segments complete 场景。"""
+    """验证探索 gate 之后两个分段完成的处理符合预期。"""
     runner = build_harness_worker_runner(harness)
     session_state = {
         "session_id": "sess_exp2",

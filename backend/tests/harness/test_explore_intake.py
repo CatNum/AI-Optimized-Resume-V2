@@ -6,7 +6,7 @@ from career_os.harness.explore_intake import (
 
 
 def test_is_explore_route():
-    """验证 is explore route 场景。"""
+    """验证是否属于 explore 路由。"""
     assert is_explore_route(
         {"workers": ["identity"], "list_type": "pipeline", "pipeline_phase": "explore"}
     )
@@ -16,7 +16,7 @@ def test_is_explore_route():
 
 
 def test_enforce_explore_intake_blocks_without_submission(tmp_path, monkeypatch):
-    """验证 enforce explore intake blocks without submission 场景。"""
+    """验证缺少提交时，强制规则 phase exploration 收集拦截的处理符合预期。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -40,7 +40,7 @@ def test_enforce_explore_intake_blocks_without_submission(tmp_path, monkeypatch)
 
 
 def test_enforce_explore_intake_repeat_gate_when_already_submitted(tmp_path, monkeypatch):
-    """验证 enforce explore intake repeat gate when already submitted 场景。"""
+    """验证已经已提交时，强制规则 phase exploration 收集重复探索 gate 的处理符合预期。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -69,7 +69,7 @@ def test_enforce_explore_intake_repeat_gate_when_already_submitted(tmp_path, mon
 def test_enforce_explore_intake_allows_submitted_intake_before_deep_explore_complete(
     tmp_path, monkeypatch
 ):
-    """验证 enforce explore intake allows submitted intake before deep explore complete 场景。"""
+    """验证强制规则 phase exploration 收集会允许已提交 intake 先于深度探索完成。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -101,7 +101,7 @@ def test_enforce_explore_intake_allows_submitted_intake_before_deep_explore_comp
 def test_enforce_explore_intake_allows_after_repeat_accepted_and_resubmit(
     tmp_path, monkeypatch
 ):
-    """验证 enforce explore intake allows after repeat accepted and resubmit 场景。"""
+    """验证强制规则 phase exploration 收集会允许之后重复探索已接受和重新提交。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 

@@ -9,7 +9,7 @@ from career_os.agents.lc.models import (
 
 
 def test_deepseek_default_config(monkeypatch):
-    """验证 deepseek default config 场景。"""
+    """验证深度求索默认配置的处理符合预期。"""
     monkeypatch.setenv("LLM_PROVIDER", "deepseek")
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     monkeypatch.delenv("LLM_BASE_URL", raising=False)
@@ -31,7 +31,7 @@ def test_deepseek_default_config(monkeypatch):
 
 
 def test_custom_model_override(monkeypatch):
-    """验证 custom model override 场景。"""
+    """验证自定义模型覆盖的处理符合预期。"""
     monkeypatch.setenv("LLM_PROVIDER", "deepseek")
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     monkeypatch.setenv("COORDINATOR_MODEL", "deepseek-reasoner")
@@ -45,12 +45,12 @@ def test_custom_model_override(monkeypatch):
 
 
 def test_full_litellm_model_passthrough():
-    """验证 full litellm model passthrough 场景。"""
+    """验证完整 LiteLLM 模型透传的处理符合预期。"""
     assert to_litellm_model("deepseek", "deepseek/deepseek-chat") == "deepseek/deepseek-chat"
 
 
 def test_openai_compatible_custom_base_url(monkeypatch):
-    """验证 openai compatible custom base url 场景。"""
+    """验证开放人工智能兼容自定义基础地址的处理符合预期。"""
     monkeypatch.setenv("LLM_PROVIDER", "openai_compatible")
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     monkeypatch.setenv("LLM_BASE_URL", "https://gateway.example/v1")
@@ -66,7 +66,7 @@ def test_openai_compatible_custom_base_url(monkeypatch):
 
 
 def test_unknown_provider_raises(monkeypatch):
-    """验证 unknown provider raises 场景。"""
+    """验证未知供应商会抛错。"""
     monkeypatch.setenv("LLM_PROVIDER", "unknown-vendor")
 
     from career_os.agents.lc import models as models_mod

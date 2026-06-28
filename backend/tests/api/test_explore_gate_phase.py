@@ -35,7 +35,7 @@ def pipeline_session(tmp_path, monkeypatch):
 
 
 def test_explore_complete_advances_to_market(pipeline_session, monkeypatch):
-    """验证 explore complete advances to market 场景。"""
+    """验证探索完成会推进到 market Worker。"""
     session_store, task_store, session_id, list_id = pipeline_session
     from career_os.api import chat as chat_mod
 
@@ -68,7 +68,7 @@ def test_explore_complete_advances_to_market(pipeline_session, monkeypatch):
 
 
 def test_explore_complete_question_does_not_advance_phase(pipeline_session, monkeypatch):
-    """验证 explore complete question does not advance phase 场景。"""
+    """验证探索完成问题不会推进 phase。"""
     session_store, task_store, session_id, list_id = pipeline_session
     from career_os.api import chat as chat_mod
 
@@ -97,7 +97,7 @@ def test_explore_complete_question_does_not_advance_phase(pipeline_session, monk
 
 
 def test_explore_complete_reject_keeps_explore_phase_open(pipeline_session):
-    """验证 explore complete reject keeps explore phase open 场景。"""
+    """验证探索完成拒绝会保持 explore 打开。"""
     session_store, task_store, session_id, list_id = pipeline_session
     from career_os.api import chat as chat_mod
 
@@ -133,7 +133,7 @@ def test_explore_complete_reject_keeps_explore_phase_open(pipeline_session):
 
 
 def test_jd_continue_gate_confirm_dispatches_opportunity(pipeline_session):
-    """验证 jd continue gate confirm dispatches opportunity 场景。"""
+    """验证 JD 继续 gate 确认会分派 opportunity Worker。"""
     session_store, task_store, session_id, list_id = pipeline_session
     from career_os.api import chat as chat_mod
 
@@ -160,7 +160,7 @@ def test_jd_continue_gate_confirm_dispatches_opportunity(pipeline_session):
 
 
 def test_explore_repeat_accept_uses_global_intake_baseline(pipeline_session):
-    """验证 explore repeat accept uses global intake baseline 场景。"""
+    """验证 explore 接受重复探索会使用全局 intake 基线。"""
     session_store, _task_store, session_id, _list_id = pipeline_session
     from career_os.api import chat as chat_mod
     from career_os.platform.store.profile import ProfileStore
@@ -196,7 +196,7 @@ def test_explore_repeat_accept_uses_global_intake_baseline(pipeline_session):
 
 
 def test_explore_repeat_reject_advances_phase_from_prior(pipeline_session):
-    """验证 explore repeat reject advances phase from prior 场景。"""
+    """验证 explore 拒绝重复探索会基于 prior_results 推进 phase。"""
     session_store, task_store, session_id, list_id = pipeline_session
     from career_os.api import chat as chat_mod
 

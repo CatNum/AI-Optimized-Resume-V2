@@ -3,7 +3,7 @@ from datetime import date
 
 
 def test_output_write_list_delete(tmp_path, monkeypatch):
-    """验证 output write list delete 场景。"""
+    """验证输出写入列表删除的处理符合预期。"""
     monkeypatch.setenv("OUTPUT_DIR", str(tmp_path / "output"))
     import career_os.config as config_mod
     import career_os.platform.store.output as output_mod

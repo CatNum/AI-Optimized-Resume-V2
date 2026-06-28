@@ -1,5 +1,5 @@
 def test_profile_created_empty_on_first_access(tmp_path, monkeypatch):
-    """验证 profile created empty on first access 场景。"""
+    """验证 profile 已创建为空在首次访问的处理符合预期。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -19,7 +19,7 @@ def test_profile_created_empty_on_first_access(tmp_path, monkeypatch):
 
 
 def test_profile_patch_set(tmp_path, monkeypatch):
-    """验证 profile patch set 场景。"""
+    """验证 profile 更新设置的处理符合预期。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -34,7 +34,7 @@ def test_profile_patch_set(tmp_path, monkeypatch):
 
 
 def test_profile_patch_rejects_session_scoped_path(tmp_path, monkeypatch):
-    """验证 profile patch rejects session scoped path 场景。"""
+    """验证 profile 更新会拒绝会话会话范围路径。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -52,7 +52,7 @@ def test_profile_patch_rejects_session_scoped_path(tmp_path, monkeypatch):
 
 
 def test_outputs_index_requires_session_id(tmp_path, monkeypatch):
-    """验证 outputs index requires session id 场景。"""
+    """验证 outputs_index 会要求会话标识。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 

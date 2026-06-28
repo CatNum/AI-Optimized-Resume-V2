@@ -12,7 +12,7 @@ def harness(tmp_path, monkeypatch):
 
 
 def test_load_skill_allowed_worker(harness):
-    """验证 load skill allowed worker 场景。"""
+    """验证 Skill 加载允许 Worker 的处理符合预期。"""
     result = harness.execute_tool(
         "identity",
         "load_skill",
@@ -24,7 +24,7 @@ def test_load_skill_allowed_worker(harness):
 
 
 def test_load_skill_rejects_wrong_worker(harness):
-    """验证 load skill rejects wrong worker 场景。"""
+    """验证 Skill 加载会拒绝错误 Worker。"""
     result = harness.execute_tool(
         "market",
         "load_skill",
@@ -34,7 +34,7 @@ def test_load_skill_rejects_wrong_worker(harness):
 
 
 def test_list_skills_for_worker(harness):
-    """验证 list skills for worker 场景。"""
+    """验证列表 Skill 针对 Worker 的处理符合预期。"""
     result = harness.execute_tool("strategy", "list_skills", {})
     assert "skills" in result
     names = [s["name"] for s in result["skills"]]

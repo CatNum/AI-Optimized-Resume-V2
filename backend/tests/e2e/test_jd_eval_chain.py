@@ -25,7 +25,7 @@ def harness(tmp_path, monkeypatch):
 
 
 def test_jd_chain_market_then_opportunity(harness):
-    """验证 jd chain market then opportunity 场景。"""
+    """验证 JD 链路 market Worker 再 opportunity Worker 的处理符合预期。"""
     seed_jd_ready_profile(ProfileStore())
     runner = build_harness_worker_runner(harness)
     state = run_coordinator_turn(
@@ -48,7 +48,7 @@ def test_jd_chain_market_then_opportunity(harness):
 
 
 def test_market_before_opportunity_order(harness):
-    """验证 market before opportunity order 场景。"""
+    """验证 market Worker 先于 opportunity Worker 顺序的处理符合预期。"""
     seed_jd_ready_profile(ProfileStore())
     runner = build_harness_worker_runner(harness)
     calls: list[str] = []
@@ -56,7 +56,7 @@ def test_market_before_opportunity_order(harness):
     original = runner
 
     def tracking_runner(worker_id, goal, session_state, context):
-        """构造测试用 Worker runner。"""
+        """构造测试用 Worker 调度器。"""
         calls.append(worker_id)
         return original(worker_id, goal, session_state, context)
 

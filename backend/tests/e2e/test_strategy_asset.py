@@ -17,7 +17,7 @@ def harness(tmp_path, monkeypatch):
 
 
 def test_strategy_emits_optimize_gate_on_jd(harness):
-    """验证 strategy emits optimize gate on jd 场景。"""
+    """验证 strategy Worker 会输出优化 gate 在 JD。"""
     result = mock_run_worker_react(
         harness,
         worker_id="strategy",
@@ -33,7 +33,7 @@ def test_strategy_emits_optimize_gate_on_jd(harness):
 
 
 def test_strategy_no_optimize_gate_on_plan(harness):
-    """验证 strategy no optimize gate on plan 场景。"""
+    """验证 strategy Worker 不优化 gate 在计划的处理符合预期。"""
     result = mock_run_worker_react(
         harness,
         worker_id="strategy",

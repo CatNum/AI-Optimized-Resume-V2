@@ -48,7 +48,7 @@ def pipeline_ctx(tmp_path, monkeypatch):
 
 
 def test_explore_flow_inactive_fixture_draft_not_forced(pipeline_ctx):
-    """验证 explore flow inactive fixture draft not forced 场景。"""
+    """验证 explore pipeline 未激活时不会强制生成 fixture 草稿。"""
     session_id, list_id, task_mod, _ = pipeline_ctx
     task_mod.TaskStore().set_current_phase(list_id, "jd_analysis")
     session_state = {
@@ -67,12 +67,12 @@ def test_explore_flow_inactive_fixture_draft_not_forced(pipeline_ctx):
 
 
 def test_market_segment_complete_advances_current_phase(pipeline_ctx, tmp_path):
-    """验证 market segment complete advances current phase 场景。"""
+    """验证市场分段完成会推进 current_phase。"""
     session_id, list_id, task_mod, coordinator_mod = pipeline_ctx
     harness = Harness()
 
     def runner(worker_id, goal, session_state, context):
-        """构造测试用 Worker runner。"""
+        """构造测试用 Worker 调度器。"""
         return {
             "worker_id": worker_id,
             "status": "completed",
@@ -104,7 +104,7 @@ def test_market_segment_complete_advances_current_phase(pipeline_ctx, tmp_path):
 
 
 def test_synthesize_not_explore_draft_when_gate_confirmed(pipeline_ctx):
-    """验证 synthesize not explore draft when gate confirmed 场景。"""
+    """验证 gate 已确认时汇总 phase 不会生成 explore 草稿。"""
     session_id, list_id, task_mod, coordinator_mod = pipeline_ctx
     task_mod.TaskStore().set_current_phase(list_id, "jd_analysis")
     harness = Harness()

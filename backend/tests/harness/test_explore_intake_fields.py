@@ -5,7 +5,7 @@ from career_os.harness.explore_intake_fields import (
 
 
 def test_extract_fields_from_resume():
-    """验证 extract fields from resume 场景。"""
+    """验证抽取字段从 resume Worker 的处理符合预期。"""
     resume = """
     张三
     5年工作经验
@@ -21,7 +21,7 @@ def test_extract_fields_from_resume():
 
 
 def test_merge_prefers_user_values_over_extraction():
-    """验证 merge prefers user values over extraction 场景。"""
+    """验证合并优先采用用户值高于抽取的处理符合预期。"""
     resume = "期望岗位：后端工程师\n3年工作经验"
     resolved, extracted, pending = merge_intake_field_values(
         resume_text=resume,
@@ -39,7 +39,7 @@ def test_merge_prefers_user_values_over_extraction():
 
 
 def test_merge_pending_when_missing_everywhere():
-    """验证 merge pending when missing everywhere 场景。"""
+    """验证缺失所有来源时，合并待处理项的处理符合预期。"""
     resolved, _, pending = merge_intake_field_values(
         resume_text="只有项目经历描述，没有结构化字段",
         user_values={

@@ -24,7 +24,7 @@ def traced_harness(tmp_path, monkeypatch):
 
 
 def test_coordinator_analyze_emits_trace(traced_harness, monkeypatch):
-    """验证 coordinator analyze emits trace 场景。"""
+    """验证 Coordinator 分析 phase 会输出 trace。"""
     harness, writer = traced_harness
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(coordinator_llm_mod, "check_jd_prerequisites", lambda session_state: (True, None))
@@ -35,7 +35,7 @@ def test_coordinator_analyze_emits_trace(traced_harness, monkeypatch):
     )
 
     def runner(worker_id, goal, session_state, context):
-        """构造测试用 Worker runner。"""
+        """构造测试用 Worker 调度器。"""
         return {
             "worker_id": worker_id,
             "status": "completed",
@@ -73,11 +73,11 @@ def test_coordinator_analyze_emits_trace(traced_harness, monkeypatch):
 
 
 def test_coordinator_preset_workers_emits_trace(traced_harness):
-    """验证 coordinator preset workers emits trace 场景。"""
+    """验证 Coordinator 预设 Worker 列表会输出 trace。"""
     harness, writer = traced_harness
 
     def runner(worker_id, goal, session_state, context):
-        """构造测试用 Worker runner。"""
+        """构造测试用 Worker 调度器。"""
         return {
             "worker_id": worker_id,
             "status": "completed",

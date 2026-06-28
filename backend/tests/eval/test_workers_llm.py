@@ -22,7 +22,7 @@ def harness(tmp_path, monkeypatch):
 
 @pytest.mark.llm
 def test_strategy_jd_emits_optimize_gate(harness):
-    """验证 strategy jd emits optimize gate 场景。"""
+    """验证 strategy Worker 会针对 JD 输出优化 gate。"""
     if not llm_enabled():
         pytest.skip("LLM_API_KEY not configured")
 
@@ -45,7 +45,7 @@ def test_strategy_jd_emits_optimize_gate(harness):
 
 @pytest.mark.llm
 def test_resume_generates_html_deliveries(harness, tmp_path):
-    """验证 resume generates html deliveries 场景。"""
+    """验证 resume Worker 会生成 HTML 交付物。"""
     if not llm_enabled():
         pytest.skip("LLM_API_KEY not configured")
 

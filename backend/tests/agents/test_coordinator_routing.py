@@ -15,14 +15,14 @@ from tests.conftest import explore_repeat_cleared_gates
 
 
 def test_is_small_talk():
-    """验证 is small talk 场景。"""
+    """验证寒暄消息能被识别，JD 请求不会被误判为寒暄。"""
     assert is_small_talk("你好")
     assert is_small_talk("  你好吗！ ")
     assert not is_small_talk("请评估这个 JD")
 
 
 def test_normalize_filters_market_on_explore_phase():
-    """验证 normalize filters market on explore phase 场景。"""
+    """验证规范化会过滤 market Worker 在 explore。"""
     allowed = {"identity", "capability", "market", "opportunity"}
     result = normalize_analyze_result(
         {
@@ -38,7 +38,7 @@ def test_normalize_filters_market_on_explore_phase():
 
 
 def test_fallback_greeting_returns_empty_workers():
-    """验证 fallback greeting returns empty workers 场景。"""
+    """验证问候消息走兜底分析时不会调度 Worker。"""
     result = fallback_analyze_workers("你好", {"prior_results": {}, "list_type": "pipeline"})
     assert result == {"workers": []}
 
@@ -46,7 +46,7 @@ def test_fallback_greeting_returns_empty_workers():
 def test_fallback_explore_returns_pipeline_phase(
     monkeypatch, tmp_path, explore_intake_profile
 ):
-    """验证 fallback explore returns pipeline phase 场景。"""
+    """验证兜底 explore 会返回 pipeline phase。"""
     result = fallback_analyze_workers(
         "帮我理清职业方向",
         {
@@ -62,7 +62,7 @@ def test_fallback_explore_returns_pipeline_phase(
 
 
 def test_analyze_workers_sanitizes_llm_mismatch(monkeypatch, explore_intake_profile):
-    """验证 analyze workers sanitizes llm mismatch 场景。"""
+    """验证分析结果清理 LLM 不匹配的处理符合预期。"""
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(
         coordinator_llm_mod.lc_client,
@@ -82,7 +82,7 @@ def test_analyze_workers_sanitizes_llm_mismatch(monkeypatch, explore_intake_prof
 
 
 def test_coordinator_hello_does_not_delegate(monkeypatch):
-    """验证 coordinator hello does not delegate 场景。"""
+    """验证 Coordinator 处理问候消息时不会发起 Worker 委派。"""
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(
         coordinator_llm_mod.lc_client,
@@ -94,7 +94,7 @@ def test_coordinator_hello_does_not_delegate(monkeypatch):
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
-        """构造测试用 Worker runner。"""
+        """构造测试用 Worker 调度器。"""
         calls.append(worker_id)
         return {
             "worker_id": worker_id,
@@ -119,7 +119,7 @@ def test_coordinator_hello_does_not_delegate(monkeypatch):
 
 
 def test_coordinator_jd_still_delegates(jd_ready_profile, monkeypatch):
-    """验证 coordinator jd still delegates 场景。"""
+    """验证 JD 请求在条件满足时仍会触发 Worker 委派。"""
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: True)
     monkeypatch.setattr(
         coordinator_llm_mod.lc_client,
@@ -134,7 +134,7 @@ def test_coordinator_jd_still_delegates(jd_ready_profile, monkeypatch):
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
-        """构造测试用 Worker runner。"""
+        """构造测试用 Worker 调度器。"""
         calls.append(worker_id)
         return {
             "worker_id": worker_id,
@@ -163,7 +163,7 @@ def test_coordinator_jd_still_delegates(jd_ready_profile, monkeypatch):
 
 
 def test_coordinator_applies_intent_phase_transition(monkeypatch, jd_ready_profile):
-    """验证 coordinator applies intent phase transition 场景。"""
+    """验证 Coordinator 应用意图 phase 流转的处理符合预期。"""
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: False)
 
     harness = Harness()
@@ -196,7 +196,7 @@ def test_coordinator_applies_intent_phase_transition(monkeypatch, jd_ready_profi
 
 
 def test_coordinator_turn_switches_to_explore(monkeypatch, jd_ready_profile):
-    """验证 coordinator turn switches to explore 场景。"""
+    """验证 Coordinator 轮次切换到 explore 的处理符合预期。"""
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: False)
     monkeypatch.setattr(classifier_mod, "llm_enabled", lambda: True)
     monkeypatch.setattr(
@@ -241,7 +241,7 @@ def test_coordinator_turn_switches_to_explore(monkeypatch, jd_ready_profile):
 
 
 def test_coordinator_turn_switches_to_market(monkeypatch, jd_ready_profile):
-    """验证 coordinator turn switches to market 场景。"""
+    """验证 Coordinator 轮次切换到 market Worker 的处理符合预期。"""
     monkeypatch.setattr(coordinator_llm_mod.lc_client, "llm_enabled", lambda: False)
     monkeypatch.setattr(classifier_mod, "llm_enabled", lambda: True)
     monkeypatch.setattr(

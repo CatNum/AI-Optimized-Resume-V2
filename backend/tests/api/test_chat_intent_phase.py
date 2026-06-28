@@ -25,7 +25,7 @@ def pipeline_env(tmp_path, monkeypatch, jd_ready_profile):
 
 
 def test_analyze_result_advances_phase_in_enforce(pipeline_env):
-    """验证 analyze result advances phase in enforce 场景。"""
+    """验证强制规则 phase 会根据分析结果推进 current_phase。"""
     session_id = "sess_chat_intent"
     list_id = instantiate_pipeline_for_session(session_id)
     task_mod.TaskStore().set_current_phase(list_id, "jd_analysis")

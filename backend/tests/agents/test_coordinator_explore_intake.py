@@ -4,7 +4,7 @@ from career_os.harness.executor import Harness
 
 
 def test_explore_intake_blocked_skips_delegate(tmp_path, monkeypatch):
-    """验证 explore intake blocked skips delegate 场景。"""
+    """验证 exploration 收集被拦截会跳过委派。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -18,7 +18,7 @@ def test_explore_intake_blocked_skips_delegate(tmp_path, monkeypatch):
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
-        """构造测试用 Worker runner。"""
+        """构造测试用 Worker 调度器。"""
         calls.append(worker_id)
         return {"worker_id": worker_id, "status": "completed", "structured_output": {}}
 
@@ -44,7 +44,7 @@ def test_explore_intake_blocked_skips_delegate(tmp_path, monkeypatch):
 def test_current_session_intake_continues_explore_even_when_repeat_flag_stale(
     tmp_path, monkeypatch
 ):
-    """验证 current session intake continues explore even when repeat flag stale 场景。"""
+    """验证重复 explore 标记过期时，当前会话 intake 仍会继续 explore。"""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     import importlib
 
@@ -59,7 +59,7 @@ def test_current_session_intake_continues_explore_even_when_repeat_flag_stale(
     submitted_at = "2026-06-07T07:46:23Z"
 
     def runner(worker_id, goal, session_state, context):
-        """构造测试用 Worker runner。"""
+        """构造测试用 Worker 调度器。"""
         calls.append(worker_id)
         return {
             "worker_id": worker_id,

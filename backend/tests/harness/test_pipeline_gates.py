@@ -32,7 +32,7 @@ def env(tmp_path, monkeypatch):
 
 
 def test_jump_resume_optimize_forbidden(env):
-    """验证 jump resume optimize forbidden 场景。"""
+    """验证跳转简历优化禁止的处理符合预期。"""
     session_store, _ = env
     session_id = session_store.create_session()
     state = session_store.get_state(session_id)
@@ -42,7 +42,7 @@ def test_jump_resume_optimize_forbidden(env):
 
 
 def test_jump_explore_allowed_without_gate(env):
-    """验证 jump explore allowed without gate 场景。"""
+    """验证缺少 gate 时允许跳转到 explore。"""
     session_store, _task_store = env
     session_id = session_store.create_session()
     instantiate_pipeline_for_session(session_id)
@@ -51,7 +51,7 @@ def test_jump_explore_allowed_without_gate(env):
 
 
 def test_jump_market_requires_explore_gate(env):
-    """验证 jump market requires explore gate 场景。"""
+    """验证跳转 market Worker 会要求探索 gate。"""
     session_store, task_store = env
     session_id = session_store.create_session()
     list_id = instantiate_pipeline_for_session(session_id)
@@ -62,7 +62,7 @@ def test_jump_market_requires_explore_gate(env):
 
 
 def test_jump_market_allowed_after_profile_completion_seeds_session(env):
-    """验证 jump market allowed after profile completion seeds session 场景。"""
+    """验证跳转 market Worker 允许之后 profile 完成写入会话的处理符合预期。"""
     session_store, _task_store = env
     session_id = session_store.create_session()
     profile = ProfileStore()
@@ -82,7 +82,7 @@ def test_jump_market_allowed_after_profile_completion_seeds_session(env):
 
 
 def test_advance_resume_optimize_does_not_create_default_works(env):
-    """验证 advance resume optimize does not create default works 场景。"""
+    """验证推进简历优化不会创建默认工作产物。"""
     session_store, task_store = env
     session_id = session_store.create_session()
     list_id = instantiate_pipeline_for_session(session_id)
@@ -102,7 +102,7 @@ def test_advance_resume_optimize_does_not_create_default_works(env):
 
 
 def test_compute_needs_full_explore_false_for_recent_completed_profile(env):
-    """验证 compute needs full explore false for recent completed profile 场景。"""
+    """验证近期已完成 profile 时不需要完整 explore。"""
     session_store, _ = env
     session_id = session_store.create_session()
     state = session_store.get_state(session_id)
@@ -134,7 +134,7 @@ def test_compute_needs_full_explore_false_for_recent_completed_profile(env):
 
 
 def test_compute_needs_full_explore_true_for_old_completed_profile(env):
-    """验证 compute needs full explore true for old completed profile 场景。"""
+    """验证过期已完成 profile 时需要完整 explore。"""
     session_store, _ = env
     session_id = session_store.create_session()
     state = session_store.get_state(session_id)
@@ -166,7 +166,7 @@ def test_compute_needs_full_explore_true_for_old_completed_profile(env):
 
 
 def test_compute_needs_full_explore_true_for_explicit_revisit(env):
-    """验证 compute needs full explore true for explicit revisit 场景。"""
+    """验证显式重新探索时需要完整 explore。"""
     session_store, _ = env
     session_id = session_store.create_session()
     state = session_store.get_state(session_id)

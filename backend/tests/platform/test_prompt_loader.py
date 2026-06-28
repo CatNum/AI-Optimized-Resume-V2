@@ -30,7 +30,7 @@ WORKER_ROLE_MARKERS = {
 
 
 def test_load_coordinator_prompt_is_single_document():
-    """验证 load coordinator prompt is single document 场景。"""
+    """验证加载 Coordinator 提示是否单个文档的处理符合预期。"""
     prompt = load_coordinator_prompt()
     assert "职业规划助手" in prompt.system
     assert "用户可见话术" in prompt.system
@@ -45,7 +45,7 @@ def test_load_coordinator_prompt_is_single_document():
 
 
 def test_load_worker_react_boot_user_template():
-    """验证 load worker react boot user template 场景。"""
+    """验证加载 Worker ReAct 启动用户模板的处理符合预期。"""
     rendered = render_prompt(
         load_worker_llm_prompt("react_boot_user"),
         payload='{"goal": "test"}',
@@ -56,7 +56,7 @@ def test_load_worker_react_boot_user_template():
 
 @pytest.mark.parametrize("worker_id", WORKER_IDS)
 def test_load_worker_system_prompt_structure(worker_id: str):
-    """验证 load worker system prompt structure 场景。"""
+    """验证加载 Worker 系统提示结构的处理符合预期。"""
     text = load_worker_system_prompt(worker_id)
     assert WORKER_ROLE_MARKERS[worker_id] in text
     assert "## 1. 角色" in text
@@ -67,6 +67,6 @@ def test_load_worker_system_prompt_structure(worker_id: str):
 
 
 def test_load_prompt_delegates_to_system_md():
-    """验证 load prompt delegates to system md 场景。"""
+    """验证加载提示委派到系统文档的处理符合预期。"""
     assert load_prompt("market") == load_worker_system_prompt("market")
     assert "市场智能体" in load_prompt("market")

@@ -10,11 +10,11 @@ from tests.conftest import seed_jd_ready_profile
 
 
 def test_gate_prompt_stops_delegate_chain_c3(jd_ready_profile):
-    """验证 gate prompt stops delegate chain c3 场景。"""
+    """验证 gate 提示停止委派链路第三条链路的处理符合预期。"""
     harness = Harness()
 
     def runner(worker_id, goal, session_state, context):
-        """构造测试用 Worker runner。"""
+        """构造测试用 Worker 调度器。"""
         if worker_id == "market":
             return {
                 "worker_id": worker_id,
@@ -55,12 +55,12 @@ def test_gate_prompt_stops_delegate_chain_c3(jd_ready_profile):
 
 
 def test_sequential_delegate_without_gate(jd_ready_profile):
-    """验证 sequential delegate without gate 场景。"""
+    """验证缺少 gate 时，顺序委派委派的处理符合预期。"""
     harness = Harness()
     calls: list[str] = []
 
     def runner(worker_id, goal, session_state, context):
-        """构造测试用 Worker runner。"""
+        """构造测试用 Worker 调度器。"""
         calls.append(worker_id)
         return {
             "worker_id": worker_id,
@@ -93,7 +93,7 @@ def test_sequential_delegate_without_gate(jd_ready_profile):
 
 
 def test_worker_index_injected():
-    """验证 worker index injected 场景。"""
+    """验证 Worker 索引注入的处理符合预期。"""
     harness = Harness()
     runner = build_stub_worker_runner({})
     state = run_coordinator_turn(

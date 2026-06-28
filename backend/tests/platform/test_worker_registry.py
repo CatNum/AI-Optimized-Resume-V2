@@ -13,13 +13,13 @@ def repo_root() -> Path:
 
 
 def test_worker_registry_loads_seven_workers(repo_root: Path):
-    """验证 worker registry loads seven workers 场景。"""
+    """验证 Worker 注册表会加载七个 Worker 列表。"""
     registry = WorkerRegistry(registry_path=repo_root / "config" / "workers.registry.json")
     assert len(registry.list_worker_ids()) == 7
 
 
 def test_get_worker_index_returns_metadata(repo_root: Path):
-    """验证 get worker index returns metadata 场景。"""
+    """验证获取 Worker 索引会返回元数据。"""
     registry = WorkerRegistry(registry_path=repo_root / "config" / "workers.registry.json")
     index = registry.get_worker_index()
     assert len(index) == 7
@@ -29,7 +29,7 @@ def test_get_worker_index_returns_metadata(repo_root: Path):
 
 
 def test_load_skill_exploration_first_allowed_workers(repo_root: Path):
-    """验证 load skill exploration first allowed workers 场景。"""
+    """验证 Skill 加载 exploration 首次允许 Worker 列表的处理符合预期。"""
     registry = SkillRegistry(skills_dir=repo_root / ".agent" / "skills")
     bundle = registry.load_skill(
         "career-inner-exploration",
@@ -42,7 +42,7 @@ def test_load_skill_exploration_first_allowed_workers(repo_root: Path):
 
 
 def test_load_skill_rejects_wrong_worker(repo_root: Path):
-    """验证 load skill rejects wrong worker 场景。"""
+    """验证 Skill 加载会拒绝错误 Worker。"""
     registry = SkillRegistry(skills_dir=repo_root / ".agent" / "skills")
     err = registry.load_skill(
         "career-inner-exploration",

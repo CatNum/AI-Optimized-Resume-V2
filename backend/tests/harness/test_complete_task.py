@@ -18,7 +18,7 @@ def harness(tmp_path, monkeypatch):
 
 
 def test_coordinator_can_complete_task(harness):
-    """验证 coordinator can complete task 场景。"""
+    """验证 Coordinator 可以完成任务。"""
     created = harness.execute_tool(
         "coordinator",
         "create_task_list",
@@ -44,7 +44,7 @@ def test_coordinator_can_complete_task(harness):
 
 
 def test_worker_cannot_complete_task(harness):
-    """验证 worker cannot complete task 场景。"""
+    """验证 Worker 不能完成任务。"""
     err = harness.execute_tool(
         "capability",
         "complete_task",
@@ -54,7 +54,7 @@ def test_worker_cannot_complete_task(harness):
 
 
 def test_proposed_completions_do_not_auto_complete(harness):
-    """验证 proposed completions do not auto complete 场景。"""
+    """验证候选完成请求执行不自动完成的处理符合预期。"""
     created = harness.execute_tool(
         "coordinator",
         "create_task_list",

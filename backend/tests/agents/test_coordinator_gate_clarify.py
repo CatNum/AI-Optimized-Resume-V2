@@ -3,11 +3,11 @@ from career_os.harness.executor import Harness
 
 
 def test_synthesize_gate_clarify_pending():
-    """验证 synthesize gate clarify pending 场景。"""
+    """验证汇总 phase gate 澄清待处理项的处理符合预期。"""
     harness = Harness()
 
     def runner(worker_id, goal, session_state, context):
-        """构造测试用 Worker runner。"""
+        """构造测试用 Worker 调度器。"""
         return {"worker_id": worker_id, "status": "completed", "structured_output": {}}
 
     state = run_coordinator_turn(
@@ -36,11 +36,11 @@ def test_synthesize_gate_clarify_pending():
 
 
 def test_chat_only_request_skips_gate_clarify():
-    """验证 chat only request skips gate clarify 场景。"""
+    """验证仅聊天请求会跳过 gate 澄清。"""
     harness = Harness()
 
     def runner(worker_id, goal, session_state, context):
-        """构造测试用 Worker runner。"""
+        """构造测试用 Worker 调度器。"""
         return {"worker_id": worker_id, "status": "completed", "structured_output": {}}
 
     state = run_coordinator_turn(

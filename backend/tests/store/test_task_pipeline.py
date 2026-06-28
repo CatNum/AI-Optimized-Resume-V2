@@ -20,7 +20,7 @@ def stores(tmp_path, monkeypatch):
 
 
 def test_complete_task_rejects_pipeline_milestone(stores):
-    """验证 complete task rejects pipeline milestone 场景。"""
+    """验证完成任务会拒绝 pipeline 里程碑。"""
     task_store, session_store = stores
     session_id = session_store.create_session()
     list_id = instantiate_pipeline_for_session(session_id)
@@ -31,7 +31,7 @@ def test_complete_task_rejects_pipeline_milestone(stores):
 
 
 def test_clear_works_and_tree(stores):
-    """验证 clear works and tree 场景。"""
+    """验证清理工作产物和树的处理符合预期。"""
     task_store, session_store = stores
     session_id = session_store.create_session()
     list_id = instantiate_pipeline_for_session(session_id)

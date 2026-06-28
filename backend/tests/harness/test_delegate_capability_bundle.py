@@ -12,7 +12,7 @@ def harness(tmp_path, monkeypatch):
 
 
 def test_delegate_includes_capability_bundle(harness, jd_ready_profile):
-    """验证 delegate includes capability bundle 场景。"""
+    """验证委派会包含 capability_bundle。"""
     _ = jd_ready_profile
     result = harness.delegate_worker(
         "coordinator",
