@@ -58,7 +58,7 @@ def normalize_experience(raw: str | None) -> tuple[str | None, str]:
     """保留页面经验原值并映射到固定经验分组；未知新标签进入“未识别”。"""
     value = _clean_optional_text(raw)
     if value is None:
-        return None, "未识别"
+        return None, "未注明"
     compact = _SPACE_PATTERN.sub("", value)
     exact_groups = {
         "经验不限": "不限",
@@ -78,7 +78,7 @@ def normalize_education(raw: str | None) -> tuple[str | None, str]:
     """保留页面学历原值并映射到固定学历分组；未知新标签进入“未识别”。"""
     value = _clean_optional_text(raw)
     if value is None:
-        return None, "未识别"
+        return None, "未注明"
     compact = _SPACE_PATTERN.sub("", value)
     exact_groups = {
         "学历不限": "不限",

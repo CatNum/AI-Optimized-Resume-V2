@@ -153,7 +153,10 @@ class SemanticExtractionEngine:
             semantic_count = sum(1 for job in updated_jobs if job.semantic_valid)
             context.semantic_analyzed_count = semantic_count
             context.data["jobs"] = updated_jobs
-            context.data["skill_taxonomy"] = taxonomy.freeze()
+            context.data["skill_taxonomy"] = taxonomy.freeze(
+                valid_job_count=len(jobs),
+                semantic_analyzed_count=semantic_count,
+            )
             if semantic_count < 3:
                 raise MarketResearchError(
                     MarketResearchErrorCode.EXECUTION_FAILED,

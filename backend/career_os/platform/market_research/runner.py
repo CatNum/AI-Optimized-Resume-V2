@@ -143,6 +143,21 @@ class DirectionRunContext:
         self.data["screenshot_paths"] = tuple(result.screenshot_paths)
         self.data["sample_limitations"] = tuple(result.sample_limitations)
 
+    def record_statistics(self, statistics: Any) -> None:
+        """记录确定性统计并同步两类岗位计数和带正确分母的冻结技能词表。"""
+        self.valid_job_count = statistics.valid_job_count
+        self.semantic_analyzed_count = statistics.semantic_analyzed_count
+        self.data["statistics"] = statistics
+        self.data["skill_taxonomy"] = statistics.skill_taxonomy
+        limitations = list(self.data.get("sample_limitations") or ())
+        if statistics.sample_level == "limited":
+            limitations.append("本次岗位样本少于 30 条，只进行有限分析。")
+        elif statistics.sample_level == "limited_no_reference":
+            limitations.append(
+                f"本次仅有 {statistics.valid_job_count} 条岗位样本，结果不具参考价值。"
+            )
+        self.data["sample_limitations"] = tuple(dict.fromkeys(limitations))
+
 
 StageHandler = Callable[[DirectionRunContext], None]
 """StageHandler（阶段处理器）在 Runner 所在线程内执行一个方向阶段。"""

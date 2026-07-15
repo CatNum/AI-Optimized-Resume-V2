@@ -5,7 +5,12 @@ import unicodedata
 from dataclasses import dataclass, field
 from typing import Any, Iterable
 
-from career_os.platform.market_research.models import SkillStatistic, SkillTaxonomy
+from career_os.platform.market_research.models import (
+    CollectedJob,
+    SkillStatistic,
+    SkillTaxonomy,
+)
+from career_os.platform.market_research.sampling import job_identity
 
 
 _BASE_SKILLS: tuple[tuple[str, tuple[str, ...]], ...] = (
@@ -128,8 +133,13 @@ class DynamicSkillTaxonomy:
                 recorded.append(entry.canonical_name)
         return tuple(recorded)
 
-    def freeze(self) -> SkillTaxonomy:
-        """冻结正式技能统计；两个及以上岗位提及进入 skills，单岗位进入补充区。"""
+    def freeze(
+        self,
+        *,
+        valid_job_count: int,
+        semantic_analyzed_count: int,
+    ) -> SkillTaxonomy:
+        """按采集与语义两类分母冻结技能；两个以上提及进入正式区。"""
         formal: list[SkillStatistic] = []
         isolated: list[SkillStatistic] = []
         for entry in self._entries.values():
@@ -145,8 +155,8 @@ class DynamicSkillTaxonomy:
                 mention_count=len(entry.mention_job_ids),
                 required_count=len(entry.required_job_ids),
                 preferred_count=len(entry.preferred_job_ids),
-                mention_denominator=0,
-                semantic_denominator=0,
+                mention_denominator=valid_job_count,
+                semantic_denominator=semantic_analyzed_count,
             )
             if statistic.mention_count >= 2:
                 formal.append(statistic)
@@ -157,6 +167,47 @@ class DynamicSkillTaxonomy:
             skills=tuple(formal),
             emerging_or_isolated=tuple(isolated),
         )
+
+
+def freeze_taxonomy_counts(
+    taxonomy: SkillTaxonomy,
+    jobs: list[CollectedJob],
+) -> SkillTaxonomy:
+    """按最终采集和语义岗位集合重算技能岗位 ID、计数、分母和正式/孤立分区。"""
+    valid_ids = {job_identity(job) for job in jobs if job.collection_valid}
+    semantic_ids = {job_identity(job) for job in jobs if job.semantic_valid}
+    formal: list[SkillStatistic] = []
+    isolated: list[SkillStatistic] = []
+    for original in (*taxonomy.skills, *taxonomy.emerging_or_isolated):
+        mention_ids = set(original.mention_job_ids) & valid_ids
+        required_ids = set(original.required_job_ids) & semantic_ids & mention_ids
+        preferred_ids = (
+            set(original.preferred_job_ids) & semantic_ids & mention_ids
+        ) - required_ids
+        if not mention_ids:
+            continue
+        statistic = original.model_copy(
+            update={
+                "mention_job_ids": tuple(sorted(mention_ids)),
+                "required_job_ids": tuple(sorted(required_ids)),
+                "preferred_job_ids": tuple(sorted(preferred_ids)),
+                "mention_count": len(mention_ids),
+                "required_count": len(required_ids),
+                "preferred_count": len(preferred_ids),
+                "mention_denominator": len(valid_ids),
+                "semantic_denominator": len(semantic_ids),
+            }
+        )
+        validated = SkillStatistic.model_validate(statistic)
+        if validated.mention_count >= 2:
+            formal.append(validated)
+        else:
+            isolated.append(validated)
+    return SkillTaxonomy(
+        direction_key=taxonomy.direction_key,
+        skills=tuple(formal),
+        emerging_or_isolated=tuple(isolated),
+    )
 
 
 def _clean_skill_name(value: str) -> str:

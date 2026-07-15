@@ -288,6 +288,34 @@ class SkillStatistic(BaseModel):
     mention_denominator: int = Field(ge=0)  # 技能提及比例使用的采集有效岗位分母
     semantic_denominator: int = Field(ge=0)  # 必需和优先比例使用的语义有效岗位分母
 
+    @model_validator(mode="after")
+    def validate_job_sets_and_counts(self) -> SkillStatistic:
+        """校验岗位集合去重、计数一致、必需优先和两类分母没有混用。"""
+        mention_ids = set(self.mention_job_ids)
+        required_ids = set(self.required_job_ids)
+        preferred_ids = set(self.preferred_job_ids)
+        if len(mention_ids) != len(self.mention_job_ids):
+            raise ValueError("mention_job_ids must be unique")
+        if len(required_ids) != len(self.required_job_ids):
+            raise ValueError("required_job_ids must be unique")
+        if len(preferred_ids) != len(self.preferred_job_ids):
+            raise ValueError("preferred_job_ids must be unique")
+        if required_ids & preferred_ids:
+            raise ValueError("required and preferred job ids must be disjoint")
+        if not (required_ids | preferred_ids).issubset(mention_ids):
+            raise ValueError("required and preferred job ids must also be mentions")
+        if self.mention_count != len(mention_ids):
+            raise ValueError("mention_count must match mention_job_ids")
+        if self.required_count != len(required_ids):
+            raise ValueError("required_count must match required_job_ids")
+        if self.preferred_count != len(preferred_ids):
+            raise ValueError("preferred_count must match preferred_job_ids")
+        if self.mention_count > self.mention_denominator:
+            raise ValueError("mention_count cannot exceed valid-job denominator")
+        if self.required_count + self.preferred_count > self.semantic_denominator:
+            raise ValueError("semantic skill counts cannot exceed semantic denominator")
+        return self
+
 
 class SkillTaxonomy(BaseModel):
     """SkillTaxonomy（技能词表）保存本次方向冻结的规范技能、别名、来源和计数。"""
@@ -297,6 +325,23 @@ class SkillTaxonomy(BaseModel):
     direction_key: str  # 技能词表所属职业方向规范键
     skills: tuple[SkillStatistic, ...] = ()  # 至少两个岗位提及的正式技能统计
     emerging_or_isolated: tuple[SkillStatistic, ...] = ()  # 只被一个岗位提及的补充技能统计
+
+
+class DirectionStatistics(BaseModel):
+    """DirectionStatistics（方向确定性统计）冻结不依赖 LLM 计数的全部结果字段。"""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    valid_job_count: int = Field(ge=3)  # 全部采集有效岗位分母
+    semantic_analyzed_count: int = Field(ge=3)  # 通过语义结构和依据校验的岗位分母
+    company_count: int = Field(ge=1)  # 公司 ID 优先、规范公司名兜底的不同公司数
+    sample_level: Literal["normal", "limited", "limited_no_reference"]  # 固定样本等级
+    experience_analysis: dict[str, Any]  # 经验分布、重点档位、相邻档位和组内薪资观察
+    education_distribution: dict[str, int]  # 全部采集有效岗位的学历分布
+    salary_analysis: dict[str, Any]  # 薪资上下限中位数和完整样本观察区间
+    industry_distribution: dict[str, int]  # 全部采集有效岗位的行业分布
+    company_size_distribution: dict[str, int]  # 全部采集有效岗位的公司规模分布
+    skill_taxonomy: SkillTaxonomy  # 使用正确两类分母重新冻结的技能词表
 
 
 class DirectionResultRef(BaseModel):
