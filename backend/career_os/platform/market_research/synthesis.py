@@ -478,6 +478,108 @@ class MarketCompletionPublisher:
                 )
             )
 
+    def publish_retry(
+        self,
+        parent_research_id: str,
+        retry_id: str,
+        origin_session_id: str,
+        plan: ResearchPlan,
+        successful: list[DirectionRunContext],
+        prior_failed: tuple[FailedDirection, ...],
+    ) -> None:
+        """发布单方向重试的新版本；引用旧成功方向且不改变原主任务状态。"""
+        if len(successful) != 1:
+            raise RuntimeError("direction retry requires exactly one successful direction")
+        context = successful[0]
+        new_direction = DirectionResult.model_validate(context.data.get("direction_result"))
+        self.store.adopt_retry_direction_temp(
+            retry_id,
+            parent_research_id,
+            new_direction.direction_run_id,
+        )
+        latest_ref = self.store.read_latest_ref(parent_research_id)
+        referenced = []
+        resolved_directions: list[DirectionResult] = []
+        if latest_ref is not None:
+            previous = self.store.read_result(
+                parent_research_id,
+                latest_ref.result_version,
+            )
+            for entry in previous.successful_directions:
+                resolved = self.store.resolve_direction_entry(entry)
+                if resolved.direction_key == new_direction.direction_key:
+                    continue
+                referenced.append(
+                    self.store.build_direction_reference(
+                        parent_research_id,
+                        latest_ref.result_version,
+                        resolved.direction_key,
+                    )
+                )
+                resolved_directions.append(resolved)
+        resolved_directions.append(new_direction)
+        remaining_failed = tuple(
+            failure
+            for failure in prior_failed
+            if failure.direction_key != new_direction.direction_key
+        )
+        result_version = self.store.next_result_version(parent_research_id)
+        researched_at = self._now()
+        result = MarketResearchResult(
+            research_id=parent_research_id,
+            plan_id=plan.plan_id,
+            result_version=result_version,
+            origin_session_id=origin_session_id,
+            status="partial_completed" if remaining_failed else "completed",
+            researched_at=researched_at,
+            expires_at=min(
+                direction.expires_at
+                for direction in (*referenced, new_direction)
+            ),
+            successful_directions=(*referenced, new_direction),
+            failed_directions=remaining_failed,
+            comparison=self.synthesis_service.synthesize_comparison(
+                tuple(resolved_directions)
+            ),
+            source_boundaries=source_boundaries(),
+            audit_refs=(
+                "result.json",
+                "jobs.json",
+                "skills.json",
+                "screenshots_manifest.json",
+            ),
+        )
+        jobs = [
+            CollectedJob.model_validate(job)
+            for job in context.data.get("jobs") or []
+        ]
+        try:
+            result_ref = self.store.publish_result(
+                parent_research_id,
+                result,
+                jobs,
+                context.data.get("skill_taxonomy"),
+            )
+        except Exception:
+            self.store.cleanup_direction_temp(
+                parent_research_id,
+                new_direction.direction_run_id,
+            )
+            raise
+        self.store.set_retry_published_result(retry_id, result_ref)
+        self.session_store.bind_market_result_for_confirmation(
+            origin_session_id,
+            result_ref.model_dump(mode="json"),
+        )
+        self.session_store.append_message(
+            origin_session_id,
+            "assistant",
+            self.renderer.render(result),
+            idempotency_key=(
+                f"market_result:{result_ref.research_id}:v{result_ref.result_version}"
+            ),
+        )
+
 
 def _validate_themes(
     candidates: tuple[SynthesisThemeCandidate, ...],

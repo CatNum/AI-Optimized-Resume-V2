@@ -20,11 +20,13 @@ from career_os.platform.market_research.models import (
     CollectedJob,
     DirectionResult,
     DirectionResultRef,
+    DirectionRetryRun,
     MarketResearchResult,
     ReferencedDirectionResult,
     ResearchSnapshot,
     ResearchStage,
     ResearchStatus,
+    ReuseCandidate,
     ResultRef,
     ScreenshotManifest,
     ScreenshotManifestItem,
@@ -55,6 +57,7 @@ class MarketResearchStore:
         self.index_path = self.root / "index.json"
         self.plans_dir = self.root / "plans"
         self.runs_dir = self.root / "runs"
+        self.retries_dir = self.root / "retries"
         self.temp_dir = self.root / "temp"
         self.staging_dir = self.root / "staging"
         self.results_dir = self.root / "results"
@@ -203,6 +206,91 @@ class MarketResearchStore:
         latest = self.read_latest_ref(research_id)
         return 1 if latest is None else latest.result_version + 1
 
+    def find_reuse_candidates(
+        self,
+        direction_key: str,
+        *,
+        aliases: tuple[str, ...] = (),
+        now: datetime | None = None,
+    ) -> list[ReuseCandidate]:
+        """按规范方向键和只扩展查找的别名返回未过期正式方向，不自动选择。"""
+        lookup_keys = {direction_key.strip().casefold()}
+        lookup_keys.update(alias.strip().casefold() for alias in aliases if alias.strip())
+        current_time = now or datetime.now(UTC)
+        candidates: list[ReuseCandidate] = []
+        with _store_lock:
+            rows = list(self._read_index().get("results") or [])
+        for row in rows:
+            research_id = row.get("research_id")
+            result_version = row.get("result_version")
+            if not isinstance(research_id, str) or not isinstance(result_version, int):
+                continue
+            try:
+                result = self.read_result(research_id, result_version)
+            except (OSError, ValueError):
+                continue
+            for entry in result.successful_directions:
+                direction = self.resolve_direction_entry(entry)
+                historical_name = direction.direction_name.strip().casefold()
+                if (
+                    direction.direction_key.strip().casefold() not in lookup_keys
+                    and historical_name not in lookup_keys
+                ):
+                    continue
+                if current_time >= direction.expires_at:
+                    continue
+                candidates.append(
+                    ReuseCandidate(
+                        research_id=research_id,
+                        result_version=result_version,
+                        direction_name=direction.direction_name,
+                        direction_key=direction.direction_key,
+                        direction_result_ref=DirectionResultRef(
+                            research_id=research_id,
+                            result_version=result_version,
+                            direction_key=direction.direction_key,
+                            direction_run_id=direction.direction_run_id,
+                        ),
+                        researched_at=direction.researched_at,
+                        expires_at=direction.expires_at,
+                        visited_cities=direction.visited_cities,
+                        boss_keywords=direction.boss_keywords,
+                        trends_keywords=direction.trends_keywords,
+                        valid_job_count=direction.valid_job_count,
+                        semantic_analyzed_count=direction.semantic_analyzed_count,
+                        trend_time_ranges=tuple(
+                            dict.fromkeys(
+                                observation.time_range
+                                for observation in direction.trend_observations
+                            )
+                        ),
+                    )
+                )
+        return sorted(
+            candidates,
+            key=lambda candidate: (
+                candidate.researched_at,
+                candidate.result_version,
+            ),
+            reverse=True,
+        )
+
+    def delete_formal_result(self, research_id: str) -> None:
+        """删除一个主调研的全部正式版本并从可重建索引移除，不触碰其他运行。"""
+        self._validate_research_id(research_id)
+        with _store_lock:
+            active = self._read_index().get("active_run")
+            if isinstance(active, dict) and active.get("research_id") == research_id:
+                raise MarketResearchError(MarketResearchErrorCode.RESEARCH_CONFLICT)
+            shutil.rmtree(self.result_research_dir(research_id), ignore_errors=True)
+            index = self._read_index()
+            index["results"] = [
+                row
+                for row in index.get("results") or []
+                if row.get("research_id") != research_id
+            ]
+            self._write_json_atomic(self.index_path, index)
+
     def get_active_run(self) -> dict[str, Any] | None:
         """读取当前 demo 唯一 active_run（活动运行）摘要，不返回本地路径。"""
         with _store_lock:
@@ -266,6 +354,55 @@ class MarketResearchStore:
         path = self.run_status_path(research_id).parent
         with _store_lock:
             shutil.rmtree(path, ignore_errors=True)
+
+    def write_retry_status(self, retry: DirectionRetryRun) -> None:
+        """原子写入独立方向重试状态，不覆盖主任务 status.json。"""
+        parsed = DirectionRetryRun.model_validate(retry)
+        with _store_lock:
+            self._write_json_atomic(
+                self.retry_status_path(parsed.retry_id),
+                parsed.model_dump(mode="json"),
+            )
+
+    def read_retry_status(self, retry_id: str) -> DirectionRetryRun | None:
+        """读取 retry_id（方向重试编号）的独立状态。"""
+        path = self.retry_status_path(retry_id)
+        if not path.exists():
+            return None
+        return DirectionRetryRun.model_validate(self._read_json(path))
+
+    def set_retry_published_result(self, retry_id: str, result_ref: ResultRef) -> None:
+        """在发布成功后记录新主结果版本引用，状态转移仍由 Runner 完成。"""
+        retry = self.read_retry_status(retry_id)
+        if retry is None:
+            raise KeyError(retry_id)
+        self.write_retry_status(
+            retry.model_copy(
+                update={
+                    "published_result_ref": result_ref.model_dump(mode="json"),
+                    "updated_at": datetime.now(UTC),
+                }
+            )
+        )
+
+    def adopt_retry_direction_temp(
+        self,
+        retry_id: str,
+        parent_research_id: str,
+        direction_run_id: str,
+    ) -> None:
+        """把成功重试的方向临时数据移到主任务名下，供新正式版本原子发布。"""
+        source = self.direction_temp_dir(retry_id, direction_run_id)
+        target = self.direction_temp_dir(parent_research_id, direction_run_id)
+        with _store_lock:
+            if not source.exists():
+                return
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if target.exists():
+                raise ValueError("retry direction temp target already exists")
+            os.replace(source, target)
+            self._fsync_directory(source.parent)
+            self._fsync_directory(target.parent)
 
     def build_direction_reference(
         self,
@@ -369,6 +506,29 @@ class MarketResearchStore:
                         ignore_errors=True,
                     )
                     recovered.append(snapshot.research_id)
+            if self.retries_dir.exists():
+                for status_path in sorted(self.retries_dir.glob("research_*/status.json")):
+                    try:
+                        retry = DirectionRetryRun.model_validate(self._read_json(status_path))
+                    except (OSError, ValueError, json.JSONDecodeError):
+                        continue
+                    if retry.status not in _ACTIVE_STATUSES:
+                        continue
+                    interrupted = retry.model_copy(
+                        update={
+                            "status": ResearchStatus.FAILED,
+                            "stage": ResearchStage.FINISHED,
+                            "available_actions": (),
+                            "error": MarketResearchError(
+                                MarketResearchErrorCode.PROCESS_INTERRUPTED,
+                                stage=retry.stage.value,
+                            ).to_payload(),
+                            "updated_at": datetime.now(UTC),
+                        }
+                    )
+                    self._write_json_atomic(status_path, interrupted.model_dump(mode="json"))
+                    shutil.rmtree(self.temp_research_dir(retry.retry_id), ignore_errors=True)
+                    recovered.append(retry.retry_id)
             for lock_path in self.runtime_dir.glob("*.lock"):
                 lock_path.unlink(missing_ok=True)
             active_run = self._read_index().get("active_run")
@@ -382,6 +542,11 @@ class MarketResearchStore:
         """返回受控 research_id（调研编号）的 status.json 路径。"""
         self._validate_research_id(research_id)
         return self.runs_dir / research_id / "status.json"
+
+    def retry_status_path(self, retry_id: str) -> Path:
+        """返回独立方向重试 status.json 路径。"""
+        self._validate_research_id(retry_id)
+        return self.retries_dir / retry_id / "status.json"
 
     def events_path(self, research_id: str) -> Path:
         """返回受控 research_id（调研编号）的脱敏事件文件路径。"""
@@ -775,6 +940,7 @@ class MarketResearchStore:
             self.root,
             self.plans_dir,
             self.runs_dir,
+            self.retries_dir,
             self.temp_dir,
             self.staging_dir,
             self.results_dir,

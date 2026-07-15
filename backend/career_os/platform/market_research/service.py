@@ -5,7 +5,7 @@ import time
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 from career_os.platform.market_research.browser import DedicatedChromeSession
 from career_os.platform.market_research.boss import BossJobCollector
@@ -14,6 +14,9 @@ from career_os.platform.market_research.errors import (
     MarketResearchErrorCode,
 )
 from career_os.platform.market_research.models import (
+    DirectionRetryRun,
+    FailedDirection,
+    ResearchPlan,
     ResearchSnapshot,
     ResearchStage,
     ResearchStatus,
@@ -56,6 +59,81 @@ RunnerFactory = Callable[
 ]
 """RunnerFactory（运行器工厂）为共享 Service 创建带终态回调的单线程 Runner。"""
 
+_DIRECTION_ALIASES: dict[str, tuple[str, ...]] = {
+    "llm 应用开发": ("大模型应用开发", "ai 应用开发", "llm应用开发"),
+    "大模型应用开发": ("llm 应用开发", "ai 应用开发", "llm应用开发"),
+    "ai agent 开发": ("agent 开发", "智能体开发", "ai智能体开发"),
+    "agent 开发": ("ai agent 开发", "智能体开发", "ai智能体开发"),
+}
+
+
+class _RetryStoreAdapter:
+    """_RetryStoreAdapter（重试存储适配器）让现有 Runner 读写独立重试状态。"""
+
+    def __init__(self, store: MarketResearchStore, retry_id: str) -> None:
+        """绑定基础 Store 和唯一 retry_id（重试编号）。"""
+        self._store = store
+        self._retry_id = retry_id
+
+    def read_status(self, research_id: str) -> ResearchSnapshot | None:
+        """把 DirectionRetryRun（方向重试运行）转换为 Runner 使用的状态快照。"""
+        if research_id != self._retry_id:
+            return None
+        retry = self._store.read_retry_status(research_id)
+        if retry is None:
+            return None
+        return ResearchSnapshot(
+            research_id=retry.retry_id,
+            plan_id=retry.plan_id,
+            origin_session_id=retry.origin_session_id,
+            status=retry.status,
+            stage=retry.stage,
+            direction_run_id=retry.direction_run_id,
+            direction_name=retry.direction_name,
+            keyword=retry.keyword,
+            city=retry.city,
+            candidate_count=retry.candidate_count,
+            valid_job_count=retry.valid_job_count,
+            semantic_analyzed_count=retry.semantic_analyzed_count,
+            elapsed_seconds=retry.elapsed_seconds,
+            available_actions=retry.available_actions,
+            error=retry.error,
+            created_at=retry.created_at,
+            updated_at=retry.updated_at,
+        )
+
+    def write_status(self, snapshot: ResearchSnapshot) -> None:
+        """把 Runner 状态字段合并回独立重试记录，不触碰原主任务。"""
+        retry = self._store.read_retry_status(snapshot.research_id)
+        if retry is None:
+            raise RuntimeError("direction retry status does not exist")
+        self._store.write_retry_status(
+            retry.model_copy(
+                update={
+                    "status": snapshot.status,
+                    "stage": snapshot.stage,
+                    "direction_run_id": snapshot.direction_run_id,
+                    "keyword": snapshot.keyword,
+                    "city": snapshot.city,
+                    "candidate_count": snapshot.candidate_count,
+                    "valid_job_count": snapshot.valid_job_count,
+                    "semantic_analyzed_count": snapshot.semantic_analyzed_count,
+                    "elapsed_seconds": snapshot.elapsed_seconds,
+                    "available_actions": snapshot.available_actions,
+                    "error": snapshot.error,
+                    "updated_at": snapshot.updated_at,
+                }
+            )
+        )
+
+    def update_active_run_status(self, research_id: str, status: ResearchStatus) -> None:
+        """同步 demo 唯一活动槽的公开状态。"""
+        self._store.update_active_run_status(research_id, status)
+
+    def __getattr__(self, name: str) -> Any:
+        """把事件、临时目录、清理和浏览器目录操作委托给基础 Store。"""
+        return getattr(self._store, name)
+
 
 class MarketResearchService:
     """MarketResearchService（市场调研应用门面）统一管理方案消费、单任务锁和运行控制。"""
@@ -75,6 +153,7 @@ class MarketResearchService:
         self.runner_factory = runner_factory or self._default_runner_factory  # 单线程 Runner 构造函数
         self._lock = threading.RLock()  # 包住检查、占位、消费和 Runner 注册的完整临界区
         self._runners: dict[str, MarketResearchRunner] = {}  # research_id 到活动 Runner 的唯一注册表
+        self._retry_runners: dict[str, MarketResearchRunner] = {}  # retry_id 到独立方向重试 Runner 的注册表
 
     def start(self, plan_id: str, session_id: str) -> ResearchSnapshot:
         """消费用户确认方案并在完整单任务临界区内启动后台调研。"""
@@ -169,9 +248,106 @@ class MarketResearchService:
         self._require_owner(snapshot, session_id)
         return snapshot
 
-    def continue_research(self, research_id: str, session_id: str) -> ResearchSnapshot:
+    def find_reuse_candidates(
+        self,
+        session_id: str,
+        direction_key: str,
+    ) -> list[dict[str, Any]]:
+        """查找但不自动选择同 demo 未过期方向结果。"""
+        if not self.session_store.session_exists(session_id):
+            raise KeyError(session_id)
+        normalized_key = direction_key.strip().casefold()
+        alias_set = set(_DIRECTION_ALIASES.get(normalized_key, ()))
+        for canonical, known_aliases in _DIRECTION_ALIASES.items():
+            if normalized_key in {alias.casefold() for alias in known_aliases}:
+                alias_set.add(canonical)
+                alias_set.update(known_aliases)
+        return [
+            candidate.model_dump(mode="json")
+            for candidate in self.store.find_reuse_candidates(
+                normalized_key,
+                aliases=tuple(sorted(alias_set)),
+            )
+        ]
+
+    def reuse_result(
+        self,
+        session_id: str,
+        research_id: str,
+        result_version: int,
+        direction_key: str,
+    ) -> dict[str, Any]:
+        """把用户明确选择的单方向正式结果作为不可变引用绑定到当前 Session。"""
+        if not self.session_store.session_exists(session_id):
+            raise KeyError(session_id)
+        result = self.store.read_result(research_id, result_version)
+        selected = None
+        for entry in result.successful_directions:
+            direction = self.store.resolve_direction_entry(entry)
+            if direction.direction_key == direction_key:
+                selected = direction
+                break
+        if selected is None:
+            raise KeyError(direction_key)
+        if datetime.now(UTC) >= selected.expires_at:
+            raise ValueError("market_result_expired")
+        direction_ref = self.store.build_direction_reference(
+            research_id,
+            result_version,
+            direction_key,
+        ).direction_result_ref
+        reuse_ref = {
+            "research_id": research_id,
+            "result_version": result_version,
+            "direction_key": direction_key,
+            "direction_result_ref": direction_ref.model_dump(mode="json"),
+            "reuse_session_id": session_id,
+            "reused_at": datetime.now(UTC).isoformat(),
+        }
+        self.session_store.bind_market_reuse_for_confirmation(session_id, reuse_ref)
+        return reuse_ref
+
+    def result_references(self, research_id: str, session_id: str) -> list[str]:
+        """校验原始结果归属后返回删除前需要展示的 Session 引用关系。"""
+        result = self.store.read_result(research_id)
+        if result.origin_session_id != session_id:
+            raise MarketResearchError(MarketResearchErrorCode.PLAN_FORBIDDEN)
+        return self.session_store.sessions_referencing_market_result(research_id)
+
+    def delete_result(
+        self,
+        research_id: str,
+        session_id: str,
+    ) -> list[str]:
+        """校验原始结果归属，清除 Session 引用后删除全部正式版本。"""
+        active = self.store.get_active_run()
+        if isinstance(active, dict):
+            active_id = active.get("research_id")
+            if isinstance(active_id, str):
+                retry = self.store.read_retry_status(active_id)
+                if retry is not None and retry.parent_research_id == research_id:
+                    raise MarketResearchError(MarketResearchErrorCode.RESEARCH_CONFLICT)
+        references = self.result_references(research_id, session_id)
+        affected = self.session_store.invalidate_market_result_references(research_id)
+        self.store.delete_formal_result(research_id)
+        return affected or references
+
+    def continue_research(
+        self, research_id: str, session_id: str
+    ) -> ResearchSnapshot | DirectionRetryRun:
         """校验归属后恢复 waiting_user（等待用户）状态中的当前方向。"""
         with self._lock:
+            retry = self.store.read_retry_status(research_id)
+            if retry is not None:
+                self._require_retry_owner(retry, session_id)
+                runner = self._retry_runners.get(research_id)
+                if runner is None:
+                    raise MarketResearchError(
+                        MarketResearchErrorCode.PROCESS_INTERRUPTED,
+                        stage=retry.stage.value,
+                    )
+                runner.request_continue(research_id)
+                return self.store.read_retry_status(research_id) or retry
             snapshot = self.get_status(research_id, session_id)
             runner = self._runners.get(research_id)
             if runner is None:
@@ -182,9 +358,28 @@ class MarketResearchService:
             runner.request_continue(research_id)
             return snapshot
 
-    def cancel(self, research_id: str, session_id: str) -> ResearchSnapshot:
+    def cancel(
+        self, research_id: str, session_id: str
+    ) -> ResearchSnapshot | DirectionRetryRun:
         """校验归属并请求活动 Runner 在安全检查点取消和清理。"""
         with self._lock:
+            retry = self.store.read_retry_status(research_id)
+            if retry is not None:
+                self._require_retry_owner(retry, session_id)
+                if retry.status in {
+                    ResearchStatus.COMPLETED,
+                    ResearchStatus.FAILED,
+                    ResearchStatus.CANCELLED,
+                }:
+                    return retry
+                runner = self._retry_runners.get(research_id)
+                if runner is None:
+                    raise MarketResearchError(
+                        MarketResearchErrorCode.PROCESS_INTERRUPTED,
+                        stage=retry.stage.value,
+                    )
+                runner.request_cancel(research_id)
+                return self.store.read_retry_status(research_id) or retry
             snapshot = self.get_status(research_id, session_id)
             if snapshot.status in {
                 ResearchStatus.COMPLETED,
@@ -212,7 +407,7 @@ class MarketResearchService:
         """删除 Session 前取消所属活动任务，并等待未发布临时数据完成清理。"""
         self.cancel(research_id, session_id)
         with self._lock:
-            runner = self._runners.get(research_id)
+            runner = self._runners.get(research_id) or self._retry_runners.get(research_id)
         if runner is not None and not runner.join(timeout_seconds):
             raise RuntimeError("market research cancellation did not finish before session delete")
 
@@ -226,12 +421,19 @@ class MarketResearchService:
                     snapshot.origin_session_id,
                     research_id,
                 )
+                continue
+            retry = self.store.read_retry_status(research_id)
+            if retry is not None:
+                self._clear_session_retry_reference(
+                    retry.origin_session_id,
+                    retry.retry_id,
+                )
         return recovered
 
     def shutdown(self, timeout_seconds: float = 10.0) -> None:
         """请求全部活动 Runner 取消并等待有限时间，不声称支持断点续跑。"""
         with self._lock:
-            runners = list(self._runners.items())
+            runners = [*self._runners.items(), *self._retry_runners.items()]
         for research_id, runner in runners:
             if runner.is_alive:
                 runner.request_cancel(research_id)
@@ -250,6 +452,124 @@ class MarketResearchService:
             "status": active_run.get("status"),
         }
 
+    def get_retry_status(
+        self,
+        retry_id: str,
+        session_id: str,
+    ) -> DirectionRetryRun:
+        """读取属于指定 Session 的独立方向重试状态。"""
+        retry = self.store.read_retry_status(retry_id)
+        if retry is None:
+            raise KeyError(retry_id)
+        self._require_retry_owner(retry, session_id)
+        return retry
+
+    def retry_direction(
+        self,
+        research_id: str,
+        direction_key: str,
+        session_id: str,
+    ) -> DirectionRetryRun:
+        """为原主任务的一个失败方向启动独立重试，不改写原主任务终态。"""
+        with self._lock:
+            if self.store.get_active_run() is not None:
+                raise MarketResearchError(MarketResearchErrorCode.RESEARCH_CONFLICT)
+            parent = self.get_status(research_id, session_id)
+            if parent.status not in {
+                ResearchStatus.COMPLETED,
+                ResearchStatus.PARTIAL_COMPLETED,
+                ResearchStatus.FAILED,
+            }:
+                raise ValueError("market_research_not_terminal")
+            plan = self.plan_store.get(parent.plan_id, session_id)
+            selected = next(
+                (direction for direction in plan.directions if direction.direction_key == direction_key),
+                None,
+            )
+            if selected is None:
+                raise KeyError(direction_key)
+            latest_ref = self.store.read_latest_ref(research_id)
+            if latest_ref is not None:
+                latest = self.store.read_result(research_id, latest_ref.result_version)
+                failed_keys = {failure.direction_key for failure in latest.failed_directions}
+                if direction_key not in failed_keys:
+                    raise ValueError("direction_not_failed")
+                prior_failed = latest.failed_directions
+            else:
+                if parent.status is not ResearchStatus.FAILED:
+                    raise ValueError("direction_not_failed")
+                error = parent.error or MarketResearchError(
+                    MarketResearchErrorCode.EXECUTION_FAILED
+                ).to_payload()
+                prior_failed = tuple(
+                    FailedDirection(
+                        direction_name=direction.direction_name,
+                        direction_key=direction.direction_key,
+                        error=error,
+                    )
+                    for direction in plan.directions
+                )
+            retry_id = f"research_{uuid.uuid4().hex}"
+            now = datetime.now(UTC)
+            retry = DirectionRetryRun(
+                retry_id=retry_id,
+                parent_research_id=research_id,
+                base_result_version=(
+                    latest_ref.result_version if latest_ref is not None else None
+                ),
+                plan_id=plan.plan_id,
+                origin_session_id=session_id,
+                direction_name=selected.direction_name,
+                direction_key=selected.direction_key,
+                status=ResearchStatus.QUEUED,
+                stage=ResearchStage.QUEUED,
+                available_actions=("cancel",),
+                created_at=now,
+                updated_at=now,
+            )
+            self.store.write_retry_status(retry)
+            self.store.reserve_active_run(retry_id, session_id, plan.plan_id)
+            self.session_store.patch_artifacts(
+                session_id,
+                [
+                    {"op": "set", "path": "market.active_retry_id", "value": retry_id},
+                    {"op": "set", "path": "market.last_retry_id", "value": retry_id},
+                ],
+            )
+            adapter = _RetryStoreAdapter(self.store, retry_id)
+            publisher = MarketCompletionPublisher(
+                self.store,
+                self.session_store,
+                MarketSynthesisService(),
+            )
+            runner = self.runner_factory(
+                adapter,
+                lambda run_id, snapshot: self._on_retry_terminal(
+                    run_id,
+                    snapshot,
+                ),
+            )
+            runner.completion_handler = (
+                lambda run_id, retry_plan, successful, _failed: publisher.publish_retry(
+                    research_id,
+                    run_id,
+                    session_id,
+                    retry_plan,
+                    successful,
+                    prior_failed,
+                )
+            )
+            self._retry_runners[retry_id] = runner
+            retry_plan = plan.model_copy(update={"directions": (selected,)})
+            try:
+                runner.start(retry_id, retry_plan)
+            except Exception:
+                self._retry_runners.pop(retry_id, None)
+                self.store.clear_active_run(retry_id)
+                self._clear_session_retry_reference(session_id, retry_id)
+                raise
+            return retry
+
     def _on_runner_terminal(
         self,
         research_id: str,
@@ -263,6 +583,22 @@ class MarketResearchService:
                 snapshot.origin_session_id,
                 research_id,
             )
+
+    def _on_retry_terminal(
+        self,
+        retry_id: str,
+        _snapshot: ResearchSnapshot,
+    ) -> None:
+        """方向重试终止后只释放重试注册和活动槽，不修改原主任务快照。"""
+        with self._lock:
+            self._retry_runners.pop(retry_id, None)
+            self.store.clear_active_run(retry_id)
+            retry = self.store.read_retry_status(retry_id)
+            if retry is not None:
+                self._clear_session_retry_reference(
+                    retry.origin_session_id,
+                    retry_id,
+                )
 
     def _clear_session_active_reference(
         self,
@@ -287,10 +623,29 @@ class MarketResearchService:
             ],
         )
 
+    def _clear_session_retry_reference(self, session_id: str, retry_id: str) -> None:
+        """仅在 Session 仍指向该方向重试时清空 active_retry_id（活动重试编号）。"""
+        if not self.session_store.session_exists(session_id):
+            return
+        artifacts = self.session_store.get_artifacts(session_id)
+        market = artifacts.get("market") if isinstance(artifacts, dict) else None
+        if not isinstance(market, dict) or market.get("active_retry_id") != retry_id:
+            return
+        self.session_store.patch_artifacts(
+            session_id,
+            [{"op": "set", "path": "market.active_retry_id", "value": None}],
+        )
+
     @staticmethod
     def _require_owner(snapshot: ResearchSnapshot, session_id: str) -> None:
         """校验 origin_session_id（来源 Session）与控制请求 Session 一致。"""
         if snapshot.origin_session_id != session_id:
+            raise MarketResearchError(MarketResearchErrorCode.PLAN_FORBIDDEN)
+
+    @staticmethod
+    def _require_retry_owner(retry: DirectionRetryRun, session_id: str) -> None:
+        """校验方向重试来源 Session 与控制请求 Session 一致。"""
+        if retry.origin_session_id != session_id:
             raise MarketResearchError(MarketResearchErrorCode.PLAN_FORBIDDEN)
 
     def _default_runner_factory(

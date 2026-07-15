@@ -173,6 +173,42 @@ class ResearchSnapshot(BaseModel):
     completion_published_at: datetime | None = None  # 完成报告写入聊天的时间
 
 
+class DirectionRetryRun(BaseModel):
+    """DirectionRetryRun（方向重试运行）保存独立于主任务终态的单方向生命周期。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1] = 1  # 方向重试状态结构版本
+    retry_id: str = Field(pattern=r"^research_[0-9a-f]+$")  # 独立运行编号，同时用于线程和临时目录
+    parent_research_id: str = Field(pattern=r"^research_[0-9a-f]+$")  # 保持终态不变的原主任务编号
+    base_result_version: int | None = Field(default=None, ge=1)  # 重试前最新正式版本；全失败时为空
+    plan_id: str = Field(pattern=r"^plan_[0-9a-f]+$")  # 原主任务使用的冻结方案
+    origin_session_id: str = Field(pattern=r"^sess_[0-9a-f]{32}$")  # 有权控制重试并接收新版本的 Session
+    direction_name: str  # 本次唯一重试方向显示名称
+    direction_key: str  # 本次唯一重试方向规范键
+    status: ResearchStatus  # 独立重试生命周期状态
+    stage: ResearchStage  # 当前执行阶段
+    direction_run_id: str | None = None  # 本次新生成的方向执行编号
+    keyword: str | None = None  # 当前 BOSS 搜索词
+    city: str | None = None  # 当前 BOSS 城市
+    candidate_count: int = Field(default=0, ge=0)  # 页面候选岗位数
+    valid_job_count: int = Field(default=0, ge=0)  # 采集有效岗位数
+    semantic_analyzed_count: int = Field(default=0, ge=0)  # 语义有效岗位数
+    elapsed_seconds: float = Field(default=0.0, ge=0)  # 排除人工等待的有效耗时
+    available_actions: tuple[Literal["continue", "cancel"], ...] = ()  # 当前可用控制动作
+    error: MarketResearchErrorPayload | None = None  # 当前错误的脱敏结构
+    published_result_ref: dict[str, Any] | None = None  # 成功后新发布的主结果版本引用
+    created_at: datetime  # 重试创建时间
+    updated_at: datetime  # 重试状态最后更新时间
+
+    @model_validator(mode="after")
+    def validate_retry_status(self) -> DirectionRetryRun:
+        """禁止重试使用主任务特有的 partial_completed 状态。"""
+        if self.status is ResearchStatus.PARTIAL_COMPLETED:
+            raise ValueError("direction retry cannot be partial_completed")
+        return self
+
+
 class JobSemanticItem(BaseModel):
     """JobSemanticItem（岗位语义项）保存 LLM 提取并通过原文依据校验的一条结构化结论。"""
 
@@ -501,6 +537,26 @@ class ResultRef(BaseModel):
 
     research_id: str = Field(pattern=r"^research_[0-9a-f]+$")  # 被引用的主调研标识
     result_version: int = Field(ge=1)  # 被引用的不可变结果版本
+
+
+class ReuseCandidate(BaseModel):
+    """ReuseCandidate（复用候选）展示一个未过期方向的来源与样本摘要。"""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    research_id: str = Field(pattern=r"^research_[0-9a-f]+$")  # 原正式调研任务编号
+    result_version: int = Field(ge=1)  # 候选所在的不可变结果版本
+    direction_name: str  # 候选职业方向显示名称
+    direction_key: str  # 候选职业方向规范键
+    direction_result_ref: DirectionResultRef  # 只定位该版本中一个方向的不可变引用
+    researched_at: datetime  # 方向实际完成时间
+    expires_at: datetime  # 原始六个自然月有效期终点
+    visited_cities: tuple[str, ...]  # 实际访问过的城市顺序
+    boss_keywords: tuple[str, ...]  # 实际执行的 BOSS 搜索词
+    trends_keywords: tuple[str, ...]  # 实际执行的搜索关注度词
+    valid_job_count: int = Field(ge=0)  # 采集有效岗位样本数
+    semantic_analyzed_count: int = Field(ge=0)  # 语义分析有效岗位数
+    trend_time_ranges: tuple[str, ...]  # 实际获得数据的搜索关注度时间窗口
 
 
 class ScreenshotManifestItem(BaseModel):

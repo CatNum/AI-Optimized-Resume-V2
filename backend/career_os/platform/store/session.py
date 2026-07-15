@@ -28,6 +28,8 @@ _DEFAULT_ARTIFACTS: dict[str, Any] = {
         "active_plan_id": None,
         "active_research_id": None,
         "last_research_id": None,
+        "active_retry_id": None,
+        "last_retry_id": None,
         "result_ref": None,
         "reuse_ref": None,
         "market_result_confirmed": False,
@@ -409,13 +411,125 @@ class SessionStore:
             self._write_state_unlocked(session_id, state)
             return state
 
+    def bind_market_reuse_for_confirmation(
+        self,
+        session_id: str,
+        reuse_ref: dict[str, Any],
+    ) -> None:
+        """原子绑定用户选择的单方向复用引用，并要求再次确认后才能进入下游。"""
+        with _lock:
+            artifacts = self._read_artifacts_unlocked(session_id)
+            market = _normalize_market_artifact(artifacts.get("market"))
+            market.update(
+                {
+                    "result_ref": None,
+                    "reuse_ref": dict(reuse_ref),
+                    "market_result_confirmed": False,
+                    "confirmed_result_ref": None,
+                }
+            )
+            artifacts["market"] = market
+            self._write_artifacts_unlocked(session_id, artifacts)
+            state = self._read_state_unlocked(session_id)
+            gates = dict(state.get("gates") or {})
+            gates["pending"] = {
+                "name": "market_result_confirmation",
+                "prompt": "已选择复用一个未过期市场方向，是否确认使用并继续下一步？",
+                "research_id": reuse_ref.get("research_id"),
+                "result_version": reuse_ref.get("result_version"),
+            }
+            state["gates"] = gates
+            self._write_state_unlocked(session_id, state)
+
+    def sessions_referencing_market_result(self, research_id: str) -> list[str]:
+        """列出 result_ref（新结果引用）或 reuse_ref（复用引用）指向该调研的 Session。"""
+        with _lock:
+            index = self._read_index_unlocked()
+            session_ids: list[str] = []
+            for row in index.get("sessions") or []:
+                session_id = row.get("session_id")
+                if not isinstance(session_id, str) or not self.session_exists(session_id):
+                    continue
+                artifacts = self._read_artifacts_unlocked(session_id)
+                market = _normalize_market_artifact(artifacts.get("market"))
+                refs = (market.get("result_ref"), market.get("reuse_ref"))
+                if any(
+                    isinstance(ref, dict) and ref.get("research_id") == research_id
+                    for ref in refs
+                ):
+                    session_ids.append(session_id)
+            return sorted(session_ids)
+
+    def invalidate_market_result_references(
+        self,
+        research_id: str,
+    ) -> list[str]:
+        """清除指向已删除结果的 Session 引用，并写入需要重新调研的确定性闸门。"""
+        affected = self.sessions_referencing_market_result(research_id)
+        with _lock:
+            for session_id in affected:
+                artifacts = self._read_artifacts_unlocked(session_id)
+                market = _normalize_market_artifact(artifacts.get("market"))
+                market.update(
+                    {
+                        "result_ref": None,
+                        "reuse_ref": None,
+                        "market_result_confirmed": False,
+                        "confirmed_result_ref": None,
+                    }
+                )
+                artifacts["market"] = market
+                self._write_artifacts_unlocked(session_id, artifacts)
+                state = self._read_state_unlocked(session_id)
+                gates = dict(state.get("gates") or {})
+                gates["pending"] = {
+                    "name": "market_research_required",
+                    "prompt": "此前使用的市场结果已删除，请重新生成并确认调研方案。",
+                }
+                state["gates"] = gates
+                self._write_state_unlocked(session_id, state)
+        return affected
+
+    def clear_expired_market_reference(
+        self,
+        session_id: str,
+        expected_ref: dict[str, Any],
+    ) -> None:
+        """仅在当前引用仍等于过期引用时清除它，并引导重新调研。"""
+        with _lock:
+            artifacts = self._read_artifacts_unlocked(session_id)
+            market = _normalize_market_artifact(artifacts.get("market"))
+            current_ref = market.get("result_ref") or market.get("reuse_ref")
+            if current_ref != expected_ref:
+                return
+            market.update(
+                {
+                    "result_ref": None,
+                    "reuse_ref": None,
+                    "market_result_confirmed": False,
+                    "confirmed_result_ref": None,
+                }
+            )
+            artifacts["market"] = market
+            self._write_artifacts_unlocked(session_id, artifacts)
+            state = self._read_state_unlocked(session_id)
+            gates = dict(state.get("gates") or {})
+            gates["pending"] = {
+                "name": "market_research_required",
+                "prompt": "当前市场结果已超过六个自然月，请重新调研。",
+            }
+            state["gates"] = gates
+            self._write_state_unlocked(session_id, state)
+
     def delete_session(self, session_id: str) -> None:
         """删除 Session；若存在活动市场调研，必须先取消并完成临时数据清理。"""
         with _lock:
             artifacts = self._read_artifacts_unlocked(session_id)
             market = _normalize_market_artifact(artifacts.get("market"))
             active_research_id = market.get("active_research_id")
-        if isinstance(active_research_id, str) and active_research_id:
+            active_retry_id = market.get("active_retry_id")
+        active_run_id = active_research_id or active_retry_id
+        if isinstance(active_run_id, str) and active_run_id:
             from career_os.platform.market_research.service import (
                 get_market_research_service,
             )
@@ -423,7 +537,7 @@ class SessionStore:
             # cancel_for_session_delete（删除 Session 前取消调研）会校验任务归属，
             # 并等待 Runner 删除 temp 和未发布截图后才允许继续删除会话文件。
             get_market_research_service().cancel_for_session_delete(
-                active_research_id,
+                active_run_id,
                 session_id,
             )
         with _lock:

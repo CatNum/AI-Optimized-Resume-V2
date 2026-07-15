@@ -4,10 +4,16 @@ import {
   confirmMarketResearchPlan,
   confirmMarketResearchResult,
   continueMarketResearch,
+  deleteMarketResult,
   getMarketResearchStatus,
+  getMarketReuseCandidates,
+  inspectMarketResultDeletion,
   reviseMarketResearchPlan,
+  retryMarketDirection,
+  reuseMarketResearchResult,
   type DirectionPlan,
   type MarketResearchStatusResponse,
+  type ReuseCandidate,
 } from "../lib/marketResearchApi";
 
 const ACTIVE = new Set(["queued", "running", "waiting_user", "cancelling"]);
@@ -50,6 +56,7 @@ export function MarketResearchStatusCard({
   const [draftDirections, setDraftDirections] = useState<DirectionPlan[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reuseCandidates, setReuseCandidates] = useState<Record<string, ReuseCandidate[]>>({});
   const terminalKeyRef = useRef<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -80,7 +87,29 @@ export function MarketResearchStatusCard({
     void refresh();
   }, [sessionId, refresh]);
 
-  const locked = Boolean(data?.snapshot && ACTIVE.has(data.snapshot.status));
+  useEffect(() => {
+    if (!sessionId || !data?.plan || data.reuse_selection || data.snapshot) {
+      setReuseCandidates({});
+      return;
+    }
+    let cancelled = false;
+    void Promise.all(
+      data.plan.directions.map(async (direction) => {
+        const response = await getMarketReuseCandidates(sessionId, direction.direction_key);
+        return [direction.direction_key, response.candidates] as const;
+      }),
+    ).then((rows) => {
+      if (!cancelled) setReuseCandidates(Object.fromEntries(rows));
+    }).catch(() => {
+      if (!cancelled) setReuseCandidates({});
+    });
+    return () => { cancelled = true; };
+  }, [data?.plan, data?.reuse_selection, data?.snapshot, sessionId]);
+
+  const locked = Boolean(
+    (data?.snapshot && ACTIVE.has(data.snapshot.status))
+    || (data?.active_retry && ACTIVE.has(data.active_retry.status)),
+  );
   useEffect(() => onLockChange(locked), [locked, onLockChange]);
 
   useEffect(() => {
@@ -102,6 +131,16 @@ export function MarketResearchStatusCard({
     }
   }
 
+  async function deleteWithReferenceConfirmation(researchId: string) {
+    if (!sessionId) return;
+    await run(async () => {
+      const preview = await inspectMarketResultDeletion(researchId, sessionId);
+      const references = preview.referencing_sessions.join("、") || "无 Session";
+      if (!window.confirm(`该结果当前被以下 Session 引用：${references}\n确认删除全部正式版本及审计数据吗？`)) return;
+      await deleteMarketResult(researchId, sessionId);
+    });
+  }
+
   const plan = data?.plan;
   const snapshot = data?.snapshot;
   if (!sessionId || (!plan && !snapshot && !data?.active_summary)) return null;
@@ -121,11 +160,12 @@ export function MarketResearchStatusCard({
         <p className="mt-2 text-sm text-slate-300">已有市场调研正在运行，请等待其结束后再启动。</p>
       ) : null}
 
-      {plan && !snapshot ? (
+      {plan && !snapshot && !data?.reuse_selection ? (
         <div className="mt-3 space-y-3 text-sm">
           <p className="text-slate-300">
             每个方向预算 {plan.budget_seconds} 秒；仅全职岗位；招聘者活跃度限定为
-            {plan.filter_policy.allowed_recruiter_activity.join("、")}。
+            {plan.filter_policy.allowed_recruiter_activity.join("、")}；月薪上下限必须可解析；
+            同一公司最多 {plan.filter_policy.max_jobs_per_company} 个岗位；按 10% 页面截图抽样审计。
           </p>
           {draftDirections.map((direction, index) => (
             <div key={`${direction.direction_key}-${index}`} className="rounded border border-slate-700 p-3">
@@ -143,6 +183,19 @@ export function MarketResearchStatusCard({
               )}
             </div>
           ))}
+          {Object.entries(reuseCandidates).map(([directionKey, candidates]) =>
+            candidates.length > 0 ? (
+              <div key={directionKey} className="rounded border border-emerald-800/60 bg-emerald-950/20 p-3">
+                <p className="mb-2 text-emerald-200">发现未过期的同方向结果，请选择复用或继续拉取新数据：</p>
+                {candidates.slice(0, 3).map((candidate) => (
+                  <div key={`${candidate.research_id}:${candidate.result_version}:${candidate.direction_key}`} className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-700/70 pb-2 last:mb-0 last:border-0 last:pb-0">
+                    <span>{candidate.direction_name} · {new Date(candidate.researched_at).toLocaleDateString()} · 城市 {csv(candidate.visited_cities)} · 关键词 {csv(candidate.boss_keywords)} · 有效/语义样本 {candidate.valid_job_count}/{candidate.semantic_analyzed_count} · Trends {csv(candidate.trend_time_ranges)} · 到期 {new Date(candidate.expires_at).toLocaleDateString()}</span>
+                    <button className="market-button-secondary" disabled={busy} onClick={() => void run(() => reuseMarketResearchResult(sessionId, candidate))}>复用此方向</button>
+                  </div>
+                ))}
+              </div>
+            ) : null,
+          )}
           <div className="flex flex-wrap gap-2">
             {editing ? (
               <>
@@ -152,9 +205,15 @@ export function MarketResearchStatusCard({
             ) : (
               <button className="market-button-secondary" disabled={busy || plan.status === "consumed"} onClick={() => setEditing(true)}>修改方案</button>
             )}
-            {plan.status === "draft" ? <button className="market-button" disabled={busy || editing} onClick={() => void run(() => confirmMarketResearchPlan(plan.plan_id, sessionId))}>确认方案</button> : null}
-            {plan.status === "confirmed" ? <button className="market-button" disabled={busy || editing || (data.has_active_research && !data.owned)} onClick={() => void run(onStartConfirmedPlan)}>开始调研</button> : null}
+            {plan.status !== "consumed" ? <button className="market-button" disabled={busy || editing || (data.has_active_research && !data.owned)} onClick={() => void run(async () => { if (plan.status === "draft") await confirmMarketResearchPlan(plan.plan_id, sessionId); await onStartConfirmedPlan(); })}>确认方案并开始调研</button> : null}
           </div>
+        </div>
+      ) : null}
+
+      {data?.reuse_selection && !snapshot ? (
+        <div className="mt-3 space-y-2 text-sm text-slate-300">
+          <p>已选择复用方向 {data.reuse_selection.direction_key}，引用结果 {data.reuse_selection.research_id} v{data.reuse_selection.result_version}。数据未复制，有效期保持原值。</p>
+          {!data.result_confirmed ? <button className="market-button" disabled={busy} onClick={() => void run(() => confirmMarketResearchResult(data.reuse_selection!.research_id, sessionId))}>确认使用复用结果并继续</button> : <span className="text-emerald-300">复用结果已确认，已进入 JD 分析阶段</span>}
         </div>
       ) : null}
 
@@ -168,6 +227,27 @@ export function MarketResearchStatusCard({
             {snapshot.available_actions.includes("cancel") ? <button className="market-button-secondary" disabled={busy} onClick={() => void run(() => cancelMarketResearch(snapshot.research_id, sessionId))}>取消调研</button> : null}
             {(snapshot.status === "completed" || snapshot.status === "partial_completed") && !data.result_confirmed ? <button className="market-button" disabled={busy} onClick={() => void run(() => confirmMarketResearchResult(snapshot.research_id, sessionId))}>确认使用结果并继续</button> : null}
             {data.result_confirmed ? <span className="self-center text-emerald-300">结果已确认，已进入 JD 分析阶段</span> : null}
+            {TERMINAL.has(snapshot.status) && data.owned ? <button className="market-button-secondary" disabled={busy} onClick={() => void deleteWithReferenceConfirmation(snapshot.research_id)}>删除正式结果</button> : null}
+          </div>
+          {data.retryable_directions && data.retryable_directions.length > 0 && (!data.active_retry || !ACTIVE.has(data.active_retry.status)) ? (
+            <div className="flex flex-wrap items-center gap-2 border-t border-slate-700 pt-2">
+              <span>失败方向可独立重试：</span>
+              {data.retryable_directions.map((direction) => (
+                <button key={direction.direction_key} className="market-button-secondary" disabled={busy || data.has_active_research} onClick={() => void run(() => retryMarketDirection(snapshot.research_id, direction.direction_key, sessionId))}>重试 {direction.direction_name}</button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {data?.active_retry ? (
+        <div className="mt-3 space-y-2 rounded border border-violet-800/60 bg-violet-950/20 p-3 text-sm text-slate-300">
+          <p>方向重试：{data.active_retry.direction_name} · {STATUS_LABELS[data.active_retry.status] || data.active_retry.status} · 阶段 {data.active_retry.stage}</p>
+          <p>关键词/城市 {data.active_retry.keyword || "-"} / {data.active_retry.city || "-"} · 候选 {data.active_retry.candidate_count} · 有效 {data.active_retry.valid_job_count} · 语义 {data.active_retry.semantic_analyzed_count} · 有效耗时 {Math.round(data.active_retry.elapsed_seconds)} 秒</p>
+          {data.active_retry.error ? <p className="text-amber-200">{data.active_retry.error.error_code}：{data.active_retry.error.user_action}</p> : null}
+          <div className="flex gap-2">
+            {data.active_retry.available_actions.includes("continue") ? <button className="market-button" disabled={busy} onClick={() => void run(() => continueMarketResearch(data.active_retry!.retry_id, sessionId))}>已完成验证，继续重试</button> : null}
+            {data.active_retry.available_actions.includes("cancel") ? <button className="market-button-secondary" disabled={busy} onClick={() => void run(() => cancelMarketResearch(data.active_retry!.retry_id, sessionId))}>取消重试</button> : null}
           </div>
         </div>
       ) : null}

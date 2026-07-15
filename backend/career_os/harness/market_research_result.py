@@ -228,6 +228,9 @@ def _resolve_result(
 
     effective_expires_at = min(direction.expires_at for direction in resolved_directions)
     if datetime.now(UTC) >= effective_expires_at:
+        session_store.clear_expired_market_reference(session_id, current_ref)
+        session_state.clear()
+        session_state.update(session_store.get_state(session_id))
         return HarnessError(
             "market_result_expired",
             "当前正式市场结果已经过期，请重新调研。",

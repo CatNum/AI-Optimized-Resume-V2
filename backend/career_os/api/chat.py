@@ -304,6 +304,24 @@ async def chat(body: ChatRequest):
                 else "market_research_in_progress"
             )
             raise HTTPException(status_code=409, detail={"code": code})
+    active_retry_id = market.get("active_retry_id")
+    if isinstance(active_retry_id, str) and active_retry_id:
+        try:
+            retry = get_market_research_service().get_retry_status(active_retry_id, session_id)
+        except KeyError:
+            retry = None
+        if retry is not None and retry.status in {
+            ResearchStatus.QUEUED,
+            ResearchStatus.RUNNING,
+            ResearchStatus.CANCELLING,
+            ResearchStatus.WAITING_USER,
+        }:
+            code = (
+                "market_research_waiting_user"
+                if retry.status == ResearchStatus.WAITING_USER
+                else "market_research_in_progress"
+            )
+            raise HTTPException(status_code=409, detail={"code": code})
     if body.market_action == "start_confirmed_plan":
         plan_id = market.get("active_plan_id")
         if not isinstance(plan_id, str) or not plan_id:
