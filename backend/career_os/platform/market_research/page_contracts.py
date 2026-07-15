@@ -214,6 +214,10 @@ class TrendsPageContract:
             raise PageChangedError(self.contract_version, stage, field.field_name)
         return element
 
+    def read_optional(self, page: Any, field: PageField) -> Any | None:
+        """读取允许缺失的页面字段，供无数据和无比较卡片等正常分支判断。"""
+        return _first_element(page, field.locators)
+
 
 def validate_external_url(url: str, allowed_hosts: frozenset[str] | set[str]) -> str:
     """校验外部 URL 只使用官方 HTTPS host，并拒绝本地地址、短链和危险协议。"""

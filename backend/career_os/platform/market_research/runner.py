@@ -18,6 +18,7 @@ from career_os.platform.market_research.models import (
     ResearchSnapshot,
     ResearchStage,
     ResearchStatus,
+    TrendObservation,
 )
 from career_os.platform.market_research.store import MarketResearchStore
 
@@ -111,6 +112,26 @@ class DirectionRunContext:
     semantic_analyzed_count: int = 0  # 已通过结构和依据校验的岗位数量
     llm_attempt_count: int = 0  # 已发起的常规岗位提取 LLM 调用次数
     data: dict[str, Any] = field(default_factory=dict)  # 后续采集与综合模块使用的方向内存数据
+
+    def require_browser_page(self) -> Any:
+        """返回 page（专用 Chrome 唯一标签页）；未接入浏览器时明确拒绝执行采集。"""
+        page = self.data.get("page")
+        if page is None:
+            raise MarketResearchError(
+                MarketResearchErrorCode.BROWSER_FAILED,
+                stage=ResearchStage.STARTING_BROWSER.value,
+                message="dedicated browser page is not available",
+            )
+        return page
+
+    def record_trend_results(
+        self,
+        observations: tuple[TrendObservation, ...],
+        summary: dict[str, Any],
+    ) -> None:
+        """记录趋势观察和确定性摘要，供统计、综合与最终持久化阶段顺序读取。"""
+        self.data["trend_observations"] = observations
+        self.data["trend_summary"] = dict(summary)
 
 
 StageHandler = Callable[[DirectionRunContext], None]
