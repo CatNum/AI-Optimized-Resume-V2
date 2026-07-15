@@ -435,8 +435,6 @@ class MarketResearchRunner:
                     stage=stage.value,
                     message=f"stage handler is not configured: {stage.value}",
                 )
-            if stage is ResearchStage.EXTRACTING_SEMANTICS:
-                context.llm_attempt_count += 1
             handler(context)
             self.update_progress(context)
 

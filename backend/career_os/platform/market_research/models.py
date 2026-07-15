@@ -278,6 +278,7 @@ class SkillStatistic(BaseModel):
 
     canonical_name: str  # 技能规范名称
     aliases: tuple[str, ...] = ()  # 归并到规范名称的技能别名
+    discovery_source: str = Field(min_length=1)  # 基础词表或首次发现该技能的关键词批次
     mention_job_ids: tuple[str, ...] = ()  # 全部采集有效岗位中的提及岗位编号
     required_job_ids: tuple[str, ...] = ()  # 语义有效岗位中的必需岗位编号
     preferred_job_ids: tuple[str, ...] = ()  # 语义有效岗位中的优先岗位编号

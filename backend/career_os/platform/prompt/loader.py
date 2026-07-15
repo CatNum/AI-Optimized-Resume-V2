@@ -116,3 +116,10 @@ def load_micro_classifier_prompt(task: str) -> str:
     if not path.exists():
         raise FileNotFoundError(f"micro_classifier prompt not found: {task}")
     return _read_system_document(path)
+
+
+@lru_cache(maxsize=1)
+def load_market_research_extraction_prompt() -> str:
+    """加载市场岗位受限语义提取 System Prompt，不向其中拼接 JD 原文。"""
+    path = _PROMPT_DIR / "market_research" / "extraction_system.md"
+    return _read_system_document(path)
