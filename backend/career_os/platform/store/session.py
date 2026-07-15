@@ -22,7 +22,16 @@ _DEFAULT_ARTIFACTS: dict[str, Any] = {
     "version": 1,
     "session_id": None,
     "exploration": {},
-    "market": {},
+    "market": {
+        "schema_version": 1,
+        "active_plan_id": None,
+        "active_research_id": None,
+        "result_ref": None,
+        "reuse_ref": None,
+        "market_result_confirmed": False,
+        "confirmed_result_ref": None,
+        "legacy_unverified": False,
+    },
     "opportunity": {},
     "strategy": {},
     "resume_outputs": [],
@@ -78,6 +87,18 @@ def _set_by_path(data: dict[str, Any], path: str, value: Any) -> None:
             current[key] = {}
         current = current[key]
     current[keys[-1]] = value
+
+
+def _default_market_artifact() -> dict[str, Any]:
+    """构造市场阶段方案、运行、结果引用和确认状态的默认生命周期信封。"""
+    return dict(_DEFAULT_ARTIFACTS["market"])
+
+
+def _normalize_market_artifact(raw: Any) -> dict[str, Any]:
+    """识别旧市场产物并返回不可向下游传播的版本化生命周期信封。"""
+    if not isinstance(raw, dict) or raw.get("schema_version") != 1:
+        return {**_default_market_artifact(), "legacy_unverified": True}
+    return {**_default_market_artifact(), **raw, "schema_version": 1}
 
 
 class SessionStore:
@@ -279,6 +300,15 @@ class SessionStore:
                 if patch.get("op") != "set":
                     continue
                 _set_by_path(artifacts, patch["path"], patch.get("value"))
+                if patch["path"] == "market.result_ref" and patch.get("value") is not None:
+                    _set_by_path(artifacts, "market.reuse_ref", None)
+                    _set_by_path(artifacts, "market.market_result_confirmed", False)
+                    _set_by_path(artifacts, "market.confirmed_result_ref", None)
+                if patch["path"] == "market.reuse_ref" and patch.get("value") is not None:
+                    _set_by_path(artifacts, "market.result_ref", None)
+                    _set_by_path(artifacts, "market.market_result_confirmed", False)
+                    _set_by_path(artifacts, "market.confirmed_result_ref", None)
+            artifacts["market"] = _normalize_market_artifact(artifacts.get("market"))
             self._write_artifacts_unlocked(session_id, artifacts)
 
     def delete_session(self, session_id: str) -> None:
@@ -365,6 +395,7 @@ class SessionStore:
         if not isinstance(data, dict):
             return {**_DEFAULT_ARTIFACTS, "session_id": session_id}
         out = {**_DEFAULT_ARTIFACTS, **data}
+        out["market"] = _normalize_market_artifact(data.get("market"))
         out["session_id"] = session_id
         return out
 
@@ -380,6 +411,7 @@ class SessionStore:
         path = self._artifacts_path(session_id)
         path.parent.mkdir(parents=True, exist_ok=True)
         payload = {**_DEFAULT_ARTIFACTS, **artifacts, "session_id": session_id}
+        payload["market"] = _normalize_market_artifact(artifacts.get("market"))
         with path.open("w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
 

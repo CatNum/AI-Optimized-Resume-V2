@@ -53,6 +53,9 @@ from career_os.harness.pipeline_intent_transition import apply_intent_phase_tran
 from career_os.platform.worker.registry import WorkerRegistry
 from career_os.platform.store.profile import ProfileStore
 from career_os.platform.store.session import SessionStore
+from career_os.platform.market_research.models import DirectionProposal
+from career_os.platform.market_research.plans import MarketResearchPlanStore
+from career_os.platform.market_research.errors import MarketResearchError
 
 WorkerRunner = Callable[[str, str, dict[str, Any], dict[str, Any]], dict[str, Any]]
 """WorkerRunner（工作者运行函数）描述 Coordinator 调用 Worker 的统一函数签名。"""
@@ -412,6 +415,58 @@ def build_coordinator_graph(
             session_state,
             result.get("context") or {},
         )
+        structured = worker_result.get("structured_output") or {}
+        if (
+            worker_id == "market"
+            and worker_result.get("status") == "completed"
+            and structured.get("mode") == "plan_proposal"
+        ):
+            try:
+                proposal = structured.get("proposal") or {}
+                directions = [
+                    DirectionProposal.model_validate(direction)
+                    for direction in proposal.get("directions") or []
+                ]
+                plan = MarketResearchPlanStore().create_draft(
+                    state["session_id"], directions
+                )
+            except (MarketResearchError, ValueError) as error:
+                return {
+                    **state,
+                    "session_state": session_state,
+                    "last_worker_result": {
+                        "worker_id": worker_id,
+                        "status": "failed",
+                        "structured_output": None,
+                        "error": str(error),
+                    },
+                    "stop_delegate": True,
+                    "pending_workers": [],
+                    "delegate_count": state.get("delegate_count", 0) + 1,
+                    "current_worker_id": None,
+                }
+            SessionStore().patch_artifacts(
+                state["session_id"],
+                [
+                    {
+                        "path": "market.active_plan_id",
+                        "value": plan.plan_id,
+                        "op": "set",
+                    }
+                ],
+            )
+            pending = list(state.get("pending_workers") or [])
+            if worker_id in pending:
+                pending.remove(worker_id)
+            return {
+                **state,
+                "session_state": session_state,
+                "last_worker_result": worker_result,
+                "stop_delegate": True,
+                "pending_workers": pending,
+                "delegate_count": state.get("delegate_count", 0) + 1,
+                "current_worker_id": None,
+            }
         prior_results = dict(session_state.get("prior_results") or {})
         # prior_results（历史 Worker 结果）只保存压缩摘要，供后续 Worker 和合成阶段引用。
         if worker_result.get("status") == "completed":
@@ -447,7 +502,6 @@ def build_coordinator_graph(
             if artifact_patches:
                 SessionStore().patch_artifacts(state["session_id"], artifact_patches)
 
-        structured = worker_result.get("structured_output") or {}
         # 支持延迟展示选项的探索 Worker 会把 guidance_options 写入 session_state，
         # 但不会立刻展示，等用户明确要“选项/例子”时再揭示。
         if worker_result.get("status") == "completed" and supports_explore_guidance(worker_id):

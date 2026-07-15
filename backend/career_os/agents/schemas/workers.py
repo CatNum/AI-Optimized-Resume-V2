@@ -3,6 +3,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from career_os.harness.explore_closure import validate_worker_structured_output
+from career_os.platform.market_research.models import DirectionProposal
 
 
 class GatePrompt(BaseModel):
@@ -96,15 +97,24 @@ class OpportunityOutput(BaseModel):
     gate_prompt: GatePrompt | None = None  # 门禁提示
 
 
+class MarketPlanProposal(BaseModel):
+    """MarketPlanProposal（市场方案提案）表示 Worker 基于初探信息建议的调研范围。"""
+
+    model_config = ConfigDict(extra="forbid")  # 禁止 Worker 混入未确认的浏览器或统计字段
+
+    directions: list[DirectionProposal] = Field(min_length=1, max_length=3)  # 尚未持久化的一到三个职业方向建议
+
+
 class MarketOutput(BaseModel):
     """
-    MarketOutput（市场分析输出）定义市场 Worker 的结果。
+    MarketOutput（交互式市场输出）只承载尚未持久化的方案提案。
     """
 
-    model_config = ConfigDict(extra="allow")  # 模型配置
+    model_config = ConfigDict(extra="forbid")  # 禁止把异步启动或最终综合混入提案输出
 
-    user_visible_summary: str  # 用户可见摘要
-    topics: list[dict[str, Any]]  # 主题列表
+    mode: Literal["plan_proposal"]  # 固定表示本轮只生成市场调研方案提案
+    user_visible_summary: str  # 本轮唯一的用户可见方案摘要
+    proposal: MarketPlanProposal  # 交给 Harness 方案存储器规范化和持久化的提案
 
 
 class StrategyOutput(BaseModel):

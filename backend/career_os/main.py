@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from career_os.api.chat import router as chat_router
 from career_os.api.sessions import router as sessions_router
+from career_os.api.market_research import router as market_research_router
 from career_os.config import settings
 from career_os.platform.tool.handlers.outputs import canonical_output_prefix, resolve_output_file
 
@@ -23,6 +24,7 @@ app.add_middleware(
 
 app.include_router(sessions_router)
 app.include_router(chat_router)
+app.include_router(market_research_router)
 
 _output_mount = Path(settings.output_dir).resolve()
 if _output_mount.exists():

@@ -17,6 +17,8 @@ class MarketResearchErrorCode(StrEnum):
     PLAN_NOT_CONFIRMED = "plan_not_confirmed"  # 调研方案尚未获得用户明确确认
     PLAN_HASH_MISMATCH = "plan_hash_mismatch"  # 当前方案内容与确认时哈希不一致
     PLAN_CONSUMED = "plan_consumed"  # 冻结方案已经被其他调研启动消费
+    PLAN_NOT_FOUND = "plan_not_found"  # 指定方案不存在或已被清理
+    PLAN_FORBIDDEN = "plan_forbidden"  # 当前 Session 不是方案所属 Session
     RESEARCH_CONFLICT = "research_conflict"  # 当前 demo 已存在其他活动调研或重试
 
 
@@ -56,6 +58,14 @@ ERROR_DEFINITIONS: dict[MarketResearchErrorCode, tuple[str, str]] = {
     MarketResearchErrorCode.PLAN_CONSUMED: (
         "plan",
         "该方案已经启动过调研，请生成并确认新方案。",
+    ),
+    MarketResearchErrorCode.PLAN_NOT_FOUND: (
+        "plan",
+        "没有找到该调研方案，请重新生成方案。",
+    ),
+    MarketResearchErrorCode.PLAN_FORBIDDEN: (
+        "authorization",
+        "当前会话不能读取或修改其他会话的调研方案。",
     ),
     MarketResearchErrorCode.RESEARCH_CONFLICT: (
         "runtime",

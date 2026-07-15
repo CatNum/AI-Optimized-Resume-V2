@@ -22,7 +22,7 @@ SECTION_PATHS: dict[str, tuple[str, ...]] = {
 }
 
 WORKERS_REQUIRE_RESUME: frozenset[str] = frozenset(
-    {"market", "opportunity", "strategy", "resume", "asset"}
+    {"opportunity", "strategy", "resume", "asset"}
 )
 
 PHASES_REQUIRE_RESUME: frozenset[str] = frozenset(
@@ -51,6 +51,8 @@ def resolve_profile_memory_sections(
     # JD/简历链路 Worker 和后续 pipeline 阶段必须加载 resume，避免 Worker 缺少基础材料。
     if worker_id and worker_id in WORKERS_REQUIRE_RESUME:
         found.add("resume")
+    if worker_id == "market":
+        found.update({"exploration", "capability"})
     if _phase_requires_resume(session_state):
         found.add("resume")
         if (get_current_phase(session_state) or "") in {
@@ -140,11 +142,7 @@ def _session_artifact_memory(session_state: dict[str, Any] | None) -> dict[str, 
         if isinstance(ref, str):
             ref_artifacts.append(SessionStore().get_artifacts(ref))
     out: dict[str, Any] = {}
-    # market/strategy 优先取已持久化产物，没有时取本轮 prior_results 摘要。
-    if isinstance(artifacts.get("market"), dict) and artifacts.get("market"):
-        out["market"] = artifacts.get("market") or {}
-    elif isinstance(prior.get("market"), dict):
-        out["market"] = prior.get("market") or {}
+    # artifacts.market 是新市场链路生命周期信封，不是可注入 Worker 的市场业务数据。
     if isinstance(artifacts.get("strategy"), dict) and artifacts.get("strategy"):
         out["strategy"] = artifacts.get("strategy") or {}
     elif isinstance(prior.get("strategy"), dict):
@@ -163,8 +161,6 @@ def _session_artifact_memory(session_state: dict[str, Any] | None) -> dict[str, 
         out["exploration"] = exploration
     # 仅处理显式引用，不自动加载历史会话。
     for ref_blob in ref_artifacts:
-        if not out.get("market") and isinstance(ref_blob.get("market"), dict):
-            out["market"] = ref_blob.get("market") or {}
         if not out.get("strategy") and isinstance(ref_blob.get("strategy"), dict):
             out["strategy"] = ref_blob.get("strategy") or {}
         if not out.get("exploration") and isinstance(ref_blob.get("exploration"), dict):
