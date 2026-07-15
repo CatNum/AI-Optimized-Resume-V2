@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import random
 import re
+import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
@@ -34,6 +36,8 @@ _TIME_RANGES: tuple[Literal["past_12_months", "past_3_months"], ...] = (
 )
 _PERCENTAGE_PATTERN = re.compile(r"([+-]?\d+(?:[.,]\d+)?)\s*%")
 _DISCLAIMER = "Google 搜索关注度不代表岗位需求或招聘趋势。"
+_DEFAULT_RETRY_DELAYS = (10.0, 30.0, 60.0)
+_RATE_LIMIT_MESSAGE = "trends_rate_limited"
 
 
 class GoogleTrendsCollector:
@@ -44,6 +48,9 @@ class GoogleTrendsCollector:
         *,
         contract: TrendsPageContract | None = None,
         retry_times: int | None = None,
+        retry_delays: tuple[float, ...] | None = None,
+        sleep: Callable[[float], None] = time.sleep,
+        jitter_factor: Callable[[], float] | None = None,
         navigate_handler: Callable[[str], Any] | None = None,
         user_action_handler: Callable[[str], None] | None = None,
         now: Callable[[], datetime] | None = None,
@@ -57,6 +64,13 @@ class GoogleTrendsCollector:
         )  # 页面技术失败后的最大重试次数，不包含首次尝试
         if self.retry_times < 0:
             raise ValueError("retry_times must not be negative")
+        self.retry_delays = retry_delays or _DEFAULT_RETRY_DELAYS  # 每次技术重试前的基础等待秒数
+        if len(self.retry_delays) < self.retry_times or any(
+            delay <= 0 for delay in self.retry_delays
+        ):
+            raise ValueError("retry_delays must cover retry_times with positive values")
+        self._sleep = sleep  # 自动退避等待函数；等待时间计入有效预算
+        self._jitter_factor = jitter_factor or (lambda: random.uniform(0.8, 1.2))
         self.navigate_handler = navigate_handler  # 经专用浏览器白名单导航的可选回调
         self.user_action_handler = user_action_handler  # 登录或验证时暂停 Runner 的回调
         self._now = now or (lambda: datetime.now(UTC))  # 生成 fetched_at（采集时间）的时钟
@@ -90,6 +104,7 @@ class GoogleTrendsCollector:
     ) -> TrendObservation:
         """页面技术失败最多重试配置次数；无数据或无比较卡片直接形成正常观察。"""
         last_error: Exception | None = None
+        rate_limit_attempt = 0
         for attempt in range(self.retry_times + 1):
             if budget.remaining_seconds() <= 0:
                 raise MarketResearchError(
@@ -108,12 +123,28 @@ class GoogleTrendsCollector:
                 )
             if attempt >= self.retry_times:
                 break
+            if _is_rate_limit_error(last_error):
+                self._sleep_before_retry(rate_limit_attempt, budget)
+                rate_limit_attempt += 1
         if isinstance(last_error, MarketResearchError):
             raise last_error
         raise MarketResearchError(
             MarketResearchErrorCode.EXECUTION_FAILED,
             stage=ResearchStage.COLLECTING_TRENDS.value,
         ) from last_error
+
+    def _sleep_before_retry(self, attempt: int, budget: ActiveBudget) -> None:
+        """按当前重试序号退避，并在等待前拒绝超出方向有效预算。"""
+        factor = float(self._jitter_factor())
+        if not 0.8 <= factor <= 1.2:
+            raise ValueError("jitter_factor must be between 0.8 and 1.2")
+        delay = self.retry_delays[attempt] * factor
+        if budget.remaining_seconds() < delay:
+            raise MarketResearchError(
+                MarketResearchErrorCode.BUDGET_EXHAUSTED,
+                stage=ResearchStage.COLLECTING_TRENDS.value,
+            )
+        self._sleep(delay)
 
     def _collect_once(
         self,
@@ -138,6 +169,13 @@ class GoogleTrendsCollector:
                 )
             self.user_action_handler(safe_url)
         validate_external_url(str(getattr(page, "url", safe_url)), self.contract.allowed_hosts)
+
+        if self.contract.technical_retry_required(page):
+            raise MarketResearchError(
+                MarketResearchErrorCode.EXECUTION_FAILED,
+                stage=ResearchStage.COLLECTING_TRENDS.value,
+                message=_RATE_LIMIT_MESSAGE,
+            )
 
         if self.contract.read_optional(page, self.contract.no_data_marker) is not None:
             return self._status_observation(query, time_range, safe_url, "no_data")
@@ -208,6 +246,15 @@ class GoogleTrendsCollector:
             fetched_at=self._now(),
             contract_version=self.contract.contract_version,
         )
+
+
+def _is_rate_limit_error(error: Exception | None) -> bool:
+    """判断采集异常是否来自 Trends 429 对应页面错误。"""
+    return (
+        isinstance(error, MarketResearchError)
+        and error.error_code == MarketResearchErrorCode.EXECUTION_FAILED
+        and error.message == _RATE_LIMIT_MESSAGE
+    )
 
 
 def build_trends_stage_handler(collector: GoogleTrendsCollector) -> StageHandler:

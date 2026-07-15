@@ -2,7 +2,7 @@
 
 | 属性 | 内容 |
 |------|------|
-| 状态 | **核心实现已完成；真实 BOSS 登录与页面主路径待用户人工验收；自动化测试/Eval 暂缓** |
+| 状态 | **核心实现已完成；Google Trends 稳定性修复已落地，真实 Trends → BOSS 主路径待用户人工验收；完整测试债务另行处理** |
 | 版本 | **0.4.0** |
 | 日期 | 2026-07-14 |
 | 产品定位 | **面试可证明的本地单用户 MVP** |
@@ -17,8 +17,8 @@
 - 已实现方案冻结、单线程状态机、专用可见 Chrome、页面契约、BOSS 当前全职岗位采集、受限 LLM 提取、确定性统计、原子结果版本、普通聊天报告、结果确认、跨 Session 复用、方向重试、引用感知删除、状态卡和聊天硬阻断。
 - 已通过后端 `compileall`、前端生产构建、Trace 白名单、复用/过期/重试/删除人工 smoke，以及隔离 demo 的 `make dev` / `make clean` 进程身份与定向清理验收；未新增自动化测试或 Eval。
 - 本机验收版本：Google Chrome `150.0.7871.116`，DrissionPage `4.1.1.4`，BOSS 页面契约 `boss-web-v1`，Google Trends 页面契约 `google-trends-web-v1`。
-- 已知页面依赖：BOSS 与 Google Trends 均依赖当前公开 Web DOM 和文本标识；关键定位器失效时返回 `page_changed`，不盲点或绕过验证。Google Trends 问题按用户要求不作为本轮阻塞项。
-- 尚需用户在专用 Chrome 中完成一次真实 BOSS 登录/验证和完整主路径验收；无人值守执行不代替用户登录，也不把该项标记为已通过。
+- 已知页面依赖：BOSS 与 Google Trends 均依赖当前公开 Web DOM 和文本标识；关键定位器失效时返回 `page_changed`，不盲点或绕过验证。人工验收发现的临时 Profile、普通登录误判和 429 立即重试问题由 `2026-07-15-google-trends-runtime-stability-design.md` 收口。
+- 尚需用户在持久化专用 Profile 中完成一次真实 Google/BOSS 登录或验证和完整主路径验收；无人值守执行不代替用户登录，也不把该项标记为已通过。
 
 ---
 

@@ -4,6 +4,7 @@ import json
 import os
 import platform
 import shutil
+import socket
 import threading
 import uuid
 from dataclasses import asdict, dataclass
@@ -49,6 +50,8 @@ class DedicatedChromeSession:
         *,
         browser_factory: Callable[[Any], Any] | None = None,
         options_factory: Callable[[], Any] | None = None,
+        port_factory: Callable[[], int] | None = None,
+        process_factory: Callable[[int], Any] | None = None,
     ) -> None:
         """注入 Store 与可测试工厂；构造对象本身不会启动 Chrome 或创建线程。"""
         self.store = store  # 当前 demo 的市场调研存储器
@@ -56,6 +59,8 @@ class DedicatedChromeSession:
         self.registry_path = store.runtime_dir / "chrome.json"  # 专用 Chrome 进程身份登记文件
         self._browser_factory = browser_factory  # 创建 DrissionPage Chromium 的可选测试工厂
         self._options_factory = options_factory  # 创建 ChromiumOptions 的可选测试工厂
+        self._port_factory = port_factory or _allocate_free_local_port  # 分配专用本地调试端口的函数
+        self._process_factory = process_factory or psutil.Process  # 读取专用 Chrome 进程身份的函数
         self._browser: Any | None = None  # 当前线程拥有的唯一 Chromium 实例
         self._page: Any | None = None  # 当前线程复用的唯一可见标签页
         self._research_id: str | None = None  # 当前专用 Chrome 所属调研编号
@@ -68,7 +73,10 @@ class DedicatedChromeSession:
         self.store.validate_research_id(research_id)
         chrome_path = discover_google_chrome_path(settings.market_research.chrome_path)
         self.profile_dir.mkdir(parents=True, exist_ok=True)
-        options = self._build_options(chrome_path)
+        local_port = self._port_factory()
+        if not isinstance(local_port, int) or not 1 <= local_port <= 65535:
+            raise RuntimeError("dedicated Chrome local port is invalid")
+        options = self._build_options(chrome_path, local_port)
         browser_factory = self._browser_factory
         if browser_factory is None:
             from DrissionPage import Chromium
@@ -79,7 +87,7 @@ class DedicatedChromeSession:
             pid = browser.process_id
             if not isinstance(pid, int) or pid <= 0:
                 raise RuntimeError("DrissionPage did not report the browser PID")
-            process = psutil.Process(pid)
+            process = self._process_factory(pid)
             identity = ChromeProcessIdentity(
                 pid=pid,
                 process_started_at=process.create_time(),
@@ -213,8 +221,8 @@ class DedicatedChromeSession:
         self.registry_path.unlink(missing_ok=True)
         return True
 
-    def _build_options(self, chrome_path: Path) -> Any:
-        """构造始终可见、独立 Profile、自动本地调试端口的 ChromiumOptions。"""
+    def _build_options(self, chrome_path: Path, local_port: int) -> Any:
+        """构造始终可见、持久化独立 Profile 和专用调试端口的 ChromiumOptions。"""
         options_factory = self._options_factory
         if options_factory is None:
             from DrissionPage import ChromiumOptions
@@ -222,8 +230,8 @@ class DedicatedChromeSession:
             options_factory = lambda: ChromiumOptions(read_file=False)
         options = options_factory()
         options.set_browser_path(chrome_path)
+        options.set_local_port(local_port)
         options.set_user_data_path(self.profile_dir)
-        options.auto_port(True)
         options.headless(False)
         options.set_argument("--no-first-run")
         options.set_argument("--no-default-browser-check")
@@ -354,6 +362,13 @@ def discover_google_chrome_path(configured_path: str | None = None) -> Path:
         stage=ResearchStage.STARTING_BROWSER.value,
         message="Google Chrome executable was not found",
     )
+
+
+def _allocate_free_local_port() -> int:
+    """向操作系统申请一个当前可用的回环地址 TCP 端口。"""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.bind(("127.0.0.1", 0))
+        return int(probe.getsockname()[1])
 
 
 def _is_executable_file(path: Path) -> bool:

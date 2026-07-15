@@ -189,15 +189,20 @@ class TrendsPageContract:
     contract_version: str = "google-trends-web-v1"  # 当前搜索关注度页面字段契约版本
     allowed_hosts: frozenset[str] = frozenset({"trends.google.com"})  # 可导航的官方 HTTPS host
     explore_url_template: str = "https://trends.google.com/trends/explore"  # 搜索关注度探索页 URL
-    login_markers: tuple[str, ...] = (
-        "text:Sign in",
-        "text:登录",
-    )  # Google 要求用户登录时的页面标识
     verification_markers: tuple[str, ...] = (
+        "css:.g-recaptcha",
+        "css:iframe[src*='recaptcha']",
         "text:Verify it's you",
         "text:验证您的身份",
+        "text:Unusual traffic",
         "text:异常流量",
     )  # Google 验证或异常流量页面标识
+    technical_retry_markers: tuple[str, ...] = (
+        "text:糟糕！出了点问题",
+        "text:请稍后重试",
+        "text:Oops! Something went wrong",
+        "text:Please try again later",
+    )  # Google widget 接口限流或暂时失败时显示的可重试技术错误
     geo_filter: PageField = PageField(
         "geo_filter",
         ("css:[aria-label*='地区']", "css:[aria-label*='Region']"),
@@ -238,8 +243,12 @@ class TrendsPageContract:
         return f"{self.explore_url_template}?{params}"
 
     def user_action_required(self, page: Any) -> bool:
-        """检测 Google 登录或验证标识；系统只暂停等待用户手工处理。"""
-        return _page_has_any(page, (*self.login_markers, *self.verification_markers))
+        """检测 Google 身份验证标识；普通登录入口不阻断匿名可用页面。"""
+        return _page_has_any(page, self.verification_markers)
+
+    def technical_retry_required(self, page: Any) -> bool:
+        """检测无需用户介入、应由采集器自动退避重试的 Trends 页面错误。"""
+        return _page_has_any(page, self.technical_retry_markers)
 
     def read_required(self, page: Any, field: PageField, *, stage: str) -> Any:
         """读取关键字段；失败时抛出带契约版本、阶段和字段名的 page_changed。"""
