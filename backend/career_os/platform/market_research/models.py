@@ -298,6 +298,36 @@ class SkillTaxonomy(BaseModel):
     emerging_or_isolated: tuple[SkillStatistic, ...] = ()  # 只被一个岗位提及的补充技能统计
 
 
+class DirectionResultRef(BaseModel):
+    """DirectionResultRef（方向结果引用）定位已发布版本中的一个不可变成功方向。"""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    research_id: str = Field(pattern=r"^research_[0-9a-f]+$")  # 原始市场调研任务编号
+    result_version: int = Field(ge=1)  # 原始不可变正式结果版本
+    direction_key: str = Field(min_length=1)  # 被引用职业方向的规范键
+    direction_run_id: str = Field(pattern=r"^direction_[0-9a-f]+$")  # 产生原方向结果的运行编号
+
+
+class ReferencedDirectionResult(BaseModel):
+    """ReferencedDirectionResult（引用方向结果）在新版本中复用旧成功方向而不复制其数据。"""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    direction_name: str = Field(min_length=1)  # 被引用职业方向的显示名称
+    direction_key: str = Field(min_length=1)  # 被引用职业方向的规范键
+    researched_at: datetime  # 原方向完成调研的时间
+    expires_at: datetime  # 原方向保持不变的过期时间
+    direction_result_ref: DirectionResultRef  # 指向原正式版本中唯一方向的不可变引用
+
+    @model_validator(mode="after")
+    def validate_reference_identity(self) -> ReferencedDirectionResult:
+        """校验外层方向键与不可变引用中的方向键一致。"""
+        if self.direction_key != self.direction_result_ref.direction_key:
+            raise ValueError("direction reference key must match direction_key")
+        return self
+
+
 class DirectionResult(BaseModel):
     """DirectionResult（方向结果）保存一个成功职业方向的冻结市场调研结果。"""
 
@@ -370,7 +400,7 @@ class MarketResearchResult(BaseModel):
     status: Literal["completed", "partial_completed"]  # 正式结果对应的成功状态
     researched_at: datetime  # 正式结果完成时间
     expires_at: datetime  # 成功方向中最早的过期时间
-    successful_directions: tuple[DirectionResult, ...]  # 至少一个成功职业方向
+    successful_directions: tuple[DirectionResult | ReferencedDirectionResult, ...]  # 新成功方向或旧版本方向引用
     failed_directions: tuple[FailedDirection, ...] = ()  # 未成功职业方向的最小错误信息
     comparison: MarketComparison | None = None  # 至少两个方向成功时的并列对照
     source_boundaries: tuple[str, ...]  # 数据来源、口径和禁止推断边界
@@ -378,9 +408,12 @@ class MarketResearchResult(BaseModel):
 
     @model_validator(mode="after")
     def validate_successful_directions(self) -> MarketResearchResult:
-        """校验正式结果至少包含一个成功职业方向。"""
+        """校验正式结果至少包含一个成功职业方向且方向键不重复。"""
         if not self.successful_directions:
             raise ValueError("at least one successful direction is required")
+        direction_keys = [direction.direction_key for direction in self.successful_directions]
+        if len(direction_keys) != len(set(direction_keys)):
+            raise ValueError("successful direction keys must be unique")
         return self
 
 
@@ -407,3 +440,25 @@ class ResultRef(BaseModel):
 
     research_id: str = Field(pattern=r"^research_[0-9a-f]+$")  # 被引用的主调研标识
     result_version: int = Field(ge=1)  # 被引用的不可变结果版本
+
+
+class ScreenshotManifestItem(BaseModel):
+    """ScreenshotManifestItem（截图清单项）保存一张正式抽样截图的完整性信息。"""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    screenshot_ref: str = Field(pattern=r"^screenshots/[0-9A-Za-z._/-]+$")  # 正式版本目录内的受控相对引用
+    direction_run_id: str = Field(pattern=r"^direction_[0-9a-f]+$")  # 截图所属方向运行编号
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")  # 截图文件内容的 SHA-256 摘要
+    size_bytes: int = Field(ge=1)  # 截图文件字节数
+
+
+class ScreenshotManifest(BaseModel):
+    """ScreenshotManifest（截图清单）冻结一个正式结果版本的 10% 抽样截图集合。"""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal[1] = 1  # 截图清单结构版本
+    research_id: str = Field(pattern=r"^research_[0-9a-f]+$")  # 截图所属市场调研任务编号
+    result_version: int = Field(ge=1)  # 截图所属不可变结果版本
+    screenshots: tuple[ScreenshotManifestItem, ...] = ()  # 通过正式版本路径可读取的抽样截图
