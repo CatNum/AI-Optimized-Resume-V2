@@ -79,6 +79,18 @@ class BossPageContract:
         "job_card",
         ("css:.job-card-wrapper", "css:li.job-card-wrapper"),
     )  # 单个岗位卡片
+    job_card_link: PageField = PageField(
+        "job_card_link",
+        ("css:a.job-card-left", "css:a[href*='/job_detail/']"),
+    )  # 岗位卡片内的官方详情链接
+    detail_closed_marker: PageField = PageField(
+        "detail_closed_marker",
+        ("text:该职位已关闭", "text:职位已下线", "text:岗位已下线"),
+    )  # 详情页明确表示岗位已关闭或下线的标识
+    detail_employment_type: PageField = PageField(
+        "detail_employment_type",
+        ("text:全职", "css:.job-primary .job-labels"),
+    )  # 详情页全职用工类型
     detail_title: PageField = PageField(
         "detail_title",
         ("css:.job-title", "css:h1"),
@@ -93,11 +105,18 @@ class BossPageContract:
     )  # 岗位城市
     detail_experience: PageField = PageField(
         "detail_experience",
-        ("css:.job-primary .text-desc", "xpath://span[contains(text(),'年')]"),
+        (
+            "css:.job-primary .text-desc",
+            "xpath://span[contains(text(),'年') or contains(text(),'应届') or contains(text(),'经验不限')]",
+        ),
     )  # 工作经验要求
     detail_education: PageField = PageField(
         "detail_education",
-        ("xpath://span[contains(text(),'本科') or contains(text(),'大专')]",),
+        (
+            "xpath://span[contains(text(),'本科') or contains(text(),'大专') or "
+            "contains(text(),'硕士') or contains(text(),'博士') or contains(text(),'高中') or "
+            "contains(text(),'中专') or contains(text(),'学历不限')]",
+        ),
     )  # 学历要求
     recruiter_activity: PageField = PageField(
         "recruiter_activity",
@@ -146,6 +165,21 @@ class BossPageContract:
         if element is None:
             raise PageChangedError(self.contract_version, stage, field.field_name)
         return element
+
+    def read_optional(self, page: Any, field: PageField) -> Any | None:
+        """读取允许缺失的 BOSS 字段，用于关闭标识和非关键公司信息。"""
+        return _first_element(page, field.locators)
+
+    def read_all_required(self, page: Any, field: PageField, *, stage: str) -> list[Any]:
+        """读取列表字段的全部元素；所有定位器均为空时抛出结构化 page_changed。"""
+        for locator in field.locators:
+            try:
+                elements = list(page.eles(locator, timeout=0.5))
+            except Exception:
+                continue
+            if elements:
+                return elements
+        raise PageChangedError(self.contract_version, stage, field.field_name)
 
 
 @dataclass(frozen=True)

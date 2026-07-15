@@ -133,6 +133,16 @@ class DirectionRunContext:
         self.data["trend_observations"] = observations
         self.data["trend_summary"] = dict(summary)
 
+    def record_boss_results(self, result: Any) -> None:
+        """记录 BOSS 确定性岗位和执行口径；raw_job_descriptions 只保留在线程内存供提取。"""
+        self.valid_job_count = len(result.jobs)
+        self.data["jobs"] = list(result.jobs)
+        self.data["raw_job_descriptions"] = dict(result.raw_job_descriptions)
+        self.data["visited_cities"] = tuple(result.visited_cities)
+        self.data["keyword_statuses"] = dict(result.keyword_statuses)
+        self.data["screenshot_paths"] = tuple(result.screenshot_paths)
+        self.data["sample_limitations"] = tuple(result.sample_limitations)
+
 
 StageHandler = Callable[[DirectionRunContext], None]
 """StageHandler（阶段处理器）在 Runner 所在线程内执行一个方向阶段。"""

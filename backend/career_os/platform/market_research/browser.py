@@ -173,6 +173,15 @@ class DedicatedChromeSession:
                 self._research_id = None
                 self._owner_thread_id = None
 
+    def restart(self) -> Any:
+        """在同一 Runner 线程安全关闭并重开当前调研的专用 Chrome，返回新的唯一标签页。"""
+        self._assert_owner_thread()
+        research_id = self._research_id
+        if research_id is None:
+            raise RuntimeError("dedicated Chrome session is not open")
+        self.close()
+        return self.open(research_id)
+
     def terminate_registered_process(
         self,
         *,
