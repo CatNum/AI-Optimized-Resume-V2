@@ -1,9 +1,9 @@
 import json
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Literal
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from career_os.agents.graphs.coordinator import run_coordinator_turn
 from career_os.agents.graphs.workers.registry import build_harness_worker_runner
@@ -15,6 +15,7 @@ from career_os.harness.explore_intake import explore_intake_submitted
 from career_os.harness.explore_intake import resolve_explore_intake
 from career_os.harness.gate import match_gate_intent
 from career_os.harness.micro_classifier import is_chat_only_intent
+from career_os.harness.market_research_result import confirm_market_result
 from career_os.harness.pipeline_gates import compute_needs_full_explore
 from career_os.harness.pipeline_gates import PipelineGateError, advance_current_phase
 from career_os.harness.pipeline_phase_transition import (
@@ -35,6 +36,8 @@ from career_os.harness.orchestrator import ChatOrchestrator
 from career_os.harness.session_activity import build_session_activity
 from career_os.platform.store.session import SessionStore
 from career_os.platform.store.profile import ProfileStore
+from career_os.platform.market_research.models import ResearchStatus
+from career_os.platform.market_research.service import get_market_research_service
 from career_os.runtime.sse import format_sse, stream_tokens
 
 router = APIRouter(prefix="/v1")
@@ -47,9 +50,12 @@ class ChatRequest(BaseModel):
     ChatRequest（聊天请求）承载前端发起一轮对话时提交的输入数据。
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     session_id: str | None = None  # 会话标识
     message: str  # 用户消息
     attachments: list[dict[str, Any]] | None = None  # 附件列表
+    market_action: Literal["start_confirmed_plan"] | None = None  # 仅允许启动当前已确认市场方案
 
 
 def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str] | None:
@@ -81,6 +87,15 @@ def _apply_pending_gate(message: str, session_state: dict[str, Any]) -> list[str
 
     if match.get("matched") and match.get("intent") == "confirm":
         # confirm 分支会按 gate 类型推进阶段、设置 flags 或返回需要立即派发的 Worker。
+        if gate_name == "market_result_confirmation":
+            session_id = session_state.get("session_id")
+            if not isinstance(session_id, str):
+                return []
+            confirmed = confirm_market_result(session_id, session_state)
+            if hasattr(confirmed, "code"):
+                session_state["gate_clarify_pending"] = True
+                return []
+            return ["opportunity"]
         gates["pending"] = None
         if gate_name == "optimize_confirm":
             flags["optimize_confirmed"] = True
@@ -188,6 +203,15 @@ async def _chat_stream(
     if pending is None:
         pending = []
     request_context = build_request_context_from_attachments(body.attachments)
+    if body.market_action == "start_confirmed_plan":
+        artifacts = session_store.get_artifacts(session_id)
+        market = artifacts.get("market") if isinstance(artifacts, dict) else {}
+        request_context = {
+            **request_context,
+            "market_action": body.market_action,
+            "active_plan_id": market.get("active_plan_id"),
+        }
+        pending = ["market"]
 
     # Coordinator 负责本轮路由、Worker 委托和确定性合成草稿。
     result = run_coordinator_turn(
@@ -255,9 +279,41 @@ async def chat(body: ChatRequest):
 
     # 没有传 session_id 时创建新会话；随后加载会话状态和历史元数据。
     session_store = SessionStore()
+    if body.market_action is not None and body.session_id is None:
+        raise HTTPException(status_code=409, detail={"code": "market_plan_session_required"})
     session_id = body.session_id or session_store.create_session()
     state = session_store.get_state(session_id)
     state["session_id"] = session_id
+    artifacts = session_store.get_artifacts(session_id)
+    market = artifacts.get("market") if isinstance(artifacts, dict) else {}
+    active_research_id = market.get("active_research_id")
+    if isinstance(active_research_id, str) and active_research_id:
+        try:
+            snapshot = get_market_research_service().get_status(active_research_id, session_id)
+        except KeyError:
+            snapshot = None
+        if snapshot is not None and snapshot.status in {
+            ResearchStatus.QUEUED,
+            ResearchStatus.RUNNING,
+            ResearchStatus.CANCELLING,
+            ResearchStatus.WAITING_USER,
+        }:
+            code = (
+                "market_research_waiting_user"
+                if snapshot.status == ResearchStatus.WAITING_USER
+                else "market_research_in_progress"
+            )
+            raise HTTPException(status_code=409, detail={"code": code})
+    if body.market_action == "start_confirmed_plan":
+        plan_id = market.get("active_plan_id")
+        if not isinstance(plan_id, str) or not plan_id:
+            raise HTTPException(status_code=409, detail={"code": "market_plan_missing"})
+        try:
+            plan = get_market_research_service().plan_store.get(plan_id, session_id)
+        except Exception:
+            raise HTTPException(status_code=409, detail={"code": "market_plan_invalid"}) from None
+        if plan.status != "confirmed" or plan.confirmed_at is None:
+            raise HTTPException(status_code=409, detail={"code": "market_plan_not_confirmed"})
     _, meta = session_store.load_chat_history(session_id)
     begin = orchestrator.begin_chat(session_id, state, meta)
     # 同一会话已有流式响应未结束时，返回 409，避免并发写状态。

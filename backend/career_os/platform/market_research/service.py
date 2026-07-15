@@ -126,6 +126,11 @@ class MarketResearchService:
                             "path": "market.active_research_id",
                             "value": research_id,
                         },
+                        {
+                            "op": "set",
+                            "path": "market.last_research_id",
+                            "value": research_id,
+                        },
                     ],
                 )
                 runner = self.runner_factory(self.store, self._on_runner_terminal)

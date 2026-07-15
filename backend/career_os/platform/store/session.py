@@ -27,6 +27,7 @@ _DEFAULT_ARTIFACTS: dict[str, Any] = {
         "schema_version": 1,
         "active_plan_id": None,
         "active_research_id": None,
+        "last_research_id": None,
         "result_ref": None,
         "reuse_ref": None,
         "market_result_confirmed": False,
@@ -373,6 +374,40 @@ class SessionStore:
             }
             state["gates"] = gates
             self._write_state_unlocked(session_id, state)
+
+    def confirm_market_result_reference(
+        self,
+        session_id: str,
+        expected_ref: dict[str, Any],
+    ) -> dict[str, Any]:
+        """原子确认当前正式市场结果引用并清除唯一的市场结果确认闸门。"""
+        with _lock:
+            artifacts = self._read_artifacts_unlocked(session_id)
+            market = _normalize_market_artifact(artifacts.get("market"))
+            result_ref = market.get("result_ref")
+            reuse_ref = market.get("reuse_ref")
+            if result_ref is not None and reuse_ref is not None:
+                raise ValueError("conflicting market result references")
+            current_ref = result_ref if result_ref is not None else reuse_ref
+            if current_ref != expected_ref:
+                raise ValueError("market result reference changed")
+            market["market_result_confirmed"] = True
+            market["confirmed_result_ref"] = dict(expected_ref)
+            artifacts["market"] = market
+            self._write_artifacts_unlocked(session_id, artifacts)
+
+            state = self._read_state_unlocked(session_id)
+            gates = dict(state.get("gates") or {})
+            pending = gates.get("pending")
+            if isinstance(pending, dict) and pending.get("name") == "market_result_confirmation":
+                gates["pending"] = None
+            flags = dict(gates.get("flags") or {})
+            flags["market_result_confirmed"] = True
+            gates["flags"] = flags
+            state["gates"] = gates
+            state["pipeline_phase"] = "jd_analysis"
+            self._write_state_unlocked(session_id, state)
+            return state
 
     def delete_session(self, session_id: str) -> None:
         """删除 Session；若存在活动市场调研，必须先取消并完成临时数据清理。"""

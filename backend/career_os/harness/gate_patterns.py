@@ -22,6 +22,12 @@ EXPLORE_COMPLETE_AFFIRMATIVE = [
 
 GATE_PATTERNS: list[tuple[str, str, list[str], list[str]]] = [
     (
+        "market_result_confirmation",
+        "confirm",
+        [r"确认使用结果", r"确认并继续", r"继续下一步", r"使用该结果"],
+        [r"暂不确认", r"重新调研", r"不使用"],
+    ),
+    (
         "explore_complete",
         "confirm",
         [

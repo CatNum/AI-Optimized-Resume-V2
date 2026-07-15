@@ -14,11 +14,12 @@ import {
   parseFileRefFromDataTransfer,
 } from "../lib/chatAttachments";
 import { ContextUsageIndicator } from "../components/ContextUsageIndicator";
+import { MarketResearchStatusCard } from "../components/MarketResearchStatusCard";
 import { OutputsPanel } from "../components/OutputsPanel";
 import { SessionSwitcher } from "../components/SessionSwitcher";
 import { TaskProgress } from "../components/TaskProgress";
 import { ThinkingIndicator } from "../components/ThinkingIndicator";
-import { useChatSSE } from "../hooks/useChatSSE";
+import { useChatSSE, type ChatRequestOptions } from "../hooks/useChatSSE";
 import type { ContextUsage } from "../lib/contextUsage";
 import {
   getMessages,
@@ -62,6 +63,7 @@ export function ChatPage() {
   const [initDone, setInitDone] = useState(false);
   const [sessionRefreshTrigger, setSessionRefreshTrigger] = useState(0);
   const [taskRefreshTrigger, setTaskRefreshTrigger] = useState(0);
+  const [marketLocked, setMarketLocked] = useState(false);
   const { sendMessage, loading } = useChatSSE();
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
@@ -195,6 +197,7 @@ export function ChatPage() {
     userText: string,
     appendUserMessage: boolean,
     refs: FileRefAttachment[] = [],
+    options?: ChatRequestOptions,
   ) {
     const trimmed = userText.trim();
     if ((!trimmed && refs.length === 0) || chatBusyOnDisplayed) return;
@@ -253,15 +256,21 @@ export function ChatPage() {
       onError: (message) => {
         if (message === "chat_in_progress") {
           setNotice("上一条仍在处理中，请稍候。");
+        } else if (message === "market_research_in_progress") {
+          setNotice("市场调研正在运行，当前 Session 的普通聊天已暂时锁定。");
+        } else if (message === "market_research_waiting_user") {
+          setNotice("市场调研正在等待登录或验证，请先在状态卡中继续或取消。");
+        } else {
+          setNotice(`请求未执行：${message}`);
         }
       },
-    }, refs);
+    }, refs, options);
     inFlightSessionIdRef.current = null;
   }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if ((!input.trim() && attachments.length === 0) || chatBusyOnDisplayed) return;
+    if ((!input.trim() && attachments.length === 0) || chatBusyOnDisplayed || marketLocked) return;
     const userText = input.trim();
     const refs = attachments;
     setInput("");
@@ -288,11 +297,12 @@ export function ChatPage() {
   function handleInputKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key !== "Enter" || e.shiftKey) return;
     e.preventDefault();
-    if ((!input.trim() && attachments.length === 0) || chatBusyOnDisplayed) return;
+    if ((!input.trim() && attachments.length === 0) || chatBusyOnDisplayed || marketLocked) return;
     void onSubmit(e as unknown as FormEvent);
   }
 
   function handleDragOver(e: DragEvent) {
+    if (marketLocked) return;
     if (!e.dataTransfer.types.includes(FILE_REF_MIME)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
@@ -307,12 +317,25 @@ export function ChatPage() {
   function handleDrop(e: DragEvent) {
     e.preventDefault();
     setDropActive(false);
+    if (marketLocked) return;
     const ref = parseFileRefFromDataTransfer(e.dataTransfer);
     if (ref) addAttachment(ref);
   }
 
-  const canSend = (input.trim().length > 0 || attachments.length > 0) && !chatBusyOnDisplayed;
-  const inputDisabled = chatBusyOnDisplayed || !initDone;
+  const canSend = (input.trim().length > 0 || attachments.length > 0) && !chatBusyOnDisplayed && !marketLocked;
+  const inputDisabled = chatBusyOnDisplayed || marketLocked || !initDone;
+
+  const handleMarketTerminal = useCallback(() => {
+    if (!sessionId) return;
+    void loadSessionView(sessionId);
+    setSessionRefreshTrigger((n) => n + 1);
+    setTaskRefreshTrigger((n) => n + 1);
+  }, [loadSessionView, sessionId]);
+
+  const handleMarketLockChange = useCallback((locked: boolean) => {
+    setMarketLocked(locked);
+    if (locked) setAttachments([]);
+  }, []);
 
   return (
     <div className="flex h-screen bg-slate-950">
@@ -343,6 +366,17 @@ export function ChatPage() {
 
       <div className="shrink-0">
         <TaskProgress sessionId={sessionId} refreshTrigger={taskRefreshTrigger} />
+        <MarketResearchStatusCard
+          sessionId={sessionId}
+          onLockChange={handleMarketLockChange}
+          onTerminal={handleMarketTerminal}
+          onStartConfirmedPlan={() => dispatchChat(
+            "开始调研",
+            true,
+            [],
+            { market_action: "start_confirmed_plan" },
+          )}
+        />
       </div>
 
       <div
@@ -413,7 +447,7 @@ export function ChatPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleInputKeyDown}
-            placeholder="输入消息… 可从右侧拖入简历引用；Enter 发送"
+            placeholder={marketLocked ? "市场调研运行中，聊天与附件暂时锁定" : "输入消息… 可从右侧拖入简历引用；Enter 发送"}
             disabled={inputDisabled}
           />
           <button

@@ -84,3 +84,19 @@ body {
 .task-progress__work {
   @apply flex justify-between gap-2 text-xs text-slate-400;
 }
+
+.market-research-card {
+  @apply mb-4 rounded-lg border border-cyan-800/70 bg-cyan-950/30 p-4 shadow-[0_10px_30px_rgba(8,145,178,0.08)];
+}
+
+.market-field {
+  @apply rounded border border-slate-600 bg-slate-900 px-2 py-1 text-slate-100 outline-none focus:border-cyan-500;
+}
+
+.market-button {
+  @apply rounded bg-cyan-600 px-3 py-1.5 font-medium text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+.market-button-secondary {
+  @apply rounded border border-slate-600 bg-slate-800 px-3 py-1.5 text-slate-200 hover:border-slate-500 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50;
+}

@@ -12,6 +12,7 @@ from career_os.platform.market_research.models import (
 )
 from career_os.platform.market_research.store import MarketResearchStore
 from career_os.platform.store.session import SessionStore
+from career_os.platform.store.task import TaskStore
 
 
 _ACTIVE_RESEARCH_STATUSES = {
@@ -54,6 +55,52 @@ def resolve_downstream_result(
     session_state: dict[str, Any],
 ) -> ResolvedMarketResult | HarnessError:
     """解析正式市场结果；校验确认、版本、有效期和删除状态后返回精简下游数据。"""
+    return _resolve_result(session_id, session_state, require_confirmation=True)
+
+
+def confirm_market_result(
+    session_id: str,
+    session_state: dict[str, Any],
+) -> ResolvedMarketResult | HarnessError:
+    """校验并确认当前正式市场结果，然后把 Pipeline 推进到 JD 分析阶段。"""
+    resolved = _resolve_result(session_id, session_state, require_confirmation=False)
+    if isinstance(resolved, HarnessError):
+        return resolved
+    session_store = SessionStore()
+    artifacts = session_store.get_artifacts(session_id)
+    market = artifacts.get("market") if isinstance(artifacts, dict) else None
+    if not isinstance(market, dict):
+        return HarnessError("market_result_reference_missing", "当前 Session 没有市场结果引用。")
+    current_ref = market.get("result_ref") or market.get("reuse_ref")
+    if not isinstance(current_ref, dict):
+        return HarnessError("market_result_reference_missing", "当前 Session 没有市场结果引用。")
+    try:
+        confirmed_state = session_store.confirm_market_result_reference(
+            session_id,
+            current_ref,
+        )
+    except ValueError:
+        return HarnessError(
+            "market_result_version_mismatch",
+            "确认期间市场结果引用发生变化，请刷新后重新确认。",
+        )
+    session_state.clear()
+    session_state.update(confirmed_state)
+    list_id = session_state.get("list_id")
+    if isinstance(list_id, str) and list_id:
+        phase_error = TaskStore().set_current_phase(list_id, "jd_analysis")
+        if phase_error is not None:
+            return HarnessError(phase_error.code, phase_error.message)
+    return resolved
+
+
+def _resolve_result(
+    session_id: str,
+    session_state: dict[str, Any],
+    *,
+    require_confirmation: bool,
+) -> ResolvedMarketResult | HarnessError:
+    """按确认要求解析当前不可变结果，供确认操作和下游读取共享同一套校验。"""
     if not session_id:
         return HarnessError(
             "market_result_reference_missing",
@@ -96,12 +143,12 @@ def resolve_downstream_result(
             "market_result_reference_missing",
             "当前 Session 尚无正式市场结果引用。",
         )
-    if not market.get("market_result_confirmed"):
+    if require_confirmation and not market.get("market_result_confirmed"):
         return HarnessError(
             "market_result_confirmation_required",
             "请先查看并明确确认当前正式市场结果。",
         )
-    if market.get("confirmed_result_ref") != current_ref:
+    if require_confirmation and market.get("confirmed_result_ref") != current_ref:
         return HarnessError(
             "market_result_version_mismatch",
             "已确认引用与当前市场结果引用不一致，请重新确认。",
