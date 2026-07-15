@@ -140,7 +140,7 @@ class MarketResearchRunner:
         stage_handlers: dict[ResearchStage, StageHandler] | None = None,
         fallback_extractor: StageHandler | None = None,
         completion_handler: CompletionHandler | None = None,
-        open_handler: Callable[[], None] | None = None,
+        open_handler: Callable[[str], Any] | None = None,
         close_handler: Callable[[], None] | None = None,
         terminal_handler: TerminalHandler | None = None,
     ) -> None:
@@ -157,6 +157,7 @@ class MarketResearchRunner:
         self._thread: threading.Thread | None = None  # 本 Runner 唯一允许创建的后台线程
         self._research_id: str | None = None  # 当前 Runner 绑定且用于权限检查的调研编号
         self._active_budget: ActiveBudget | None = None  # 当前方向预算，供等待控制暂停和恢复
+        self._browser_page: Any | None = None  # 专用 Chrome 唯一标签页，供所有阶段顺序复用
         self._control_lock = threading.RLock()  # 保护线程启动、控制事件和当前预算引用
 
     def start(self, research_id: str, plan: ResearchPlan) -> None:
@@ -188,7 +189,7 @@ class MarketResearchRunner:
             self._transition(research_id, ResearchStatus.RUNNING)
             if self.open_handler is not None:
                 self._update_run_stage(research_id, ResearchStage.STARTING_BROWSER)
-                self.open_handler()
+                self._browser_page = self.open_handler(research_id)
             for direction in plan.directions:
                 self._check_cancelled(research_id)
                 context = DirectionRunContext(
@@ -198,6 +199,8 @@ class MarketResearchRunner:
                     direction=direction,
                     budget=ActiveBudget(plan.budget_seconds),
                 )
+                if self._browser_page is not None:
+                    context.data["page"] = self._browser_page
                 with self._control_lock:
                     self._active_budget = context.budget
                 try:
@@ -289,6 +292,7 @@ class MarketResearchRunner:
                     self.close_handler()
                 except Exception:
                     pass
+            self._browser_page = None
             if terminal_snapshot is None:
                 terminal_snapshot = self.store.read_status(research_id)
             if terminal_snapshot is not None and self.terminal_handler is not None:

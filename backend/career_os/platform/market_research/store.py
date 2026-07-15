@@ -821,6 +821,11 @@ class MarketResearchStore:
         self._fsync_directory(root)
 
     @staticmethod
+    def validate_research_id(research_id: str) -> None:
+        """公开校验 research_id（调研编号），供不解析路径的模块复用同一格式约束。"""
+        MarketResearchStore._validate_research_id(research_id)
+
+    @staticmethod
     def _validate_research_id(research_id: str) -> None:
         """校验 research_id（调研编号）符合受控十六进制格式。"""
         if not _RESEARCH_ID_PATTERN.fullmatch(research_id):

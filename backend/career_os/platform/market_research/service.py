@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Callable
 
+from career_os.platform.market_research.browser import DedicatedChromeSession
 from career_os.platform.market_research.errors import (
     MarketResearchError,
     MarketResearchErrorCode,
@@ -265,8 +266,14 @@ class MarketResearchService:
         store: MarketResearchStore,
         terminal_handler: TerminalHandler,
     ) -> MarketResearchRunner:
-        """创建默认单线程 Runner；后续采集任务向它注入阶段实现。"""
-        return MarketResearchRunner(store, terminal_handler=terminal_handler)
+        """创建默认单线程 Runner，并让专用 Chrome 在该 Runner 线程内启动和关闭。"""
+        browser_session = DedicatedChromeSession(store)
+        return MarketResearchRunner(
+            store,
+            open_handler=browser_session.open,
+            close_handler=browser_session.close,
+            terminal_handler=terminal_handler,
+        )
 
 
 _service_lock = threading.RLock()
