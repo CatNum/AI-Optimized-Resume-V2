@@ -34,15 +34,14 @@
     {
       "worker_id": "market",
       "label": "市场智能体",
-      "summary": "岗位族、行业趋势、技术周期、公开情报（browser_fetch）",
+      "summary": "基于初探生成冻结市场调研方案，并异步启动正式调研",
       "when_to_use": [
         "用户咨询市场/岗位方向（可无具体 JD）",
-        "JD 流程：岗位/机会评估前的市场与公开情报调研（B03）",
-        "更新 market.trend_notes、market.role_families"
+        "JD 流程：岗位/机会评估前生成、确认并启动市场调研方案（B03）"
       ],
-      "outputs": ["topics", "market.trend_notes[]"],
+      "outputs": ["plan_proposal", "accepted_async"],
       "skills": [],
-      "tools": ["profile_patch", "browser_fetch"],
+      "tools": ["market_research"],
       "gates_can_emit": [],
       "notes": "JD 主路径须先于 opportunity 派工（JD-R1）"
     },
@@ -60,12 +59,12 @@
         "jd_fingerprint"
       ],
       "skills": [],
-      "tools": ["profile_patch", "browser_fetch"],
+      "tools": ["profile_patch"],
       "gates_can_emit": ["jd_continue_despite_not_recommended"],
       "hard_prerequisites": [
-        "list_type=jd 时须 session_state.prior_results.market 已存在（JD-R1）"
+        "须由 Harness 解析当前未过期正式市场结果，且用户已确认当前唯一引用（JD-R1）"
       ],
-      "notes": "依赖 market 结论注入 context；不得跳过 market 直接评估 JD"
+      "notes": "只读取 Harness 本轮注入的 context.market_research_result；旧缓存不授权"
     },
     {
       "worker_id": "strategy",

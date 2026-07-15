@@ -5,6 +5,11 @@ from typing import Any
 from career_os.harness.explore_closure import explore_continuation_analyze
 from career_os.harness.jd_prerequisites import check_jd_prerequisites, is_jd_intent
 from career_os.harness.pipeline_gates import is_explore_gate_confirmed
+from career_os.harness.errors import HarnessError
+from career_os.harness.market_research_result import (
+    market_result_is_confirmed,
+    resolve_downstream_result,
+)
 from career_os.platform.pipeline_constants import PHASE_TO_MILESTONE_ID, PIPELINE_PHASES
 from career_os.platform.store.task import TaskStore
 
@@ -196,6 +201,22 @@ def enforce_pipeline_phase_rules(
                 "pipeline_phase": pipeline_phase,
             }
 
+    downstream_workers = {"opportunity", "strategy", "resume", "asset"}
+    if any(worker in downstream_workers for worker in workers):
+        resolved = resolve_downstream_result(
+            str(session_state.get("session_id") or ""),
+            session_state,
+        )
+        if isinstance(resolved, HarnessError):
+            return {
+                "workers": [],
+                "list_type": "pipeline",
+                "pipeline_phase": pipeline_phase,
+                "market_result_blocked": True,
+                "market_result_error_code": resolved.code,
+                "market_result_error_message": resolved.message,
+            }
+
     if current_phase == "resume_optimize":
         flags = (session_state.get("gates") or {}).get("flags") or {}
         if not flags.get("optimize_confirmed"):
@@ -250,7 +271,7 @@ def pipeline_fallback_workers(
         is_jd_intent(user_message) or "jd" in text or "岗位" in user_message
     ):
         w = ["market"] if phase == "market" else ["opportunity"]
-        if phase == "jd_analysis" and "market" in prior and "opportunity" not in prior:
+        if phase == "jd_analysis" and "opportunity" not in prior:
             w = ["opportunity"]
         return enforce_pipeline_phase_rules(
             {"workers": w}, session_state, user_message
@@ -259,9 +280,10 @@ def pipeline_fallback_workers(
         k in user_message
         for k in ("策略", "继续", "下一步", "制定", "优化", "改简历", "项目", "agent")
     ):
-        return enforce_pipeline_phase_rules(
-            {"workers": ["strategy"]}, session_state, user_message
-        )
+        if market_result_is_confirmed(session_state):
+            return enforce_pipeline_phase_rules(
+                {"workers": ["strategy"]}, session_state, user_message
+            )
     if phase == "resume_optimize" and flags.get("optimize_confirmed"):
         if ("优化" in user_message or "resume" in text) and "resume" not in prior:
             return enforce_pipeline_phase_rules(

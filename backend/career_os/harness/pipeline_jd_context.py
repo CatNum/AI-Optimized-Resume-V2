@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from career_os.harness.jd_prerequisites import is_jd_intent
+from career_os.harness.market_research_result import market_result_is_confirmed
 from career_os.platform.store.task import TaskStore
 
 _JD_REFERENCE_PHRASES = (
@@ -33,7 +34,9 @@ def has_jd_context(
         if meta.get("related_jd_fingerprint"):
             return True
     prior = session_state.get("prior_results") or {}
-    if "market" in prior or "opportunity" in prior:
+    if "opportunity" in prior:
+        return True
+    if market_result_is_confirmed(session_state):
         return True
     if is_jd_intent(user_message):
         return True

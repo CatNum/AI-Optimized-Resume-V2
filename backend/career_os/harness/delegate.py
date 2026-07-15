@@ -3,6 +3,7 @@ from typing import Any
 from career_os.harness.errors import HarnessError
 from career_os.harness.jd_prerequisites import jd_delegate_block_error
 from career_os.harness.explore_intake import worker_context_from_intake
+from career_os.harness.market_research_result import resolve_downstream_result
 from career_os.platform.trace.writer import TraceWriter
 
 
@@ -10,8 +11,6 @@ def check_delegate_rules(
     worker_id: str, session_state: dict[str, Any]
 ) -> HarnessError | None:
     """检查delegate rules。"""
-    list_type = session_state.get("list_type")
-    prior_results = session_state.get("prior_results") or {}
     gates = session_state.get("gates") or {}
     flags = gates.get("flags") or {}
 
@@ -19,15 +18,16 @@ def check_delegate_rules(
     if b1:
         return b1
 
-    if worker_id == "opportunity":
-        from career_os.harness.pipeline_routing import is_pipeline_session
-
-        on_jd_chain = list_type == "jd" or is_pipeline_session(session_state)
-        if on_jd_chain and "market" not in prior_results:
-            return HarnessError(
-                "delegate_blocked",
-                "JD-R1: opportunity requires prior_results.market",
-            )
+    on_market_chain = session_state.get("list_type") in {"jd", "pipeline"} or bool(
+        session_state.get("list_id")
+    )
+    if worker_id == "opportunity" or (
+        on_market_chain and worker_id in {"strategy", "resume", "asset"}
+    ):
+        session_id = session_state.get("session_id")
+        resolved = resolve_downstream_result(str(session_id or ""), session_state)
+        if isinstance(resolved, HarnessError):
+            return resolved
 
     if worker_id == "resume":
         if not flags.get("optimize_confirmed"):
@@ -117,6 +117,16 @@ def delegate_worker(
 
     if worker_id in {"identity", "capability"} and is_pipeline_explore_phase(session_state):
         merged_context.update(worker_context_from_intake(session_state))
+    if worker_id == "opportunity":
+        resolved = resolve_downstream_result(
+            str(session_id or session_state.get("session_id") or ""),
+            session_state,
+        )
+        if isinstance(resolved, HarnessError):
+            return resolved
+        # market_research_result（正式市场调研上下文）由 Harness 本轮重新解析，
+        # 不接受 Worker、聊天状态或旧 prior_results.market 提供的缓存替代。
+        merged_context["market_research_result"] = resolved.to_context()
 
     return {
         "worker_id": worker_id,

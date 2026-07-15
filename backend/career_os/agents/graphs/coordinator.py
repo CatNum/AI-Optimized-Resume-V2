@@ -169,6 +169,9 @@ def build_coordinator_graph(
         )
         session_state.pop("jd_prerequisite_blocked", None)
         session_state.pop("jd_block_reason", None)
+        session_state.pop("market_result_blocked", None)
+        session_state.pop("market_result_error_code", None)
+        session_state.pop("market_result_error_message", None)
         # 如果当前不是“重复初探且需要重新填表”，清理旧的 explore_intake_blocked，
         # 避免上一轮表单阻断继续影响本轮正常路由。
         if not needs_repeat_intake(session_state):
@@ -233,6 +236,15 @@ def build_coordinator_graph(
             if result.get("jd_prerequisite_blocked"):
                 session_state["jd_prerequisite_blocked"] = True
                 session_state["jd_block_reason"] = result.get("jd_block_reason")
+                return []
+            if result.get("market_result_blocked"):
+                session_state["market_result_blocked"] = True
+                session_state["market_result_error_code"] = result.get(
+                    "market_result_error_code"
+                )
+                session_state["market_result_error_message"] = result.get(
+                    "market_result_error_message"
+                )
                 return []
             # 初探信息表未完成时，只记录阻断标记，让 synthesize 输出填表引导。
             if result.get("explore_intake_blocked"):
@@ -383,6 +395,14 @@ def build_coordinator_graph(
             session_state,
             worker_id=worker_id,
         )
+        if worker_id == "market" and state.get("session_id"):
+            market_artifact = SessionStore().get_artifacts(state["session_id"]).get("market")
+            if isinstance(market_artifact, dict):
+                # market_lifecycle（市场生命周期上下文）只暴露等待启动的方案编号，
+                # 不把结果引用、确认状态或旧市场数据当成 Worker 可自行信任的业务上下文。
+                delegate_context["market_lifecycle"] = {
+                    "active_plan_id": market_artifact.get("active_plan_id")
+                }
         # harness.delegate_worker（委托 Worker）先做权限、前置条件和上下文包装；
         # 只有它通过后才会调用真正 runner。
         result = harness.delegate_worker(
@@ -400,6 +420,10 @@ def build_coordinator_graph(
             if block_reason:
                 session_state["jd_prerequisite_blocked"] = True
                 session_state["jd_block_reason"] = block_reason
+            if result.code.startswith("market_"):
+                session_state["market_result_blocked"] = True
+                session_state["market_result_error_code"] = result.code
+                session_state["market_result_error_message"] = result.message
             return {
                 **state,
                 "session_state": session_state,
@@ -416,6 +440,55 @@ def build_coordinator_graph(
             result.get("context") or {},
         )
         structured = worker_result.get("structured_output") or {}
+        if worker_id == "market" and worker_result.get("status") == "accepted_async":
+            research_id = structured.get("research_id")
+            plan_id = structured.get("plan_id")
+            initial_status = structured.get("status")
+            if not all(
+                isinstance(value, str)
+                for value in (research_id, plan_id, initial_status)
+            ):
+                return {
+                    **state,
+                    "session_state": session_state,
+                    "last_worker_result": {
+                        "worker_id": worker_id,
+                        "status": "failed",
+                        "structured_output": None,
+                        "error": "invalid accepted_async market payload",
+                    },
+                    "stop_delegate": True,
+                    "pending_workers": [],
+                    "delegate_count": state.get("delegate_count", 0) + 1,
+                    "current_worker_id": None,
+                }
+            SessionStore().patch_artifacts(
+                state["session_id"],
+                [
+                    {
+                        "path": "market.active_research_id",
+                        "value": research_id,
+                        "op": "set",
+                    }
+                ],
+            )
+            session_state["market_research"] = {
+                "research_id": research_id,
+                "plan_id": plan_id,
+                "status": initial_status,
+            }
+            pending = list(state.get("pending_workers") or [])
+            if worker_id in pending:
+                pending.remove(worker_id)
+            return {
+                **state,
+                "session_state": session_state,
+                "last_worker_result": worker_result,
+                "stop_delegate": True,
+                "pending_workers": pending,
+                "delegate_count": state.get("delegate_count", 0) + 1,
+                "current_worker_id": None,
+            }
         if (
             worker_id == "market"
             and worker_result.get("status") == "completed"
@@ -641,6 +714,12 @@ def build_coordinator_graph(
         elif session_state.get("jd_prerequisite_blocked"):
             # JD 前置条件未满足时，输出固定阻断文案，引导用户先完成 onboarding/explore。
             text = jd_prerequisites_draft(session_state.get("jd_block_reason"))
+        elif session_state.get("market_result_blocked"):
+            # 市场正式结果仍在运行、未确认、过期或已删除时使用 Harness 的确定性阻断说明。
+            text = str(
+                session_state.get("market_result_error_message")
+                or "请先完成并确认当前市场调研结果，再继续岗位分析。"
+            )
         elif session_state.get("explore_repeat_blocked"):
             # 用户已完成过探索但系统判断需要重走时，先询问是否重新初探。
             prompt = explore_repeat_draft()

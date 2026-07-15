@@ -29,7 +29,7 @@ TOOL_ZH: dict[str, str] = {
     "apply_proposed_patches": "应用待确认补丁",
     "load_skill": "加载 Skill",
     "list_skills": "列出 Skill",
-    "browser_fetch": "浏览器抓取",
+    "market_research": "启动市场调研",
     "write_resume_html": "写入简历 HTML",
     "resume_read": "读取简历素材",
     "register_outputs_index": "登记产物索引",
@@ -95,6 +95,13 @@ ERROR_CODE_ZH: dict[str, str] = {
     "invalid_html": "简历 HTML 格式无效",
     "chat_in_progress": "会话正在处理中",
     "session_expired": "会话已过期",
+    "market_research_in_progress": "市场调研进行中",
+    "market_result_confirmation_required": "市场结果待用户确认",
+    "market_result_reference_missing": "缺少正式市场结果引用",
+    "market_result_reference_conflict": "市场结果引用冲突",
+    "market_result_version_mismatch": "市场结果版本不一致",
+    "market_result_expired": "市场结果已过期",
+    "market_result_deleted": "市场结果已删除",
 }
 
 

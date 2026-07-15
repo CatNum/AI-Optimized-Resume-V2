@@ -293,6 +293,13 @@ class MarketResearchStore:
             )
         raise KeyError(direction_key)
 
+    def resolve_direction_entry(
+        self,
+        direction: DirectionResult | ReferencedDirectionResult,
+    ) -> DirectionResult:
+        """解析新方向或旧版本引用，并返回最初发布的完整不可变方向结果。"""
+        return self._resolve_direction_entry(direction)
+
     def cleanup_direction_temp(
         self,
         research_id: str,

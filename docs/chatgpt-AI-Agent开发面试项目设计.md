@@ -46,7 +46,7 @@ flowchart LR
 
 这个项目把职业规划和简历优化做成了一个 Agent 系统。用户通过聊天输入简历、职业困惑或 JD，后端先由 Coordinator 判断当前意图和阶段，再按需派发给 identity、capability、market、opportunity、strategy、resume、asset 等 Worker。
 
-Worker 不直接互相调用，也不直接面向用户输出，而是在各自 Run 内通过 ReAct 选择 `load_skill（加载技能包）`、`profile_patch（写入画像）`、`browser_fetch（浏览器检索）`、`write_resume_html（生成简历 HTML）` 等工具。所有工具都必须经过 Harness，Harness 会校验 actor 是否有权限、当前闸门是否通过、Profile 写入路径是否合法，并把关键事件写入 Trace。
+Worker 不直接互相调用，也不直接面向用户输出，而是在各自 Run 内通过 ReAct 选择 `load_skill（加载技能包）`、`profile_patch（写入画像）`、`market_research（按冻结方案启动市场调研）`、`write_resume_html（生成简历 HTML）` 等工具。所有工具都必须经过 Harness，Harness 会校验 actor 是否有权限、当前闸门是否通过、Profile 写入路径是否合法，并把关键事件写入 Trace。
 
 这个设计的重点是把 LLM 的不确定性包在工程边界里：LLM 负责理解意图、生成策略和调用工具；Harness 负责权限、流程、状态和审计；Eval 负责验证闸门、派工链、工具白名单、状态写入和端到端链路是否稳定。
 
@@ -638,7 +638,7 @@ class WorkerState(TypedDict, total=False):
 - `coordinator（协调者）`：可以派工、管理任务、读取 profile、应用确认后的 patch。
 - `resume（简历 Worker）`：可以 `write_resume_html（写入简历 HTML）`。
 - `asset（资产 Worker）`：可以 `register_outputs_index（登记产物索引）`。
-- `market（市场 Worker）` 和 `opportunity（机会 Worker）`：可以 `browser_fetch（浏览器检索）`。
+- `market（市场 Worker）`：只可用 `market_research（按冻结方案启动市场调研）`；`opportunity（机会 Worker）` 没有浏览器能力。
 - 所有业务 Worker：可以按白名单调用 `profile_patch（写入用户画像）`。
 
 如果 actor 调用不属于自己的工具，`execute_tool（执行工具）` 返回 `tool_not_allowed（工具不允许）`。
@@ -649,7 +649,7 @@ class WorkerState(TypedDict, total=False):
 
 它记录三类信息：
 
-- `name（工具名称）`：例如 `profile_patch`、`write_resume_html`、`browser_fetch`。
+- `name（工具名称）`：例如 `profile_patch`、`write_resume_html`、`market_research`。
 - `actors（可调用者集合）`：哪些 actor 可以调用这个工具。
 - `handler（处理函数）`：真正执行工具逻辑的 Python 函数。
 
@@ -750,7 +750,7 @@ Trace 由 `TraceWriter（轨迹写入器）` 写入 JSONL 文件。关键事件�
   "latency_ms": 42,                         // 耗时毫秒：用于定位慢调用，可为空
   "detail": {                               // 事件详情：不同事件放不同结构化补充信息
     "code": "tool_not_allowed",             // 错误码：失败时用于定位原因，可选
-    "message": "resume cannot use browser_fetch", // 错误信息：失败时的说明，可选
+    "message": "resume cannot use market_research", // 错误信息：失败时的说明，可选
     "source": "rule",                       // 来源：例如 rule / llm / fallback / queue，可选
     "workers": ["market", "opportunity"],   // 派工队列：coordinator.analyze 常用，可选
     "gate_name": "optimize_confirm",        // 闸门名称：gate 事件常用，可选
@@ -962,7 +962,7 @@ Harness 会增加架构复杂度，但这是从“能跑的 Agent Demo”升级�
 
 当前：
 
-- `browser_fetch（浏览器检索工具）` 主要服务 market 和 opportunity。
+- `market_research（市场调研工具）` 仅服务 market，并且只接受用户确认的冻结 `plan_id`。
 - 失败时 Worker 可以降级继续。
 
 后续：

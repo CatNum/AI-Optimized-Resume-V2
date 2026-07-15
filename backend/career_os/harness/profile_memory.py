@@ -16,7 +16,6 @@ SECTION_PATHS: dict[str, tuple[str, ...]] = {
     "resume": ("resume", "exploration"),
     "basic_intent": ("basic", "intent"),
     "exploration": ("exploration",),
-    "market": ("market",),
     "strategy": ("strategy",),
     "capability": ("capability",),
 }
@@ -56,12 +55,6 @@ def resolve_profile_memory_sections(
     if _phase_requires_resume(session_state):
         found.add("resume")
         if (get_current_phase(session_state) or "") in {
-            "jd_analysis",
-            "resume_strategy",
-            "resume_optimize",
-        }:
-            found.add("market")
-        if (get_current_phase(session_state) or "") in {
             "resume_strategy",
             "resume_optimize",
         }:
@@ -87,7 +80,7 @@ def resolve_profile_memory_sections(
                 found.add(section)
 
     # 固定输出顺序，保证下游提示词稳定。
-    order = ("resume", "basic_intent", "exploration", "market", "strategy", "capability")
+    order = ("resume", "basic_intent", "exploration", "strategy", "capability")
     return [s for s in order if s in found]
 
 
@@ -207,8 +200,6 @@ def materialize_profile_memory(
             exploration = dict(profile.get("exploration") or {})
             exploration.pop("intake", None)
             memory["exploration"] = exploration
-    if "market" in sections:
-        memory["market"] = session_memory.get("market") or {}
     if "strategy" in sections:
         memory["strategy"] = session_memory.get("strategy") or {}
     if "capability" in sections:
@@ -262,8 +253,6 @@ def format_profile_memory_for_draft(memory: dict[str, Any]) -> str:
             lines.append("档案中尚无简历正文，可引导用户通过初探信息表提交。")
     if memory.get("exploration"):
         lines.append("已加载 exploration 档案字段（不含 intake 全文）。")
-    if memory.get("market"):
-        lines.append("已加载 market 档案字段。")
     if memory.get("strategy"):
         lines.append("已加载 strategy 档案字段。")
     return "\n".join(lines) if lines else "（档案切片为空）"

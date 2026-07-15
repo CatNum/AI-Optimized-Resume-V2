@@ -36,6 +36,7 @@ from career_os.harness.profile_memory import (
     materialize_profile_memory,
     resolve_profile_memory_sections,
 )
+from career_os.harness.market_research_result import market_result_is_confirmed
 from career_os.platform.prompt.loader import load_coordinator_prompt
 
 EXPLORE_WORKERS = frozenset({"identity", "capability"})
@@ -446,8 +447,8 @@ def fallback_analyze_workers(
             return enforce_explore_intake(result, session_state)
         # 已有市场和 JD 分析产物但还没有策略产物时，“继续/下一步/制定”倾向进入策略 Worker。
         if (
-            "market" in prior
-            and "opportunity" in prior
+            "opportunity" in prior
+            and market_result_is_confirmed(session_state)
             and "strategy" not in prior
             and any(k in user_message for k in ("策略", "继续", "下一步", "制定"))
         ):

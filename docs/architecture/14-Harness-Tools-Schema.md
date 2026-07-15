@@ -33,7 +33,7 @@ Worker **仅可见** 其 `tool_index` 内工具；执行统一走 `Harness.execu
 }
 ```
 
-**Harness 硬约束**：无 `optimize_confirmed` → `worker_id=resume` 拒绝（`gate_blocked`）。`list_type=jd` 且无 `session_state.prior_results.market` → `worker_id=opportunity` 拒绝（`delegate_blocked`，JD-R1）。
+**Harness 硬约束**：无 `optimize_confirmed` → `worker_id=resume` 拒绝（`gate_blocked`）。市场阶段之后的 Worker 必须通过正式结果引用、有效期、删除状态和用户确认校验；旧缓存不能授权。
 
 ### 2.2 Task 工具
 
@@ -181,16 +181,30 @@ Harness 校验 `allowed_workers[mode]`（见 [A03](../prd/A03.%20机制-技能�
 }
 ```
 
-### 4.6 `browser_fetch`（market / opportunity）
+### 4.6 `market_research`（仅 market）
 
-见 [11-L7-浏览器Tool.md](./11-L7-浏览器Tool.md)。
+```json
+{
+  "type": "object",
+  "properties": {
+    "plan_id": {"type": "string", "pattern": "^plan_[0-9a-f]+$"}
+  },
+  "required": ["plan_id"],
+  "additionalProperties": false
+}
+```
+
+Handler 只按用户确认的冻结方案启动后台任务，不接受关键词、城市、action 或任意 URL。`opportunity` 没有浏览器或市场采集能力。
 
 ## 5. 通用 Tool 错误码
 
 | code | 场景 |
 |------|------|
 | `gate_blocked` | 闸门未满足（如 resume 无 optimize_confirmed） |
-| `delegate_blocked` | 派工前置未满足（如 JD-R1：缺 `prior_results.market`） |
+| `market_research_in_progress` | 正式市场调研仍处于活动状态 |
+| `market_result_confirmation_required` | 当前正式结果尚未由用户确认 |
+| `market_result_expired` | 当前引用结果已超过有效期 |
+| `market_result_deleted` | 当前正式结果已删除或不可读取 |
 | `profile_patch_rejected` | 白名单 / actor / 并发冲突 |
 | `task_blocked` | `blockedBy` / `ready` list / milestone 未完成 |
 | `skill_not_allowed` | `load_skill` actor 不在 `allowed_workers` |

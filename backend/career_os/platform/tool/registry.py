@@ -40,8 +40,8 @@ WORKER_META_TOOLS = {"list_skills", "load_skill"}
 WORKER_BUSINESS_TOOLS: dict[str, set[str]] = {
     "identity": {"profile_patch"},
     "capability": {"profile_patch", "resume_read"},
-    "market": {"profile_patch", "browser_fetch"},
-    "opportunity": {"profile_patch", "browser_fetch"},
+    "market": {"market_research"},
+    "opportunity": {"profile_patch"},
     "strategy": {"profile_patch"},
     "resume": {"profile_patch", "resume_read", "write_resume_html"},
     "asset": {"register_outputs_index", "delete_output"},

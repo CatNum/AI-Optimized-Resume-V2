@@ -4,7 +4,7 @@ from career_os.harness.delegate import check_delegate_rules, delegate_worker as 
 from career_os.harness.errors import HarnessError
 from career_os.harness.gate import match_gate_intent as run_match_gate_intent
 from career_os.platform.trace.writer import TraceWriter
-from career_os.platform.tool.handlers.browser_fetch import browser_fetch
+from career_os.platform.tool.handlers.market_research import market_research
 from career_os.platform.tool.handlers.outputs import delete_output, register_outputs_index
 from career_os.platform.tool.handlers.profile import (
     apply_proposed_patches,
@@ -101,7 +101,7 @@ class Harness:
             self._match_gate_intent_handler,
             actors={"coordinator"},
         )
-        # 简历、产物、浏览器和 skill 工具只开放给对应 Worker。
+        # 简历、产物、冻结方案调研和 skill 工具只开放给对应 Worker。
         self.tools.register("write_resume_html", write_resume_html, actors={"resume"})
         self.tools.register("resume_read", resume_read, actors={"capability", "resume"})
         self.tools.register(
@@ -111,9 +111,9 @@ class Harness:
         )
         self.tools.register("delete_output", delete_output, actors={"asset"})
         self.tools.register(
-            "browser_fetch",
-            browser_fetch,
-            actors={"market", "opportunity"},
+            "market_research",
+            market_research,
+            actors={"market"},
         )
         self.tools.register("load_skill", load_skill, actors=worker_actors)
         self.tools.register("list_skills", list_skills, actors=worker_actors)

@@ -194,8 +194,8 @@ Worker（领域智能体）负责具体领域问题。当前注册表中有 7 �
 |--------|----------|----------|
 | `identity`（身份智能体） | 内心五主题、职业偏好、初探价值锚点 | `profile_patch` |
 | `capability`（能力智能体） | 经历素材、能力图谱、简历深挖 | `profile_patch`、`resume_read` |
-| `market`（市场智能体） | 岗位族、行业趋势、公开情报 | `profile_patch`、`browser_fetch` |
-| `opportunity`（岗位/机会智能体） | JD 解析、匹配评估、推荐判断 | `profile_patch`、`browser_fetch` |
+| `market`（市场智能体） | 生成冻结调研方案并异步启动正式市场调研 | `market_research(plan_id)` |
+| `opportunity`（岗位/机会智能体） | JD 解析、匹配评估、推荐判断 | `profile_patch`；只读 Harness 注入的正式市场结果 |
 | `strategy`（策略智能体） | 多路径推演、投递策略、优化确认 | `profile_patch` |
 | `resume`（简历智能体） | 按档位生成 HTML 简历 | `write_resume_html`、`profile_patch`、`resume_read` |
 | `asset`（资产智能体） | 复用建议、产物索引登记、删除产物 | `register_outputs_index`、`delete_output` |
@@ -474,4 +474,3 @@ Trace 的核心价值是回答三个问题：
 而是：
 
 > 我做了一个面向 IT 求职场景的 Personal Career OS。它用本地 Python 单体承载 FastAPI、LangGraph Coordinator、7 类领域 Worker 和自研 Harness。Coordinator 负责编排，Worker 负责领域推理，Harness 负责工具权限、阶段约束、Profile 写入、Gate、Trace 和产物登记。这个设计的重点不是让模型更自由，而是让长流程 Agent 在真实交付中可控、可追踪、可验证。
-

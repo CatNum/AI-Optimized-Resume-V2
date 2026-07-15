@@ -8,6 +8,9 @@ from career_os.harness.explore_closure import (
     PHASE_SEGMENT_COMPLETE,
 )
 from career_os.platform.tool.handlers.resume_html import sort_optimization_levels
+from career_os.platform.market_research.errors import MarketResearchError
+from career_os.platform.market_research.plans import MarketResearchPlanStore
+from career_os.platform.store.session import SessionStore
 
 
 def _next_explore_phase_status(worker_id: str, session_state: dict[str, Any]) -> str:
@@ -30,6 +33,38 @@ def mock_run_worker_react(
     session_id = session_state.get("session_id")
 
     if worker_id == "market":
+        active_plan_id: str | None = None  # 当前 Session 等待启动的调研方案编号
+        if isinstance(session_id, str) and SessionStore().session_exists(session_id):
+            market_artifact = SessionStore().get_artifacts(session_id).get("market") or {}
+            candidate = market_artifact.get("active_plan_id")
+            if isinstance(candidate, str):
+                active_plan_id = candidate
+        if active_plan_id and isinstance(session_id, str):
+            try:
+                plan = MarketResearchPlanStore().get(active_plan_id, session_id)
+            except MarketResearchError:
+                plan = None
+            if plan is not None and plan.status == "confirmed":
+                tool_result = harness.execute_tool(
+                    "market",
+                    "market_research",
+                    {"plan_id": active_plan_id},
+                    session_id=session_id,
+                )
+                if isinstance(tool_result, dict) and tool_result.get("accepted") is True:
+                    return {
+                        "worker_id": "market",
+                        "status": "accepted_async",
+                        "structured_output": {
+                            "accepted": True,
+                            "research_id": tool_result.get("research_id"),
+                            "plan_id": tool_result.get("plan_id"),
+                            "status": tool_result.get("status"),
+                            "user_visible_summary": tool_result.get("message")
+                            or "市场调研已在后台启动。",
+                        },
+                        "error": None,
+                    }
         return finalize_worker_result(
             "market",
             {

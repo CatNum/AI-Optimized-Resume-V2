@@ -21,10 +21,16 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
         },
         "required": ["path", "value"],
     },
-    "browser_fetch": {
+    "market_research": {
         "type": "object",
-        "properties": {"query": {"type": "string"}},
-        "required": ["query"],
+        "properties": {
+            "plan_id": {
+                "type": "string",
+                "pattern": "^plan_[0-9a-f]+$",
+            }
+        },
+        "required": ["plan_id"],
+        "additionalProperties": False,
     },
     "write_resume_html": {
         "type": "object",

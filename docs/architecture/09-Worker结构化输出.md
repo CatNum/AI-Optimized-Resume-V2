@@ -42,11 +42,11 @@
 
 | 字段 | 必填 | 说明 |
 |------|:----:|------|
-| `user_visible_summary` | ✓ | |
-| `topics` | ✓ | ≥1 条 `{ topic, summary }` |
-| `external_sources` | 条件 | 本轮调用 `browser_fetch` 时 **必填** |
-| `role_families` | 条件 | 用户咨询岗位族/方向时必填 |
-| `gate_prompt` | **禁止** | |
+| `mode` | ✓ | 固定为 `plan_proposal` |
+| `user_visible_summary` | ✓ | 仅说明待确认方案 |
+| `proposal.directions` | ✓ | 1–3 个方向，分别保存 BOSS 与搜索关注度关键词 |
+
+调用 `market_research(plan_id)` 被接受时，Worker Run 返回 `status=accepted_async`，不伪装成 `MarketOutput` 的完成结果。
 
 ### 2.4 `opportunity`（O1）
 

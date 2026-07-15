@@ -104,8 +104,7 @@ stateDiagram-v2
   "capability_bundle": {                // 能力索引包：仅元数据，不含 skill 正文
     "skill_index": [],                  // 该 Worker 可用的 skill 目录（name/description/when_to_use）；opportunity 示例为空
     "tool_index": [                     // 该 Worker 可调用的 tool 目录（名称 + 描述）
-      { "name": "profile_patch", "description": "..." },
-      { "name": "browser_fetch", "description": "..." }
+      { "name": "profile_patch", "description": "..." }
     ]
   },
   "context": {                          // 派工上下文（协调者组装，非 Worker 互传）
@@ -114,8 +113,12 @@ stateDiagram-v2
       "list_id": "list_7f3a9c2e",       // 当前任务列表 ID（A02）
       "list_type": "jd",                // 业务流类型：explore | jd | plan
       "prior_results": {                // 已完成 Worker 的结构化结论摘要（按 worker_id 键）
-        "market": { "summary": "..." }
+        "opportunity": { "summary": "..." }
       }
+    },
+    "market_research_result": {         // Harness 本轮解析、校验并裁剪的正式市场结果
+      "research_id": "research_...",
+      "result_version": 1
     },
     "profile_slices": [                 // 从 profile.json 截取的路径列表，Harness 注入片段
       "exploration.summary",
@@ -189,7 +192,7 @@ stateDiagram-v2
 
 > **非固定全局流水线**：协调者依据 [02 §3 Worker 注册表](./02-平台服务.md#3-worker-管理注册表--协调者-worker_index) 的 `worker_index` 选人；下图仅为 **golden path 参考**。v0.1 **同轮内顺序连派、不真并行**（C3 遇 gate 则停）。
 
-PRD 阶段顺序不变；**调用拓扑**为星型。**JD 评估**须 **先** `market` **再** `opportunity`（JD-R1：后者依赖前者调研结论注入 `context`）。
+PRD 阶段顺序不变；**调用拓扑**为星型。**JD 评估**须先完成市场调研并由用户确认正式结果；Harness 每次委托 `opportunity` 时重新解析引用并注入 `context.market_research_result`。
 
 ```mermaid
 sequenceDiagram
@@ -201,9 +204,10 @@ sequenceDiagram
   participant R as resume
   participant A as asset
 
-  C->>M: delegate(市场/公开情报, JD 背景)
-  M-->>C: structured_output → prior_results.market
-  C->>O: delegate(JD 评估, context 含 market)
+  C->>M: delegate(生成方案或启动冻结方案)
+  M-->>C: plan_proposal 或 accepted_async
+  C->>C: 等待正式结果并由用户确认
+  C->>O: delegate(JD 评估, context 含已校验正式结果)
   O-->>C: structured_output
   C->>C: 对话：推荐/不推荐 + 闸门
   C->>S: delegate(投递策略, context 含 O 结果)
@@ -306,9 +310,9 @@ flowchart LR
 | **B3** | **`complete_task` 仅协调者**；Worker 返 `proposed_task_completions`；milestone 须在 gate/对话 confirm 后；`work` 在 resume 成功 + `html_deliveries` 校验后按档 complete |
 | **M1** | 协调者 messages：**首条 user + 最近 40 条 / 12k tokens**；Worker 不读全量；见 [10 §1.5](./10-会话闸门与state.md#15-m1-对话历史上限与裁剪) |
 | **M1-R** | `trimmed` 或 `usage_ratio≥0.95` → synthesize **推荐新会话**（不强制） |
-| **JD-R1** | `list_type=jd` → `opportunity` 前 **须** 已有 `prior_results.market`（Harness 硬拦） |
+| **JD-R1** | `opportunity` 前须能解析当前正式市场引用，结果未过期且用户确认引用与当前引用完全一致；旧缓存不授权 |
 | **T6-1** | `explore` / `jd` / `plan` 主路径 **必须** `create_task_list`；闲聊/单次 FAQ **不建** list |
-| **Harness** | 硬约束（`optimize_confirmed`、tool 权限、task 状态机、JD-R1、explore 类 Worker 禁 `gate_prompt`） |
+| **Harness** | 硬约束（`optimize_confirmed`、tool 权限、task 状态机、正式市场结果门禁、explore 类 Worker 禁 `gate_prompt`） |
 | **协调者 LLM** | 意图识别、Worker 选择、`goal` / `context`（含 `explore_closure.required_workers`、`selected_optimization_levels`、`requires_optimize_gate` 等） |
 
 #### Opt-1：三档多选（纯对话）

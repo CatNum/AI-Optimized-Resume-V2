@@ -78,6 +78,26 @@ def _serialize_tool_result(result: Any) -> str:
         return json.dumps({"result": str(result)}, ensure_ascii=False)
 
 
+def _accepted_market_research_result(tool_result: Any) -> dict[str, Any] | None:
+    """把已接受的后台市场任务裁剪为 Worker 可返回给 Coordinator 的固定白名单。"""
+    if not isinstance(tool_result, dict) or tool_result.get("accepted") is not True:
+        return None
+    research_id = tool_result.get("research_id")  # 后台市场调研任务编号
+    plan_id = tool_result.get("plan_id")  # 本次启动消费的冻结方案编号
+    status = tool_result.get("status")  # Service 创建时返回的 queued 初始状态
+    if not all(isinstance(value, str) for value in (research_id, plan_id, status)):
+        return None
+    return {
+        "accepted": True,
+        "research_id": research_id,
+        "plan_id": plan_id,
+        "status": status,
+        "user_visible_summary": str(
+            tool_result.get("message") or "市场调研已在后台启动。"
+        ),
+    }
+
+
 def run_worker_react(
     harness: Any,
     *,
@@ -178,6 +198,15 @@ def run_worker_react(
                     args,
                     session_id=session_state.get("session_id"),
                 )
+                if worker_id == "market" and tc.function.name == "market_research":
+                    accepted = _accepted_market_research_result(tool_result)
+                    if accepted is not None:
+                        return {
+                            "worker_id": worker_id,
+                            "status": "accepted_async",
+                            "structured_output": accepted,
+                            "error": None,
+                        }
                 state["messages"].append(
                     {
                         "role": "tool",

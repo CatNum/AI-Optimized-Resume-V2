@@ -67,7 +67,7 @@
 | 22 | 2026-05-30 | **闸门 G1 + B1**：`state.json` 临时位；未初探 JD 软引导、无 HTTP 403 → [10 §2](./10-会话闸门与state.md#2-gates-闸门) |
 | 23 | 2026-05-30 | **structured_output S2** + 各 Worker 契约 → [09](./09-Worker结构化输出.md) |
 | 24 | 2026-05-30 | **Profile 落档 P3 + O-P1**：proposed vs patch；snapshot 即时 patch |
-| 25 | 2026-05-30 | **L7-C + T1**：搜索 API + httpx 抓页；Worker 自选 `browser_fetch` → [11](./11-L7-浏览器Tool.md) |
+| 25 | 2026-05-30 | ~~旧公开搜索抓页方案~~；已由 2026-07-15 冻结方案市场调研工具替代 → [11](./11-市场调研Tool.md) |
 | 26 | 2026-05-30 | **协调者 C3 + T6-1** → [01 §9](./01-协调者与Worker.md#9-协调者路由策略) |
 | 27 | 2026-05-30 | ~~**初探 gate E1**：`gate_owner`~~ → **#45 E2** `explore_closure` 替代 |
 | 28 | 2026-05-30 | 修订 #16：Session **含** `messages.json`（会话级，不跨会话） |
@@ -86,7 +86,7 @@
 | 41 | 2026-05-30 | **Session 闲置 I2**：24h TTL、410 `session_expired`、`/ping` → [10 §1.4](./10-会话闸门与state.md#14-闲置过期i2) |
 | 42 | 2026-05-31 | **Worker Registry WR**：`config/workers.registry.json` + 协调者 `worker_index` → [02 §3](./02-平台服务.md#3-worker-管理注册表--协调者-worker_index) |
 | 43 | 2026-05-31 | **顺序连派**：v0.1 同轮多 Worker **顺序** delegate，不 asyncio 真并行 |
-| 44 | 2026-05-31 | **JD-R1**：`list_type=jd` 须 `market` → `opportunity`；Harness 硬拦缺 `prior_results.market` |
+| 44 | 2026-05-31 | **JD-R1（已收紧）**：`opportunity` 前须重新解析未过期正式市场结果，且用户确认当前引用；旧缓存不授权 |
 | 45 | 2026-05-31 | **E2 explore_closure**：双 Worker 收束位 + 协调者 explore gate；废弃 E1 `gate_owner` → [10 §2.5](./10-会话闸门与state.md#25-explore_closuree2-双-worker-收束) |
 | 46 | 2026-05-31 | **Opt-1 三档**：纯对话解析、无 gate、直接 delegate(resume)；持久化仅 `profile.resume.last_optimization_levels[]` |
 | 47 | 2026-05-31 | **B3 complete_task**：仅协调者执行；Worker → `proposed_task_completions` → [02 §5.5](./02-平台服务.md#55-任务完成b3) |
@@ -106,7 +106,7 @@
 | P0-2 | `ProfileStore` / `SessionStore` / `TaskStore` | 读写 `profile.example.json`；`messages.json` + `state.json` |
 | P0-3 | `POST /v1/sessions/new` + session 换会话 **清 tasks** | [10 §1](./10-会话闸门与state.md#1-会话工作区生命周期) |
 | P0-4 | Tool 注册表 + Worker Registry + `profile_get/patch`、`apply_proposed_patches` | L1 pytest ≥5（无 LLM） |
-| P0-5 | `delegate_worker` + **真 LLM** Worker（先 `market`、`opportunity`、`strategy`） | 返 S2 schema；JD-R1 拒错；无 SSE Worker token |
+| P0-5 | `delegate_worker` + **真 LLM** Worker（先 `market`、`opportunity`、`strategy`） | 返 S2 schema；正式市场结果门禁；无 SSE Worker token |
 | P0-6 | 协调者 LangGraph + **C3**（真 LLM 验证 gate 停链） | trajectory case ≥3（`-m llm`） |
 | P0-7 | `POST /v1/chat` SSE（仅协调者 token）+ `match_gate_intent` + **409 单飞** | 闸门 3 个：深度探讨、不推荐继续、优化确认 |
 | P0-8 | `TraceWriter` → `data/logs/traces/*.jsonl` | delegate / tool / gate 可 grep |
@@ -126,7 +126,7 @@
 
 | 步骤 | 交付 | 验收 |
 |:----:|------|------|
-| P2-1 | `browser_fetch`（L7-C） | 降级 case ≥3 |
+| P2-1 | `market_research(plan_id)` 冻结方案异步调研 | accepted_async、状态机和正式结果门禁验收 |
 | P2-2 | Eval **≥20**（真 LLM 为主；`-m not llm` 仅降级） | [12 §3.2](./12-评测与可观测.md#32-20-条-case-分布简历对齐) |
 | P2-3 | 记录 LLM eval 通过率 + token 成本摘要 | 简历可引用实测数据 |
 | P2-4 | `python -m career_os.trace replay`（可选） | 单 run_id 时序摘要 |
