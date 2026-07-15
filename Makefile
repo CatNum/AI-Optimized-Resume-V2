@@ -1,4 +1,4 @@
-.PHONY: dev clean install
+.PHONY: dev clean install market-check
 
 # 非 login shell 下补全 uv / Homebrew 常见路径
 export PATH := $(HOME)/.local/bin:$(HOME)/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$(PATH)
@@ -31,3 +31,7 @@ install:
 	cd backend && uv sync
 	cd web && npm install
 	@test -f backend/.env || cp backend/.env.example backend/.env
+
+market-check:
+	cd backend && uv run python -m compileall career_os
+	cd web && npm run build

@@ -12,6 +12,31 @@ from career_os.platform.trace.labels import annotate_trace_record
 
 _lock = threading.Lock()
 
+_MARKET_DETAIL_KEYS = frozenset(
+    {
+        "research_id",
+        "plan_id",
+        "plan_version",
+        "direction_count",
+        "direction_run_id",
+        "direction_name",
+        "direction_key",
+        "status",
+        "stage",
+        "keyword",
+        "city",
+        "candidate_count",
+        "valid_job_count",
+        "semantic_analyzed_count",
+        "elapsed_seconds",
+        "error_code",
+        "retry_count",
+        "result_version",
+        "published",
+        "referencing_session_count",
+    }
+)
+
 
 class TraceWriter:
     """
@@ -73,6 +98,36 @@ class TraceWriter:
                 if line:
                     events.append(json.loads(line))
         return events
+
+    def emit_market(
+        self,
+        event: str,
+        *,
+        session_id: str | None,
+        research_id: str | None = None,
+        status: str = "ok",
+        detail: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """通过固定白名单写市场 Trace，拒绝页面、用户档案和 Prompt 类任意字段。"""
+        safe_detail = {
+            key: value
+            for key, value in (detail or {}).items()
+            if key in _MARKET_DETAIL_KEYS
+            and (
+                value is None
+                or isinstance(value, (str, int, float, bool))
+            )
+        }
+        if research_id is not None:
+            safe_detail["research_id"] = research_id
+        return self.emit(
+            event,
+            session_id=session_id,
+            run_id=research_id,
+            worker_id="market",
+            status=status,
+            detail=safe_detail,
+        )
 
 
 def timed_emit(

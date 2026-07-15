@@ -32,6 +32,7 @@ from career_os.platform.market_research.models import (
     ScreenshotManifestItem,
     SkillTaxonomy,
 )
+from career_os.platform.trace.writer import TraceWriter
 
 
 _store_lock = threading.RLock()
@@ -80,8 +81,14 @@ class MarketResearchStore:
             return None
         return ResearchSnapshot.model_validate(self._read_json(path))
 
-    def append_event(self, research_id: str, event: dict[str, Any]) -> None:
-        """追加一条不含页面原文的脱敏生命周期事件并同步到磁盘。"""
+    def append_event(
+        self,
+        research_id: str,
+        event: dict[str, Any],
+        *,
+        session_id: str | None = None,
+    ) -> None:
+        """追加脱敏生命周期事件；session_id 可标识复用等跨 Session 操作发起者。"""
         self._validate_research_id(research_id)
         allowed_keys = {
             "event",
@@ -112,6 +119,31 @@ class MarketResearchStore:
                 file.flush()
                 os.fsync(file.fileno())
             self._fsync_directory(path.parent)
+        snapshot = self.read_status(research_id)
+        retry = self.read_retry_status(research_id) if snapshot is None else None
+        trace_session_id = session_id or (
+            snapshot.origin_session_id
+            if snapshot is not None
+            else retry.origin_session_id if retry is not None else None
+        )
+        event_name = str(safe_event.get("event") or "market.research.lifecycle")
+        trace_event = {
+            "research.stage_changed": "market.research.stage",
+            "research.status_changed": "market.research.lifecycle",
+            "direction.completed": "market.direction.completed",
+            "direction.failed": "market.direction.failed",
+        }.get(event_name, event_name)
+        TraceWriter().emit_market(
+            trace_event,
+            session_id=trace_session_id,
+            research_id=research_id,
+            status=(
+                "failed"
+                if safe_event.get("error_code") is not None
+                else str(safe_event.get("status") or "ok")
+            ),
+            detail=safe_event,
+        )
 
     def publish_result(
         self,

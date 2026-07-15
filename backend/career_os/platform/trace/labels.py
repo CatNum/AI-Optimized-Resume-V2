@@ -10,6 +10,17 @@ EVENT_ZH: dict[str, str] = {
     "coordinator.analyze": "入口路由选型",
     "gate.rule_hit": "闸门硬规则命中",
     "gate.llm_classify": "闸门 LLM 分类",
+    "market.plan.generated": "市场方案已生成",
+    "market.plan.revised": "市场方案已修改",
+    "market.plan.confirmed": "市场方案已确认",
+    "market.research.lifecycle": "市场调研状态变化",
+    "market.research.stage": "市场调研阶段变化",
+    "market.direction.completed": "市场方向完成",
+    "market.direction.failed": "市场方向失败",
+    "market.result.published": "市场结果已发布",
+    "market.result.reused": "市场结果已选择复用",
+    "market.retry.started": "市场方向重试已启动",
+    "market.result.deleted": "市场结果已删除",
 }
 
 WORKER_ZH: dict[str, str] = {
@@ -64,6 +75,19 @@ DETAIL_KEY_ZH: dict[str, str] = {
     "workers": "派工队列",
     "list_type": "列表类型",
     "next_worker": "下一 Worker",
+    "research_id": "调研编号",
+    "plan_id": "方案编号",
+    "plan_version": "方案版本",
+    "direction_count": "方向数量",
+    "direction_name": "方向名称",
+    "direction_run_id": "方向运行编号",
+    "stage": "调研阶段",
+    "candidate_count": "候选岗位数",
+    "valid_job_count": "有效岗位数",
+    "semantic_analyzed_count": "语义有效岗位数",
+    "elapsed_seconds": "有效耗时秒数",
+    "result_version": "结果版本",
+    "published": "是否发布",
 }
 
 ANALYZE_SOURCE_ZH: dict[str, str] = {

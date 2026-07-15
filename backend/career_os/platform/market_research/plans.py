@@ -22,6 +22,7 @@ from career_os.platform.market_research.models import (
     FilterPolicy,
     ResearchPlan,
 )
+from career_os.platform.trace.writer import TraceWriter
 
 
 _plan_lock = threading.RLock()
@@ -83,6 +84,16 @@ class MarketResearchPlanStore:
         )
         with _plan_lock:
             self._write_plan_unlocked(plan)
+        TraceWriter().emit_market(
+            "market.plan.generated",
+            session_id=session_id,
+            detail={
+                "plan_id": plan.plan_id,
+                "plan_version": plan.plan_version,
+                "direction_count": len(plan.directions),
+                "status": plan.status,
+            },
+        )
         return plan
 
     def revise(
@@ -107,6 +118,16 @@ class MarketResearchPlanStore:
                 }
             )
             self._write_plan_unlocked(revised)
+        TraceWriter().emit_market(
+            "market.plan.revised",
+            session_id=session_id,
+            detail={
+                "plan_id": revised.plan_id,
+                "plan_version": revised.plan_version,
+                "direction_count": len(revised.directions),
+                "status": revised.status,
+            },
+        )
         return revised
 
     def confirm(self, plan_id: str, session_id: str) -> ResearchPlan:
@@ -124,6 +145,16 @@ class MarketResearchPlanStore:
                 }
             )
             self._write_plan_unlocked(confirmed)
+        TraceWriter().emit_market(
+            "market.plan.confirmed",
+            session_id=session_id,
+            detail={
+                "plan_id": confirmed.plan_id,
+                "plan_version": confirmed.plan_version,
+                "direction_count": len(confirmed.directions),
+                "status": confirmed.status,
+            },
+        )
         return confirmed
 
     def consume(self, plan_id: str, session_id: str) -> ResearchPlan:

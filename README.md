@@ -39,6 +39,7 @@ make dev blank
 | LLM | [LiteLLM](backend/career_os/agents/lc/providers.py) 统一路由；配置见 `backend/.env.example` |
 | 前端 | React + Vite；Chat SSE（含 `gate` 事件展示） |
 | 评测 | **96** pytest（L1 **90** + LLM **6**）；trace 写入各环境 `data/{demo|test}/logs/traces/` |
+| 市场调研 | 用户确认冻结方案后，专用可见 Chrome 串行采集搜索关注度与 BOSS 当前岗位；状态卡轮询、结果确认、复用和方向重试已接入 |
 
 尚未落地或待深化：记忆索引 side-query、三档 HTML 生成顺序复用、Browser Tool 生产级降级、部分 PRD 业务流程细节（见下方「优化点」）。
 
@@ -66,6 +67,24 @@ make clean test
 ```
 
 清除后重新启动：`make dev demo`。若浏览器仍连着旧会话，请无痕打开或执行 `localStorage.removeItem('session_id')`。
+
+`make dev <后缀>` 会在 `backend/data/<后缀>/market_research/runtime/` 登记 dev shell、后端、前端和按需启动的专用 Chrome 进程身份。`make clean <后缀>` 会先复核 demo、PID、启动时间、可执行路径和命令标识，只关闭身份仍匹配的进程；先发送 TERM 并等待最多 10 秒，仍未退出时才对同一身份发送 KILL，然后删除该后缀的数据和输出。日常 Chrome 与其他 demo 不在清理范围内。
+
+## 市场调研主路径
+
+1. 在职业初探后查看 1～3 个方向的调研方案，核对 BOSS 词、搜索关注度词、城市顺序、经验口径和固定筛选规则。
+2. 如有需要先修改方案；点击“确认方案并开始调研”后，当前 Session 的聊天输入和附件会锁定。
+3. 专用可见 Chrome 需要登录或验证时，状态卡进入 `waiting_user`（等待用户），完成操作后点击继续；也可以安全取消。
+4. 完成后普通 assistant 消息展示纯文本报告。必须再次确认当前不可变结果，Opportunity Worker 才能读取市场上下文并进入 JD 分析。
+5. 同 demo 的其他 Session 只会看到未过期复用候选，不会自动复用；方向重试拥有独立状态，原主任务终态和旧结果版本保持不变。
+
+市场调研不保存 JD 原文。岗位职责和要求是经校验的 LLM 提取结果；人工审计只保留 10% 页面抽样截图。招聘者活跃度固定允许“刚刚活跃”“今日活跃”“3 日内活跃”。Google 数据只表示搜索关注度，不代表招聘趋势。
+
+静态与前端构建检查：
+
+```bash
+make market-check
+```
 
 **分步启动**（需两个终端）：
 

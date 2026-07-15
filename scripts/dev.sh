@@ -50,13 +50,19 @@ fi
 
 prepare_data_dirs() {
   mkdir -p "${ROOT}/backend/data/${CAREER_OS_SUFFIX}" \
-    "${ROOT}/backend/output/${CAREER_OS_SUFFIX}"
+    "${ROOT}/backend/output/${CAREER_OS_SUFFIX}" \
+    "${ROOT}/backend/data/${CAREER_OS_SUFFIX}/market_research/runtime"
 }
 
 require_cmd uv
 require_cmd npm
 
+CLEANED=0
 cleanup() {
+  if [[ "${CLEANED}" -eq 1 ]]; then
+    return
+  fi
+  CLEANED=1
   local pids
   pids="$(jobs -p 2>/dev/null || true)"
   if [[ -n "${pids}" ]]; then
@@ -86,12 +92,24 @@ echo ">>> 环境 ${CAREER_OS_SUFFIX}  DATA_DIR=${DATA_DIR}  OUTPUT_DIR=${OUTPUT_
 echo ">>> 同步后端依赖..."
 (cd "${ROOT}/backend" && uv sync)
 
+RUNTIME_DIR="${ROOT}/backend/data/${CAREER_OS_SUFFIX}/market_research/runtime"
+PROCESS_REGISTRY="${ROOT}/scripts/process_registry.py"
+(
+  cd "${ROOT}/backend"
+  uv run python "${PROCESS_REGISTRY}" record "${RUNTIME_DIR}" dev-shell "$$" "${CAREER_OS_SUFFIX}" "scripts/dev.sh"
+)
+
 echo ">>> 启动后端 http://127.0.0.1:${BACKEND_PORT}"
 (
   cd "${ROOT}/backend"
   export DATA_DIR OUTPUT_DIR
-  uv run uvicorn career_os.main:app --reload --port "${BACKEND_PORT}"
+  exec uv run uvicorn career_os.main:app --reload --port "${BACKEND_PORT}"
 ) &
+BACKEND_PID=$!
+(
+  cd "${ROOT}/backend"
+  uv run python "${PROCESS_REGISTRY}" record "${RUNTIME_DIR}" backend "${BACKEND_PID}" "${CAREER_OS_SUFFIX}" "uvicorn"
+)
 
 if [[ ! -d "${ROOT}/web/node_modules" ]]; then
   echo ">>> 安装前端依赖..."
@@ -99,4 +117,14 @@ if [[ ! -d "${ROOT}/web/node_modules" ]]; then
 fi
 
 echo ">>> 启动前端 http://localhost:${FRONTEND_PORT}"
-(cd "${ROOT}/web" && npm run dev -- --port "${FRONTEND_PORT}")
+(
+  cd "${ROOT}/web"
+  exec npm run dev -- --port "${FRONTEND_PORT}"
+) &
+FRONTEND_PID=$!
+(
+  cd "${ROOT}/backend"
+  uv run python "${PROCESS_REGISTRY}" record "${RUNTIME_DIR}" frontend "${FRONTEND_PID}" "${CAREER_OS_SUFFIX}" "npm"
+)
+
+wait "${FRONTEND_PID}"

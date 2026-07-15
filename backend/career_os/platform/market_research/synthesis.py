@@ -452,6 +452,14 @@ class MarketCompletionPublisher:
             if result_ref is None:
                 raise RuntimeError("existing result is missing latest reference")
         result_ref_payload = result_ref.model_dump(mode="json")
+        self.store.append_event(
+            research_id,
+            {
+                "event": "market.result.published",
+                "result_version": result_ref.result_version,
+                "published": True,
+            },
+        )
         self.session_store.bind_market_result_for_confirmation(
             snapshot.origin_session_id,
             result_ref_payload,
@@ -567,6 +575,14 @@ class MarketCompletionPublisher:
             )
             raise
         self.store.set_retry_published_result(retry_id, result_ref)
+        self.store.append_event(
+            retry_id,
+            {
+                "event": "market.result.published",
+                "result_version": result_ref.result_version,
+                "published": True,
+            },
+        )
         self.session_store.bind_market_result_for_confirmation(
             origin_session_id,
             result_ref.model_dump(mode="json"),

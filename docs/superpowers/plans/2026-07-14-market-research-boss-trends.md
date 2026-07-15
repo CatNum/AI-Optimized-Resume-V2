@@ -10,7 +10,9 @@
 
 **Design SSOT:** `../specs/2026-07-14-market-research-boss-trends-design.md`
 
-**状态:** 待执行
+**状态:** 核心实现已完成；Task 14 真实 BOSS 登录与页面主路径待用户人工验收；自动化测试/Eval 暂缓
+
+**2026-07-15 执行记录:** Task 1～13 已按顺序实现并分别提交。Task 14 已完成脱敏 Trace、进程登记、安全清理、静态编译、前端构建、隐私边界扫描和异常路径 smoke；本机使用 Chrome `150.0.7871.116`、DrissionPage `4.1.1.4`、`boss-web-v1` 与 `google-trends-web-v1` 页面契约。Google Trends 问题按用户要求不作为阻塞项。剩余步骤仅为需要用户在专用 Chrome 中完成登录/验证的真实 BOSS 端到端主路径。
 
 ## Global Constraints
 
@@ -985,19 +987,19 @@ feat(market): 完成市场结果复用与方向级版本管理
 - Modify: `docs/superpowers/specs/2026-07-14-market-research-boss-trends-design.md`
 - Modify: `docs/superpowers/plans/2026-07-14-market-research-boss-trends.md`
 
-- [ ] **Step 1: 写入最小可审计 Trace**
+- [x] **Step 1: 写入最小可审计 Trace**
 
 记录方案生成/修改/确认、任务和方向状态、各阶段耗时、关键词候选/采集/语义数、重试、错误码、result_version 和发布状态。Trace detail 使用白名单构造，禁止 JD、DOM、Cookie、Profile、截图内容、招聘者信息和原始 Prompt。
 
-- [ ] **Step 2: `make dev <demo>` 登记进程**
+- [x] **Step 2: `make dev <demo>` 登记进程**
 
 在 `backend/data/<demo>/market_research/runtime/` 记录 dev shell、后端、前端和专用 Chrome 的 PID、启动时间、命令标识与 demo。Chrome 仍只在开始调研时启动。脚本接到 INT/TERM 时优先调用正常关闭流程。
 
-- [ ] **Step 3: `make clean <demo>` 先关进程再删数据**
+- [x] **Step 3: `make clean <demo>` 先关进程再删数据**
 
 清理顺序固定：校验 demo 后缀 → 读取记录 → 向身份匹配进程发送 TERM → 最多等待 10 秒 → 只对仍匹配的记录进程发送 KILL → 删除该 demo data/output/runtime。不得影响其他 demo 或日常 Chrome。删除会一并清除市场结果、截图、temp、独立 Profile 和 BOSS 登录状态。
 
-- [ ] **Step 4: 执行静态和构建检查**
+- [x] **Step 4: 执行静态和构建检查**
 
 运行：
 
@@ -1017,21 +1019,23 @@ cd web && npm run build
 
 - [ ] **Step 5: 执行完整人工主路径**
 
+待用户在专用 Chrome 中完成真实 BOSS 登录或验证；其余无人值守链路已 smoke。
+
 使用 `make dev market-demo` 验收：职业初探资料生成 1～3 方向 → 修改并确认预览 → 可见独立 Chrome → 手工登录等待/继续 → Trends 先执行 → BOSS 顺序采集 → 状态卡锁聊天 → 至少一个方向成功 → 普通 assistant 纯文本报告 → 用户确认后才能进入下游。
 
-- [ ] **Step 6: 执行关键异常路径**
+- [x] **Step 6: 执行关键异常路径**
 
 人工验证：取消清除未发布数据；关闭后端后重启标记 process_interrupted；Chrome 缺失返回 browser_failed；DOM 契约字段失效返回 page_changed；Trends 无数据不失败；全部方向失败不发布；部分成功可交付；重复轮询不重复消息；`make clean market-demo` 只关闭并删除该 demo。
 
-- [ ] **Step 7: 检查隐私和边界**
+- [x] **Step 7: 检查隐私和边界**
 
 用 `rg` 检查 data 与 Trace：无完整 JD、HTML、Cookie、验证码和 Prompt 原文；正式结果无 district、福利、招聘者、融资、评论；报告无需求强弱、招聘趋势、城市比较、用户匹配、评分和推荐。
 
-- [ ] **Step 8: 回写状态**
+- [x] **Step 8: 回写状态**
 
 人工验收全部通过后，把 spec 与 plan 状态改为“已实现（自动化测试暂缓）”，记录实际 Chrome/DrissionPage 页面契约版本和已知页面依赖，不改变既有设计决策。
 
-- [ ] **Step 9: 建议提交**
+- [x] **Step 9: 建议提交**
 
 ```text
 chore(market): 收口调研运行维护与人工验收

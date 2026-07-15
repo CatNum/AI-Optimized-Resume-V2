@@ -305,6 +305,16 @@ class MarketResearchService:
             "reused_at": datetime.now(UTC).isoformat(),
         }
         self.session_store.bind_market_reuse_for_confirmation(session_id, reuse_ref)
+        self.store.append_event(
+            research_id,
+            {
+                "event": "market.result.reused",
+                "direction_name": selected.direction_name,
+                "result_version": result_version,
+                "published": True,
+            },
+            session_id=session_id,
+        )
         return reuse_ref
 
     def result_references(self, research_id: str, session_id: str) -> list[str]:
@@ -329,6 +339,13 @@ class MarketResearchService:
                     raise MarketResearchError(MarketResearchErrorCode.RESEARCH_CONFLICT)
         references = self.result_references(research_id, session_id)
         affected = self.session_store.invalidate_market_result_references(research_id)
+        self.store.append_event(
+            research_id,
+            {
+                "event": "market.result.deleted",
+                "published": False,
+            },
+        )
         self.store.delete_formal_result(research_id)
         return affected or references
 
@@ -529,6 +546,16 @@ class MarketResearchService:
             )
             self.store.write_retry_status(retry)
             self.store.reserve_active_run(retry_id, session_id, plan.plan_id)
+            self.store.append_event(
+                retry_id,
+                {
+                    "event": "market.retry.started",
+                    "status": retry.status.value,
+                    "stage": retry.stage.value,
+                    "direction_name": retry.direction_name,
+                    "retry_count": 1,
+                },
+            )
             self.session_store.patch_artifacts(
                 session_id,
                 [
