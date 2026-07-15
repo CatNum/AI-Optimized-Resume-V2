@@ -17,6 +17,7 @@ _DEFAULT_STATE: dict[str, Any] = {
     "explore_closure": None,
     "messages_meta": {},
     "gates": {},
+    "message_idempotency_keys": [],
 }
 _DEFAULT_ARTIFACTS: dict[str, Any] = {
     "version": 1,
@@ -229,15 +230,37 @@ class SessionStore:
             self._touch_index_unlocked(session_id)
         return session_id
 
-    def append_message(self, session_id: str, role: str, content: str) -> None:
-        """追加message。"""
+    def append_message(
+        self,
+        session_id: str,
+        role: str,
+        content: str,
+        *,
+        idempotency_key: str | None = None,
+    ) -> bool:
+        """追加普通聊天消息；提供幂等键时同一市场报告最多写入一次。"""
         schedule_title = False
         with _lock:
             messages = self._read_messages_unlocked(session_id)
+            state = self._read_state_unlocked(session_id)
+            keys = list(state.get("message_idempotency_keys") or [])
+            if idempotency_key is not None and (
+                idempotency_key in keys
+                or any(
+                    message.get("role") == role and message.get("content") == content
+                    for message in messages
+                )
+            ):
+                if idempotency_key not in keys:
+                    keys.append(idempotency_key)
+                    state["message_idempotency_keys"] = keys
+                    self._write_state_unlocked(session_id, state)
+                return False
             messages.append({"role": role, "content": content})
             self._write_messages_unlocked(session_id, messages)
-            state = self._read_state_unlocked(session_id)
             state["last_activity_at"] = datetime.now(UTC).isoformat()
+            if idempotency_key is not None:
+                state["message_idempotency_keys"] = [*keys, idempotency_key]
             self._write_state_unlocked(session_id, state)
             self._touch_index_unlocked(session_id)
             if role == "user":
@@ -249,6 +272,7 @@ class SessionStore:
             from career_os.platform.store.session_title import schedule_maybe_generate_title
 
             schedule_maybe_generate_title(session_id)
+        return True
 
     def load_chat_history(
         self, session_id: str
@@ -310,6 +334,45 @@ class SessionStore:
                     _set_by_path(artifacts, "market.confirmed_result_ref", None)
             artifacts["market"] = _normalize_market_artifact(artifacts.get("market"))
             self._write_artifacts_unlocked(session_id, artifacts)
+
+    def bind_market_result_for_confirmation(
+        self,
+        session_id: str,
+        result_ref: dict[str, Any],
+    ) -> None:
+        """原子更新 Session 内市场结果引用、清空复用/确认并登记待确认闸门。"""
+        research_id = result_ref.get("research_id")
+        result_version = result_ref.get("result_version")
+        if not isinstance(research_id, str) or not re.fullmatch(
+            r"research_[0-9a-f]+", research_id
+        ):
+            raise ValueError("invalid market result research_id")
+        if not isinstance(result_version, int) or result_version < 1:
+            raise ValueError("invalid market result version")
+        with _lock:
+            artifacts = self._read_artifacts_unlocked(session_id)
+            market = _normalize_market_artifact(artifacts.get("market"))
+            market.update(
+                {
+                    "result_ref": dict(result_ref),
+                    "reuse_ref": None,
+                    "market_result_confirmed": False,
+                    "confirmed_result_ref": None,
+                }
+            )
+            artifacts["market"] = market
+            self._write_artifacts_unlocked(session_id, artifacts)
+
+            state = self._read_state_unlocked(session_id)
+            gates = dict(state.get("gates") or {})
+            gates["pending"] = {
+                "name": "market_result_confirmation",
+                "prompt": "市场调研结果已生成，是否确认使用该结果并继续下一步？",
+                "research_id": research_id,
+                "result_version": result_version,
+            }
+            state["gates"] = gates
+            self._write_state_unlocked(session_id, state)
 
     def delete_session(self, session_id: str) -> None:
         """删除 Session；若存在活动市场调研，必须先取消并完成临时数据清理。"""

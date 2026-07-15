@@ -13,6 +13,8 @@ from career_os.platform.market_research.errors import (
 )
 from career_os.platform.market_research.models import (
     DirectionPlan,
+    DirectionResult,
+    FailedDirection,
     MarketResearchErrorPayload,
     ResearchPlan,
     ResearchSnapshot,
@@ -158,12 +160,20 @@ class DirectionRunContext:
             )
         self.data["sample_limitations"] = tuple(dict.fromkeys(limitations))
 
+    def record_direction_result(self, direction_result: DirectionResult) -> None:
+        """记录经过 Harness 引用校验并合并冻结数字后的单方向正式结果候选。"""
+        if direction_result.direction_run_id != self.direction_run_id:
+            raise ValueError("direction result run id must match context")
+        if direction_result.direction_key != self.direction.direction_key:
+            raise ValueError("direction result key must match context")
+        self.data["direction_result"] = direction_result
+
 
 StageHandler = Callable[[DirectionRunContext], None]
 """StageHandler（阶段处理器）在 Runner 所在线程内执行一个方向阶段。"""
 
 CompletionHandler = Callable[
-    [str, ResearchPlan, list[DirectionRunContext], list[MarketResearchErrorPayload]],
+    [str, ResearchPlan, list[DirectionRunContext], list[FailedDirection]],
     None,
 ]
 """CompletionHandler（完成处理器）在预算外合并并原子发布至少一个成功方向。"""
@@ -228,7 +238,7 @@ class MarketResearchRunner:
             elif self._research_id != research_id:
                 raise ValueError("runner is already bound to another research_id")
         successful: list[DirectionRunContext] = []
-        failed: list[MarketResearchErrorPayload] = []
+        failed: list[FailedDirection] = []
         terminal_snapshot: ResearchSnapshot | None = None
         try:
             self._check_cancelled(research_id)
@@ -265,7 +275,13 @@ class MarketResearchRunner:
                     raise
                 except Exception as error:
                     market_error = self._normalize_error(error)
-                    failed.append(market_error.to_payload())
+                    failed.append(
+                        FailedDirection(
+                            direction_name=context.direction.direction_name,
+                            direction_key=context.direction.direction_key,
+                            error=market_error.to_payload(),
+                        )
+                    )
                     self.store.cleanup_direction_temp(
                         research_id,
                         context.direction_run_id,
@@ -314,7 +330,7 @@ class MarketResearchRunner:
                     research_id,
                     ResearchStatus.FAILED,
                     stage=ResearchStage.FINISHED,
-                    error=failed[-1] if failed else None,
+                    error=failed[-1].error if failed else None,
                 )
         except _CancellationRequested:
             terminal_snapshot = self._cancel_and_cleanup(research_id)
@@ -429,6 +445,13 @@ class MarketResearchRunner:
     def is_alive(self) -> bool:
         """返回唯一后台线程是否仍在执行。"""
         return self._thread is not None and self._thread.is_alive()
+
+    def replace_browser_page(self, page: Any) -> None:
+        """在 Runner 所在线程登记专用 Chrome 重启后的新唯一标签页。"""
+        thread = self._thread
+        if thread is not None and thread.ident != threading.get_ident():
+            raise RuntimeError("browser page can only be replaced from the Runner thread")
+        self._browser_page = page
 
     def _run_direction(self, context: DirectionRunContext) -> None:
         """按固定阶段顺序执行一个方向，并在预算耗尽时应用唯一兜底提取。"""

@@ -95,7 +95,7 @@ class ScreenshotSampler:
 def job_identity(job: CollectedJob) -> str:
     """返回岗位编号优先、确定性指纹兜底的方向内全局去重身份。"""
     if job.job_id:
-        return f"job_id:{job.job_id}"
+        return job.job_id
     if job.fingerprint:
-        return f"fingerprint:{job.fingerprint}"
+        return job.fingerprint
     raise ValueError("job_id or fingerprint is required")

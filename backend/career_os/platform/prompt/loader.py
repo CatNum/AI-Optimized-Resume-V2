@@ -123,3 +123,17 @@ def load_market_research_extraction_prompt() -> str:
     """加载市场岗位受限语义提取 System Prompt，不向其中拼接 JD 原文。"""
     path = _PROMPT_DIR / "market_research" / "extraction_system.md"
     return _read_system_document(path)
+
+
+@lru_cache(maxsize=1)
+def load_market_research_direction_prompt() -> str:
+    """加载单方向只读综合 Prompt；输入只允许结构化语义和冻结统计。"""
+    path = _PROMPT_DIR / "market_research" / "direction_system.md"
+    return _read_system_document(path)
+
+
+@lru_cache(maxsize=1)
+def load_market_research_comparison_prompt() -> str:
+    """加载多方向并列对照 Prompt；禁止排名、匹配、评分或推荐。"""
+    path = _PROMPT_DIR / "market_research" / "comparison_system.md"
+    return _read_system_document(path)

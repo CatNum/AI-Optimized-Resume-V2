@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Callable
 
 from career_os.platform.market_research.browser import DedicatedChromeSession
+from career_os.platform.market_research.boss import BossJobCollector
 from career_os.platform.market_research.errors import (
     MarketResearchError,
     MarketResearchErrorCode,
@@ -17,9 +18,35 @@ from career_os.platform.market_research.models import (
     ResearchStage,
     ResearchStatus,
 )
+from career_os.platform.market_research.extraction import (
+    SemanticExtractionEngine,
+    build_extraction_stage_handler,
+    build_fallback_extractor,
+)
+from career_os.platform.market_research.page_contracts import (
+    BossPageContract,
+    TrendsPageContract,
+)
 from career_os.platform.market_research.plans import MarketResearchPlanStore
-from career_os.platform.market_research.runner import MarketResearchRunner, TerminalHandler
+from career_os.platform.market_research.runner import (
+    DirectionRunContext,
+    MarketResearchRunner,
+    TerminalHandler,
+)
+from career_os.platform.market_research.statistics import (
+    DeterministicStatisticsCalculator,
+    build_statistics_stage_handler,
+)
 from career_os.platform.market_research.store import MarketResearchStore
+from career_os.platform.market_research.synthesis import (
+    MarketCompletionPublisher,
+    MarketSynthesisService,
+    build_synthesis_stage_handler,
+)
+from career_os.platform.market_research.trends import (
+    GoogleTrendsCollector,
+    summarize_trend_directions,
+)
 from career_os.platform.store.session import SessionStore
 
 
@@ -261,19 +288,104 @@ class MarketResearchService:
         if snapshot.origin_session_id != session_id:
             raise MarketResearchError(MarketResearchErrorCode.PLAN_FORBIDDEN)
 
-    @staticmethod
     def _default_runner_factory(
+        self,
         store: MarketResearchStore,
         terminal_handler: TerminalHandler,
     ) -> MarketResearchRunner:
-        """创建默认单线程 Runner，并让专用 Chrome 在该 Runner 线程内启动和关闭。"""
+        """组装浏览器、采集、提取、统计、综合、发布和终态清理的完整单线程 Runner。"""
         browser_session = DedicatedChromeSession(store)
-        return MarketResearchRunner(
+        extraction_engine = SemanticExtractionEngine()
+        statistics_calculator = DeterministicStatisticsCalculator()
+        synthesis_service = MarketSynthesisService()
+        completion_publisher = MarketCompletionPublisher(
             store,
+            self.session_store,
+            synthesis_service,
+        )
+        runner: MarketResearchRunner
+
+        def collect_trends(direction_context: DirectionRunContext) -> None:
+            """在当前方向复用唯一标签页采集搜索关注度并记录确定性摘要。"""
+            contract = TrendsPageContract()
+            collector = GoogleTrendsCollector(
+                contract=contract,
+                navigate_handler=lambda url: browser_session.navigate(
+                    url, contract.allowed_hosts
+                ),
+                user_action_handler=lambda target_url: browser_session.wait_for_user_verification(
+                    runner=runner,
+                    context=direction_context,
+                    contract=contract,
+                    stage=ResearchStage.COLLECTING_TRENDS,
+                    target_url=target_url,
+                ),
+            )
+            observations = collector.collect(
+                direction_context.direction,
+                direction_context.require_browser_page(),
+                direction_context.budget,
+            )
+            direction_context.record_trend_results(
+                observations,
+                summarize_trend_directions(observations),
+            )
+
+        def collect_boss(direction_context: DirectionRunContext) -> None:
+            """在当前方向组装 BOSS 回调，支持登录等待、状态更新和一次安全重启。"""
+            contract = BossPageContract()
+
+            def restart_browser() -> object:
+                """安全重启已登记专用 Chrome，并让后续方向使用新的唯一标签页。"""
+                page = browser_session.restart()
+                runner.replace_browser_page(page)
+                return page
+
+            collector = BossJobCollector(
+                store,
+                contract=contract,
+                restart_handler=restart_browser,
+                user_action_handler=lambda target_url: browser_session.wait_for_user_verification(
+                    runner=runner,
+                    context=direction_context,
+                    contract=contract,
+                    stage=ResearchStage.COLLECTING_BOSS,
+                    target_url=target_url,
+                ),
+                progress_handler=lambda current, keyword, city: runner.update_progress(
+                    current,
+                    keyword=keyword,
+                    city=city,
+                ),
+            )
+            result = collector.collect(
+                direction_context,
+                direction_context.require_browser_page(),
+            )
+            direction_context.record_boss_results(result)
+
+        runner = MarketResearchRunner(
+            store,
+            stage_handlers={
+                ResearchStage.COLLECTING_TRENDS: collect_trends,
+                ResearchStage.COLLECTING_BOSS: collect_boss,
+                ResearchStage.EXTRACTING_SEMANTICS: build_extraction_stage_handler(
+                    extraction_engine
+                ),
+                ResearchStage.CALCULATING_STATISTICS: build_statistics_stage_handler(
+                    statistics_calculator
+                ),
+                ResearchStage.SYNTHESIZING: build_synthesis_stage_handler(
+                    synthesis_service
+                ),
+            },
+            fallback_extractor=build_fallback_extractor(extraction_engine),
+            completion_handler=completion_publisher.publish,
             open_handler=browser_session.open,
             close_handler=browser_session.close,
             terminal_handler=terminal_handler,
         )
+        return runner
 
 
 _service_lock = threading.RLock()

@@ -271,6 +271,17 @@ class ThemeSummary(BaseModel):
     representative_jobs: Annotated[tuple[JobReference, ...], Field(max_length=3)] = ()  # 最多三个用户可见代表岗位
 
 
+class SynthesisThemeCandidate(BaseModel):
+    """SynthesisThemeCandidate（综合主题候选）由 Worker 提议，等待 Harness 校验岗位引用。"""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    theme: str = Field(min_length=1)  # Worker 归纳的职责、要求、优先或岗位证据主题
+    support_job_ids: tuple[str, ...]  # 声称支持该主题的完整岗位身份集合
+    support_count: int = Field(ge=2)  # Worker 声明的支持数，必须等于去重岗位身份数
+    representative_job_ids: Annotated[tuple[str, ...], Field(max_length=3)] = ()  # 最多三个展示岗位身份
+
+
 class SkillStatistic(BaseModel):
     """SkillStatistic（技能统计）保存程序确定性计算的技能岗位数与分母。"""
 
@@ -403,12 +414,15 @@ class DirectionResult(BaseModel):
     evidence_themes: tuple[ThemeSummary, ...] = ()  # 岗位证据主题及岗位支持关系
     skill_statistics: tuple[SkillStatistic, ...] = ()  # 正式技能统计
     emerging_or_isolated_skills: tuple[SkillStatistic, ...] = ()  # 单岗位技能补充区
+    skill_explanations: dict[str, str] = Field(default_factory=dict)  # Worker 对冻结技能名的边界内解释
     experience_analysis: dict[str, Any]  # 程序生成的经验分布和重点档位
     education_distribution: dict[str, int]  # 程序生成的学历分布
     salary_analysis: dict[str, Any]  # 程序生成的薪资中位数和观察区间
+    salary_explanation: str | None = None  # Worker 对冻结薪资字段的只读说明
     industry_distribution: dict[str, int]  # 程序生成的行业分布
     company_size_distribution: dict[str, int]  # 程序生成的公司规模分布
     trend_observations: tuple[TrendObservation, ...] = ()  # 两个时间窗口的页面比较字段
+    trend_explanation: str | None = None  # Worker 对搜索关注度的边界内说明
     sample_limitations: tuple[str, ...] = ()  # 默认排序、个性化和小样本等限制
     representative_jobs: tuple[JobReference, ...] = ()  # 方向级代表岗位
     audit_refs: tuple[str, ...] = ()  # 正式截图和结构化审计文件引用
@@ -470,10 +484,11 @@ class MarketSynthesisOutput(BaseModel):
 
     career_definition: str | None = None  # Worker 生成的职业定义候选
     career_definition_job_ids: tuple[str, ...] = ()  # 支持职业定义的岗位编号
-    responsibility_themes: tuple[ThemeSummary, ...] = ()  # Worker 归纳的职责主题
-    requirement_themes: tuple[ThemeSummary, ...] = ()  # Worker 归纳的任职要求主题
-    preference_themes: tuple[ThemeSummary, ...] = ()  # Worker 归纳的优先条件主题
-    evidence_themes: tuple[ThemeSummary, ...] = ()  # Worker 归纳的岗位证据主题
+    responsibility_themes: tuple[SynthesisThemeCandidate, ...] = ()  # Worker 归纳的职责主题候选
+    requirement_themes: tuple[SynthesisThemeCandidate, ...] = ()  # Worker 归纳的任职要求主题候选
+    preference_themes: tuple[SynthesisThemeCandidate, ...] = ()  # Worker 归纳的优先条件主题候选
+    evidence_themes: tuple[SynthesisThemeCandidate, ...] = ()  # Worker 归纳的岗位证据主题候选
+    statistic_refs: tuple[str, ...] = ()  # Worker 实际引用的冻结统计字段名，不承载数字副本
     skill_explanations: dict[str, str] = Field(default_factory=dict)  # 对冻结技能统计的文字解释
     salary_explanation: str | None = None  # 对冻结薪资统计的文字说明
     trend_explanation: str | None = None  # 对搜索关注度边界内结果的文字说明

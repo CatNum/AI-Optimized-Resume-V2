@@ -562,6 +562,14 @@ class MarketResearchStore:
                 self._validate_direction_reference(result, direction)
                 continue
             self._validate_inline_direction(direction, job_map, screenshot_refs)
+        for skill in (*skill_taxonomy.skills, *skill_taxonomy.emerging_or_isolated):
+            skill_job_ids = {
+                *skill.mention_job_ids,
+                *skill.required_job_ids,
+                *skill.preferred_job_ids,
+            }
+            if not skill_job_ids.issubset(job_map):
+                raise ValueError("skill taxonomy references an unknown job")
         self._validate_audit_refs(result.audit_refs, screenshot_refs)
 
     def _validate_inline_direction(
@@ -578,15 +586,45 @@ class MarketResearchStore:
             *direction.evidence_themes,
         )
         for theme in themes:
-            if not set(theme.support_job_ids).issubset(job_map):
+            support_ids = set(theme.support_job_ids)
+            if len(support_ids) != len(theme.support_job_ids) or len(support_ids) < 2:
+                raise ValueError("theme requires at least two unique support jobs")
+            if not support_ids.issubset(job_map):
                 raise ValueError("theme references an unknown job")
             for representative in theme.representative_jobs:
                 if representative.job_id not in job_map:
                     raise ValueError("theme representative references an unknown job")
+                if representative.job_id not in support_ids:
+                    raise ValueError("theme representative must belong to support jobs")
+                self._validate_job_reference(representative, job_map[representative.job_id])
+        if direction.career_definition is not None and len(direction.representative_jobs) < 3:
+            raise ValueError("career definition requires three representative jobs")
         for representative in direction.representative_jobs:
             if representative.job_id not in job_map:
                 raise ValueError("direction representative references an unknown job")
+            self._validate_job_reference(representative, job_map[representative.job_id])
+        for skill in (
+            *direction.skill_statistics,
+            *direction.emerging_or_isolated_skills,
+        ):
+            skill_job_ids = {
+                *skill.mention_job_ids,
+                *skill.required_job_ids,
+                *skill.preferred_job_ids,
+            }
+            if not skill_job_ids.issubset(job_map):
+                raise ValueError("direction skill references an unknown job")
         self._validate_audit_refs(direction.audit_refs, screenshot_refs)
+
+    @staticmethod
+    def _validate_job_reference(reference: Any, job: CollectedJob) -> None:
+        """校验报告岗位引用的标题、公司和 URL 与冻结岗位元数据完全一致。"""
+        if (
+            reference.title != job.title
+            or reference.company_name != job.company_name
+            or reference.job_url != job.job_url
+        ):
+            raise ValueError("job reference metadata does not match the frozen job")
 
     def _validate_direction_reference(
         self,
