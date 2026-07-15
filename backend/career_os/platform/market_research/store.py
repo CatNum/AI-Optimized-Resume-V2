@@ -203,6 +203,70 @@ class MarketResearchStore:
         latest = self.read_latest_ref(research_id)
         return 1 if latest is None else latest.result_version + 1
 
+    def get_active_run(self) -> dict[str, Any] | None:
+        """读取当前 demo 唯一 active_run（活动运行）摘要，不返回本地路径。"""
+        with _store_lock:
+            active_run = self._read_index().get("active_run")
+            return dict(active_run) if isinstance(active_run, dict) else None
+
+    def reserve_active_run(
+        self,
+        research_id: str,
+        origin_session_id: str,
+        plan_id: str,
+    ) -> None:
+        """原子占用 demo 活动任务槽并记录调研、Session 和方案归属。"""
+        self._validate_research_id(research_id)
+        self.validate_plan_id(plan_id)
+        if not re.fullmatch(r"^sess_[0-9a-f]{32}$", origin_session_id):
+            raise ValueError("invalid origin_session_id")
+        with _store_lock:
+            index = self._read_index()
+            if index.get("active_run") is not None:
+                raise MarketResearchError(MarketResearchErrorCode.RESEARCH_CONFLICT)
+            index["active_run"] = {
+                "research_id": research_id,
+                "origin_session_id": origin_session_id,
+                "plan_id": plan_id,
+                "status": ResearchStatus.QUEUED.value,
+                "reserved_at": datetime.now(UTC).isoformat(),
+            }
+            self._write_json_atomic(self.index_path, index)
+
+    def update_active_run_status(
+        self,
+        research_id: str,
+        status: ResearchStatus,
+    ) -> None:
+        """同步 active_run（活动运行）的公开状态摘要，不改变任务归属。"""
+        self._validate_research_id(research_id)
+        parsed_status = ResearchStatus(status)
+        with _store_lock:
+            index = self._read_index()
+            active_run = index.get("active_run")
+            if not isinstance(active_run, dict) or active_run.get("research_id") != research_id:
+                return
+            active_run["status"] = parsed_status.value
+            index["active_run"] = active_run
+            self._write_json_atomic(self.index_path, index)
+
+    def clear_active_run(self, research_id: str) -> None:
+        """仅当编号匹配时原子释放当前 demo 的活动任务槽。"""
+        self._validate_research_id(research_id)
+        with _store_lock:
+            index = self._read_index()
+            active_run = index.get("active_run")
+            if not isinstance(active_run, dict) or active_run.get("research_id") != research_id:
+                return
+            index["active_run"] = None
+            self._write_json_atomic(self.index_path, index)
+
+    def delete_run_placeholder(self, research_id: str) -> None:
+        """删除尚未启动成功的 queued 运行占位，不触碰正式结果或浏览器 Profile。"""
+        path = self.run_status_path(research_id).parent
+        with _store_lock:
+            shutil.rmtree(path, ignore_errors=True)
+
     def build_direction_reference(
         self,
         research_id: str,
@@ -300,6 +364,11 @@ class MarketResearchStore:
                     recovered.append(snapshot.research_id)
             for lock_path in self.runtime_dir.glob("*.lock"):
                 lock_path.unlink(missing_ok=True)
+            active_run = self._read_index().get("active_run")
+            if isinstance(active_run, dict):
+                active_research_id = active_run.get("research_id")
+                if isinstance(active_research_id, str):
+                    self.clear_active_run(active_research_id)
         return recovered
 
     def run_status_path(self, research_id: str) -> Path:
@@ -649,11 +718,11 @@ class MarketResearchStore:
     def _read_index(self) -> dict[str, Any]:
         """读取市场正式结果索引；不存在时返回版本一的空索引。"""
         if not self.index_path.exists():
-            return {"schema_version": 1, "results": []}
+            return {"schema_version": 1, "active_run": None, "results": []}
         payload = self._read_json(self.index_path)
         if payload.get("schema_version") != 1 or not isinstance(payload.get("results"), list):
             raise ValueError("invalid market research index")
-        return payload
+        return {"active_run": None, **payload}
 
     def _initialize_layout(self) -> None:
         """创建当前 demo 固定的方案、运行、临时、正式结果、事件和浏览器目录。"""
@@ -672,7 +741,7 @@ class MarketResearchStore:
         if not self.index_path.exists():
             self._write_json_atomic(
                 self.index_path,
-                {"schema_version": 1, "results": []},
+                {"schema_version": 1, "active_run": None, "results": []},
             )
 
     def _write_json_atomic(self, path: Path, payload: Any) -> None:

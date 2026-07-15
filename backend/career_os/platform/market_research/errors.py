@@ -14,6 +14,8 @@ class MarketResearchErrorCode(StrEnum):
     TREND_COMPARISON_UNAVAILABLE = "trend_comparison_unavailable"  # 页面正常但没有窗口比较字段
     PROCESS_INTERRUPTED = "process_interrupted"  # FastAPI 进程退出导致本地线程任务中断
     STORAGE_FAILED = "storage_failed"  # 状态或正式结果无法可靠写入磁盘
+    BUDGET_EXHAUSTED = "budget_exhausted"  # 当前方向十分钟有效预算已经耗尽
+    EXECUTION_FAILED = "execution_failed"  # 方向执行器发生不含页面原文的技术失败
     PLAN_NOT_CONFIRMED = "plan_not_confirmed"  # 调研方案尚未获得用户明确确认
     PLAN_HASH_MISMATCH = "plan_hash_mismatch"  # 当前方案内容与确认时哈希不一致
     PLAN_CONSUMED = "plan_consumed"  # 冻结方案已经被其他调研启动消费
@@ -46,6 +48,14 @@ ERROR_DEFINITIONS: dict[MarketResearchErrorCode, tuple[str, str]] = {
     MarketResearchErrorCode.STORAGE_FAILED: (
         "storage",
         "本地结果保存失败，请检查数据目录权限和磁盘空间后重试。",
+    ),
+    MarketResearchErrorCode.BUDGET_EXHAUSTED: (
+        "budget",
+        "当前方向已达到十分钟有效预算，可查看已有样本或单独重试该方向。",
+    ),
+    MarketResearchErrorCode.EXECUTION_FAILED: (
+        "runtime",
+        "当前方向执行失败，可查看状态后重试该方向。",
     ),
     MarketResearchErrorCode.PLAN_NOT_CONFIRMED: (
         "plan",

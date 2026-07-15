@@ -312,7 +312,22 @@ class SessionStore:
             self._write_artifacts_unlocked(session_id, artifacts)
 
     def delete_session(self, session_id: str) -> None:
-        """删除session。"""
+        """删除 Session；若存在活动市场调研，必须先取消并完成临时数据清理。"""
+        with _lock:
+            artifacts = self._read_artifacts_unlocked(session_id)
+            market = _normalize_market_artifact(artifacts.get("market"))
+            active_research_id = market.get("active_research_id")
+        if isinstance(active_research_id, str) and active_research_id:
+            from career_os.platform.market_research.service import (
+                get_market_research_service,
+            )
+
+            # cancel_for_session_delete（删除 Session 前取消调研）会校验任务归属，
+            # 并等待 Runner 删除 temp 和未发布截图后才允许继续删除会话文件。
+            get_market_research_service().cancel_for_session_delete(
+                active_research_id,
+                session_id,
+            )
         with _lock:
             session_dir = self._session_dir(session_id)
             if session_dir.exists():
