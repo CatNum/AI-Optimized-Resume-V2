@@ -24,6 +24,7 @@ owner: career_os/agents/workers
 - 用户未指定城市时输出空城市列表，由 Harness 补为北京、上海、深圳、杭州。
 - 同方向发展使用 `experience_basis=total`；转行使用 `experience_basis=related`。
 - `experience_min` 和 `experience_max` 表示重点分析的工作年限范围，单位为年。
+- 当前存在未消费方案且用户要求增删方向、修改关键词/城市/年限时，输出修改后的完整 `plan_proposal`；Harness 会原地修订当前方案，禁止只用自然语言声称已经修改。
 - 不创建 `plan_id`，不计算哈希，不确认或冻结方案；这些操作只属于 Harness。
 
 ## 4. 禁止事项

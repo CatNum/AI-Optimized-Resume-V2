@@ -7,14 +7,38 @@ import pytest
 from career_os.platform.market_research.page_contracts import TrendsPageContract
 
 
-class FakePage:
-    """按定位器返回页面上可见的测试标记。"""
+class FakeElementStates:
+    """FakeElementStates（元素状态）提供是否实际显示的测试值。"""
 
-    def __init__(self, visible_locators: set[str]) -> None:
+    def __init__(self, is_displayed: bool) -> None:
+        self.is_displayed = is_displayed
+
+
+class FakeElement:
+    """FakeElement（页面元素）模拟 DrissionPage 的可见性状态。"""
+
+    def __init__(self, *, is_displayed: bool = True) -> None:
+        self.states = FakeElementStates(is_displayed)
+
+
+class FakePage:
+    """按定位器返回页面测试标记，并区分可见与隐藏元素。"""
+
+    def __init__(
+        self,
+        visible_locators: set[str],
+        *,
+        hidden_locators: set[str] | None = None,
+    ) -> None:
         self.visible_locators = visible_locators
+        self.hidden_locators = hidden_locators or set()
 
     def ele(self, locator: str, **_: Any) -> object | None:
-        return object() if locator in self.visible_locators else None
+        if locator in self.visible_locators:
+            return FakeElement(is_displayed=True)
+        if locator in self.hidden_locators:
+            return FakeElement(is_displayed=False)
+        return None
 
 
 @pytest.mark.parametrize("login_text", ["text:登录", "text:Sign in"])
@@ -36,6 +60,24 @@ def test_trends_verification_challenge_requires_user_action(
     contract = TrendsPageContract()
 
     assert contract.user_action_required(FakePage({verification_text})) is True
+
+
+def test_hidden_invisible_recaptcha_does_not_require_user_action() -> None:
+    """正常 Trends 页面常驻的隐藏 reCAPTCHA iframe 不会暂停调研。"""
+    contract = TrendsPageContract()
+    recaptcha_iframe = "css:iframe[src*='recaptcha']"
+
+    page = FakePage(set(), hidden_locators={recaptcha_iframe})
+
+    assert contract.user_action_required(page) is False
+
+
+def test_visible_recaptcha_requires_user_action() -> None:
+    """真正显示出来的 reCAPTCHA 仍暂停调研并等待用户处理。"""
+    contract = TrendsPageContract()
+    recaptcha_iframe = "css:iframe[src*='recaptcha']"
+
+    assert contract.user_action_required(FakePage({recaptcha_iframe})) is True
 
 
 @pytest.mark.parametrize(

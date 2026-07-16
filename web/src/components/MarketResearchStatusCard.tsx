@@ -32,6 +32,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 type Props = {
   sessionId: string | null;
+  refreshTrigger?: number;
   onLockChange: (locked: boolean) => void;
   onTerminal: () => void;
   onStartConfirmedPlan: () => Promise<void>;
@@ -47,6 +48,7 @@ function splitCsv(value: string): string[] {
 
 export function MarketResearchStatusCard({
   sessionId,
+  refreshTrigger = 0,
   onLockChange,
   onTerminal,
   onStartConfirmedPlan,
@@ -57,7 +59,9 @@ export function MarketResearchStatusCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reuseCandidates, setReuseCandidates] = useState<Record<string, ReuseCandidate[]>>({});
-  const terminalKeyRef = useRef<string | null>(null);
+  // notifiedTerminalKeysRef（已通知终态键集合）记录当前 Session 已处理过的调研或重试终态，
+  // 避免普通数据刷新把同一个 failed/completed 再次通知给父组件。
+  const notifiedTerminalKeysRef = useRef<Set<string>>(new Set());
 
   const refresh = useCallback(async () => {
     if (!sessionId) {
@@ -69,13 +73,21 @@ export function MarketResearchStatusCard({
       setData(next);
       setError(null);
       if (!editing && next.plan) setDraftDirections(next.plan.directions);
+      const terminalKeys: string[] = [];
       const snapshot = next.snapshot;
       if (snapshot && TERMINAL.has(snapshot.status)) {
-        const key = `${snapshot.research_id}:${snapshot.status}`;
-        if (terminalKeyRef.current !== key) {
-          terminalKeyRef.current = key;
-          onTerminal();
-        }
+        terminalKeys.push(`research:${snapshot.research_id}:${snapshot.status}`);
+      }
+      const activeRetry = next.active_retry;
+      if (activeRetry && TERMINAL.has(activeRetry.status)) {
+        terminalKeys.push(`retry:${activeRetry.retry_id}:${activeRetry.status}`);
+      }
+      const hasNewTerminal = terminalKeys.some(
+        (key) => !notifiedTerminalKeysRef.current.has(key),
+      );
+      terminalKeys.forEach((key) => notifiedTerminalKeysRef.current.add(key));
+      if (hasNewTerminal) {
+        onTerminal();
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "market_status_failed");
@@ -83,9 +95,12 @@ export function MarketResearchStatusCard({
   }, [editing, onTerminal, sessionId]);
 
   useEffect(() => {
-    terminalKeyRef.current = null;
+    notifiedTerminalKeysRef.current.clear();
+  }, [sessionId]);
+
+  useEffect(() => {
     void refresh();
-  }, [sessionId, refresh]);
+  }, [sessionId, refresh, refreshTrigger]);
 
   useEffect(() => {
     if (!sessionId || !data?.plan || data.reuse_selection || data.snapshot) {
@@ -227,7 +242,7 @@ export function MarketResearchStatusCard({
             {snapshot.available_actions.includes("cancel") ? <button className="market-button-secondary" disabled={busy} onClick={() => void run(() => cancelMarketResearch(snapshot.research_id, sessionId))}>取消调研</button> : null}
             {(snapshot.status === "completed" || snapshot.status === "partial_completed") && !data.result_confirmed ? <button className="market-button" disabled={busy} onClick={() => void run(() => confirmMarketResearchResult(snapshot.research_id, sessionId))}>确认使用结果并继续</button> : null}
             {data.result_confirmed ? <span className="self-center text-emerald-300">结果已确认，已进入 JD 分析阶段</span> : null}
-            {TERMINAL.has(snapshot.status) && data.owned ? <button className="market-button-secondary" disabled={busy} onClick={() => void deleteWithReferenceConfirmation(snapshot.research_id)}>删除正式结果</button> : null}
+            {TERMINAL.has(snapshot.status) && data.owned && snapshot.completion_published_at ? <button className="market-button-secondary" disabled={busy} onClick={() => void deleteWithReferenceConfirmation(snapshot.research_id)}>删除正式结果</button> : null}
           </div>
           {data.retryable_directions && data.retryable_directions.length > 0 && (!data.active_retry || !ACTIVE.has(data.active_retry.status)) ? (
             <div className="flex flex-wrap items-center gap-2 border-t border-slate-700 pt-2">

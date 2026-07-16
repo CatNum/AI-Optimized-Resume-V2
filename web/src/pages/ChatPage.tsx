@@ -368,6 +368,7 @@ export function ChatPage() {
         <TaskProgress sessionId={sessionId} refreshTrigger={taskRefreshTrigger} />
         <MarketResearchStatusCard
           sessionId={sessionId}
+          refreshTrigger={taskRefreshTrigger}
           onLockChange={handleMarketLockChange}
           onTerminal={handleMarketTerminal}
           onStartConfirmedPlan={() => dispatchChat(

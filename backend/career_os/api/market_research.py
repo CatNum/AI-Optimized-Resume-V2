@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from career_os.platform.market_research.errors import MarketResearchError
 from career_os.platform.market_research.models import DirectionProposal, ResearchPlan
+from career_os.platform.market_research.models import ResearchSnapshot
 from career_os.platform.market_research.service import get_market_research_service
 from career_os.harness.errors import HarnessError
 from career_os.harness.market_research_result import confirm_market_result
@@ -12,6 +13,19 @@ from career_os.platform.store.session import SessionStore
 
 
 router = APIRouter(prefix="/v1/market-research", tags=["market-research"])
+
+
+def _active_plan_supersedes_snapshot(
+    plan: ResearchPlan,
+    snapshot: ResearchSnapshot,
+) -> bool:
+    """判断待确认的新方案是否应覆盖不同旧方案留下的终态快照。"""
+    return (
+        plan.status in {"draft", "confirmed"}
+        and plan.plan_id != snapshot.plan_id
+        and snapshot.status.value
+        in {"completed", "partial_completed", "failed", "cancelled"}
+    )
 
 
 class ReviseMarketResearchPlanRequest(BaseModel):
@@ -123,6 +137,7 @@ def get_market_research_status(
         "owned": False,
         "result_confirmed": bool(market.get("market_result_confirmed")),
     }
+    snapshot: ResearchSnapshot | None = None
     if isinstance(research_id, str) and research_id:
         try:
             snapshot = service.get_status(research_id, session_id)
@@ -170,6 +185,10 @@ def get_market_research_status(
             plan = None
         if plan is not None:
             response["plan"] = plan.model_dump(mode="json")
+            if snapshot is not None and _active_plan_supersedes_snapshot(plan, snapshot):
+                response.pop("snapshot", None)
+                response.pop("retryable_directions", None)
+                response["owned"] = False
     reuse_ref = market.get("reuse_ref")
     if isinstance(reuse_ref, dict):
         response["reuse_selection"] = reuse_ref

@@ -56,6 +56,7 @@ from career_os.platform.store.session import SessionStore
 from career_os.platform.market_research.models import DirectionProposal
 from career_os.platform.market_research.plans import MarketResearchPlanStore
 from career_os.platform.market_research.errors import MarketResearchError
+from career_os.harness.market_plan_intent import revise_plan_from_selection_message
 
 WorkerRunner = Callable[[str, str, dict[str, Any], dict[str, Any]], dict[str, Any]]
 """WorkerRunner（工作者运行函数）描述 Coordinator 调用 Worker 的统一函数签名。"""
@@ -167,6 +168,38 @@ def build_coordinator_graph(
             session_state,
             state.get("user_message", ""),
         )
+        # 用户明确说“只调研某方向”时，直接修订当前未消费方案。
+        # 这是方案选择的确定性控制语义，不交给 LLM 以避免只回复文字却不落盘。
+        if state.get("session_id"):
+            market_artifact = SessionStore().get_artifacts(
+                state["session_id"]
+            ).get("market")
+            active_plan_id = (
+                market_artifact.get("active_plan_id")
+                if isinstance(market_artifact, dict)
+                else None
+            )
+            if isinstance(active_plan_id, str):
+                revised_plan = revise_plan_from_selection_message(
+                    MarketResearchPlanStore(),
+                    active_plan_id,
+                    state["session_id"],
+                    state.get("user_message", ""),
+                )
+                if revised_plan is not None:
+                    session_state["market_plan_revision"] = {
+                        "plan_id": revised_plan.plan_id,
+                        "plan_version": revised_plan.plan_version,
+                        "direction_names": [
+                            item.direction_name for item in revised_plan.directions
+                        ],
+                    }
+                    return {
+                        **state,
+                        "session_state": session_state,
+                        "current_worker_id": None,
+                        "pending_workers": [],
+                    }
         session_state.pop("jd_prerequisite_blocked", None)
         session_state.pop("jd_block_reason", None)
         session_state.pop("market_result_blocked", None)
@@ -500,9 +533,33 @@ def build_coordinator_graph(
                     DirectionProposal.model_validate(direction)
                     for direction in proposal.get("directions") or []
                 ]
-                plan = MarketResearchPlanStore().create_draft(
-                    state["session_id"], directions
+                plan_store = MarketResearchPlanStore()
+                market_artifact = SessionStore().get_artifacts(
+                    state["session_id"]
+                ).get("market")
+                active_plan_id = (
+                    market_artifact.get("active_plan_id")
+                    if isinstance(market_artifact, dict)
+                    else None
                 )
+                active_plan = None
+                if isinstance(active_plan_id, str):
+                    try:
+                        active_plan = plan_store.get(
+                            active_plan_id, state["session_id"]
+                        )
+                    except MarketResearchError:
+                        active_plan = None
+                if active_plan is not None and active_plan.status != "consumed":
+                    plan = plan_store.revise(
+                        active_plan.plan_id,
+                        state["session_id"],
+                        directions,
+                    )
+                else:
+                    plan = plan_store.create_draft(
+                        state["session_id"], directions
+                    )
             except (MarketResearchError, ValueError) as error:
                 return {
                     **state,
@@ -670,9 +727,17 @@ def build_coordinator_graph(
         list_type = session_state.get("list_type")
         offer_explore, _diag = can_offer_explore_complete(profile, session_state)
         text: str | None = None
+        market_plan_revision = session_state.pop("market_plan_revision", None)
         # 以下分支按业务优先级合成回复：探索完成 gate、Worker 自带 gate、
         # JD 前置阻断、探索信息补齐、探索指引展示，最后才回落到普通摘要。
-        if (
+        if isinstance(market_plan_revision, dict):
+            direction_names = market_plan_revision.get("direction_names") or []
+            selected_text = "、".join(str(item) for item in direction_names)
+            text = (
+                f"调研方案已更新为仅包含：{selected_text}。"
+                "请在市场调研卡片中预览条件，确认后开始调研。"
+            )
+        elif (
             list_type == "pipeline"
             and offer_explore
             and can_set_explore_gate_pending(session_state.get("explore_closure"))

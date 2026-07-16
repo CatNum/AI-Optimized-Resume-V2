@@ -244,7 +244,7 @@ class TrendsPageContract:
 
     def user_action_required(self, page: Any) -> bool:
         """检测 Google 身份验证标识；普通登录入口不阻断匿名可用页面。"""
-        return _page_has_any(page, self.verification_markers)
+        return _page_has_any_visible(page, self.verification_markers)
 
     def technical_retry_required(self, page: Any) -> bool:
         """检测无需用户介入、应由采集器自动退避重试的 Trends 页面错误。"""
@@ -305,3 +305,24 @@ def _first_element(page: Any, locators: tuple[str, ...]) -> Any | None:
 def _page_has_any(page: Any, locators: tuple[str, ...]) -> bool:
     """判断页面是否命中任一登录或验证标识，不返回标识附近的页面原文。"""
     return _first_element(page, locators) is not None
+
+
+def _page_has_any_visible(page: Any, locators: tuple[str, ...]) -> bool:
+    """判断页面是否存在实际显示的标识，忽略隐藏的常驻验证组件。"""
+    for locator in locators:
+        try:
+            element = page.ele(locator, timeout=0.2)
+        except Exception:
+            continue
+        if not element:
+            continue
+        try:
+            displayed = element.states.is_displayed
+            if callable(displayed):
+                displayed = displayed()
+        except Exception:
+            # 测试替身或其他页面驱动未提供可见性状态时，保持原有存在即命中的语义。
+            return True
+        if bool(displayed):
+            return True
+    return False

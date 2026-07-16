@@ -48,10 +48,6 @@ export function SessionSwitcher({
 
   useEffect(() => {
     void loadList();
-  }, [loadList]);
-
-  useEffect(() => {
-    void loadList();
   }, [refreshTrigger, loadList]);
 
   useEffect(() => {
