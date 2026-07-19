@@ -9,7 +9,11 @@ from career_os.platform.market_research.errors import MarketResearchErrorCode
 from career_os.platform.market_research.models import DirectionPlan
 from career_os.platform.market_research.page_contracts import PageChangedError
 from career_os.platform.market_research.runner import ActiveBudget
-from career_os.platform.market_research.trends import GoogleTrendsCollector
+from career_os.platform.market_research.trends import (
+    GoogleTrendsCollector,
+    _bind_keyword_headers,
+)
+from career_os.platform.market_research.page_contracts import TrendsPageContract
 
 
 class FakeClock:
@@ -52,13 +56,36 @@ def _direction() -> DirectionPlan:
     )
 
 
-def test_collector_defaults_to_three_rate_limit_retries() -> None:
-    """默认首次请求后允许三次退避，完整覆盖 10、30、60 秒序列。"""
-    assert GoogleTrendsCollector().retry_times == 3
+def test_keyword_headers_bind_by_name_in_page_column_order() -> None:
+    """数据列可任意重排，但每列必须由实际表头唯一绑定冻结关键词。"""
+    bound = _bind_keyword_headers(
+        ("AI Agent", "LLM Agent"),
+        ("LLM Agent", "AI Agent", "Agent 开发"),
+        contract=TrendsPageContract(),
+    )
+
+    assert bound == ("AI Agent", "LLM Agent")
 
 
-def test_collect_backs_off_10_30_60_seconds_before_recovering() -> None:
-    """前三次 429 页面错误后按固定基础间隔退避，第四次恢复并继续。"""
+def test_unknown_keyword_header_is_page_changed_not_positional_fallback() -> None:
+    """未知列不能仅因列数正确而按冻结关键词位置猜测映射。"""
+    with pytest.raises(PageChangedError) as captured:
+        _bind_keyword_headers(
+            ("未知术语",),
+            ("LLM Agent",),
+            contract=TrendsPageContract(),
+        )
+
+    assert captured.value.field_name == "keyword_header_binding"
+
+
+def test_collector_defaults_to_one_rate_limit_retry() -> None:
+    """默认首次请求后最多只允许一次 429 退避重试。"""
+    assert GoogleTrendsCollector().retry_times == 1
+
+
+def test_collect_backs_off_once_before_recovering() -> None:
+    """首次 429 固定等待十秒后只重试一次，第二次恢复即继续。"""
     page = FakePage()
     clock = FakeClock()
     navigation_count = 0
@@ -69,8 +96,8 @@ def test_collect_backs_off_10_30_60_seconds_before_recovering() -> None:
         navigation_count += 1
         page.url = url
         page.visible_locators = (
-            {"text:糟糕！出了点问题"}
-            if navigation_count <= 3
+            {"text:Too Many Requests"}
+            if navigation_count <= 1
             else {"text:没有足够的数据"}
         )
 
@@ -79,8 +106,8 @@ def test_collect_backs_off_10_30_60_seconds_before_recovering() -> None:
         user_action_count += 1
 
     collector = GoogleTrendsCollector(
-        retry_times=3,
-        retry_delays=(10.0, 30.0, 60.0),
+        retry_times=1,
+        retry_delays=(10.0,),
         sleep=clock.sleep,
         jitter_factor=lambda: 1.0,
         navigate_handler=navigate,
@@ -88,11 +115,11 @@ def test_collect_backs_off_10_30_60_seconds_before_recovering() -> None:
     )
     budget = ActiveBudget(600, monotonic=clock.monotonic)
 
-    observations = collector.collect(_direction(), page, budget)
+    result = collector.collect(_direction(), page, budget)
 
-    assert clock.sleeps == [10.0, 30.0, 60.0]
-    assert budget.elapsed_seconds() == 100.0
-    assert [item.direction for item in observations] == ["no_data", "no_data"]
+    assert clock.sleeps == [10.0]
+    assert budget.elapsed_seconds() == 10.0
+    assert result.source_status == "no_data"
     assert user_action_count == 0
 
 
@@ -106,22 +133,19 @@ def test_collect_does_not_sleep_past_remaining_budget() -> None:
         page.visible_locators = {"text:请稍后重试"}
 
     collector = GoogleTrendsCollector(
-        retry_times=3,
-        retry_delays=(10.0, 30.0, 60.0),
+        retry_times=1,
+        retry_delays=(10.0,),
         sleep=clock.sleep,
         jitter_factor=lambda: 1.0,
         navigate_handler=navigate,
     )
 
-    with pytest.raises(MarketResearchError) as captured:
-        collector.collect(
-            _direction(),
-            page,
-            ActiveBudget(9, monotonic=clock.monotonic),
-        )
+    result = collector.collect(_direction(), page, ActiveBudget(9, monotonic=clock.monotonic))
 
-    assert captured.value.error_code == MarketResearchErrorCode.BUDGET_EXHAUSTED
-    assert clock.sleeps == []
+    assert result.source_status == "degraded"
+    assert result.diagnostic is not None
+    assert result.diagnostic.page_state == "transient_error"
+    assert clock.sleeps == [5.0]
 
 
 def test_collect_allows_retry_delay_equal_to_remaining_budget() -> None:
@@ -134,22 +158,17 @@ def test_collect_allows_retry_delay_equal_to_remaining_budget() -> None:
         page.visible_locators = {"text:请稍后重试"}
 
     collector = GoogleTrendsCollector(
-        retry_times=3,
-        retry_delays=(10.0, 30.0, 60.0),
+        retry_times=1,
+        retry_delays=(10.0,),
         sleep=clock.sleep,
         jitter_factor=lambda: 1.0,
         navigate_handler=navigate,
     )
 
-    with pytest.raises(MarketResearchError) as captured:
-        collector.collect(
-            _direction(),
-            page,
-            ActiveBudget(10, monotonic=clock.monotonic),
-        )
+    result = collector.collect(_direction(), page, ActiveBudget(10, monotonic=clock.monotonic))
 
-    assert captured.value.error_code == MarketResearchErrorCode.BUDGET_EXHAUSTED
-    assert clock.sleeps == [10.0]
+    assert result.source_status == "degraded"
+    assert clock.sleeps == [5.0]
 
 
 def test_collect_does_not_back_off_for_page_contract_error() -> None:
@@ -169,10 +188,12 @@ def test_collect_does_not_back_off_for_page_contract_error() -> None:
         navigate_handler=navigate,
     )
 
-    with pytest.raises(PageChangedError):
-        collector.collect(_direction(), page, ActiveBudget(600, monotonic=clock.monotonic))
+    result = collector.collect(_direction(), page, ActiveBudget(600, monotonic=clock.monotonic))
 
-    assert clock.sleeps == []
+    assert result.source_status == "degraded"
+    assert result.diagnostic is not None
+    assert result.diagnostic.page_state == "render_timeout"
+    assert sum(clock.sleeps) == 10.0
 
 
 def test_first_rate_limit_uses_first_delay_after_non_rate_limit_error() -> None:
@@ -186,53 +207,51 @@ def test_first_rate_limit_uses_first_delay_after_non_rate_limit_error() -> None:
         navigation_count += 1
         page.url = url
         if navigation_count == 1:
-            page.visible_locators = set()
-        elif navigation_count == 2:
-            page.visible_locators = {"text:请稍后重试"}
+            page.visible_locators = {"text:Too Many Requests"}
         else:
             page.visible_locators = {"text:没有足够的数据"}
 
     collector = GoogleTrendsCollector(
-        retry_times=3,
-        retry_delays=(10.0, 30.0, 60.0),
+        retry_times=1,
+        retry_delays=(10.0,),
         sleep=clock.sleep,
         jitter_factor=lambda: 1.0,
         navigate_handler=navigate,
     )
 
-    observations = collector.collect(
+    result = collector.collect(
         _direction(),
         page,
         ActiveBudget(600, monotonic=clock.monotonic),
     )
 
     assert clock.sleeps == [10.0]
-    assert [item.direction for item in observations] == ["no_data", "no_data"]
+    assert result.source_status == "no_data"
 
 
-def test_collect_returns_structured_error_after_three_rate_limit_retries() -> None:
-    """持续 429 页面错误在三次退避后返回稳定的 execution_failed。"""
+def test_collect_returns_degraded_result_after_one_rate_limit_retry() -> None:
+    """持续 429 在一次退避重试后返回结构化来源降级。"""
     page = FakePage()
     clock = FakeClock()
 
     def navigate(url: str) -> None:
         page.url = url
-        page.visible_locators = {"text:Oops! Something went wrong"}
+        page.visible_locators = {"text:Too Many Requests"}
 
     collector = GoogleTrendsCollector(
-        retry_times=3,
-        retry_delays=(10.0, 30.0, 60.0),
+        retry_times=1,
+        retry_delays=(10.0,),
         sleep=clock.sleep,
         jitter_factor=lambda: 1.0,
         navigate_handler=navigate,
     )
 
-    with pytest.raises(MarketResearchError) as captured:
-        collector.collect(_direction(), page, ActiveBudget(600, monotonic=clock.monotonic))
+    result = collector.collect(_direction(), page, ActiveBudget(600, monotonic=clock.monotonic))
 
-    assert captured.value.error_code == MarketResearchErrorCode.EXECUTION_FAILED
-    assert captured.value.message == "trends_rate_limited"
-    assert clock.sleeps == [10.0, 30.0, 60.0]
+    assert result.source_status == "degraded"
+    assert result.diagnostic is not None
+    assert result.diagnostic.page_state == "rate_limited"
+    assert clock.sleeps == [10.0]
 
 
 def test_collect_ignores_regular_login_button_without_user_wait() -> None:
@@ -254,7 +273,7 @@ def test_collect_ignores_regular_login_button_without_user_wait() -> None:
         user_action_handler=wait_for_user,
     )
 
-    observations = collector.collect(_direction(), page, ActiveBudget(600))
+    result = collector.collect(_direction(), page, ActiveBudget(600))
 
-    assert [item.direction for item in observations] == ["no_data", "no_data"]
+    assert result.source_status == "no_data"
     assert user_action_count == 0

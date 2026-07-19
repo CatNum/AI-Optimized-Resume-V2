@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import unicodedata
 from collections import Counter
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -17,6 +18,7 @@ from career_os.platform.market_research.models import (
     CollectedJob,
     JobSemanticItem,
     ResearchStage,
+    SemanticValidationAudit,
 )
 from career_os.platform.market_research.sampling import job_identity
 from career_os.platform.market_research.skills import DynamicSkillTaxonomy
@@ -197,13 +199,19 @@ class SemanticExtractionEngine:
             except _TopLevelInvalid:
                 payload = None
                 if top_attempt == 1:
+                    self._record_semantic_failures(
+                        context,
+                        jobs,
+                        {job_identity(job): ("top_level_invalid", ("__root__",)) for job in jobs},
+                        attempt=2,
+                    )
                     return {}
         if payload is None:
             return {}
 
-        valid, failed_ids = _validate_job_outputs(payload, expected, raw_descriptions)
-        if failed_ids:
-            retry_jobs = [expected[job_id] for job_id in failed_ids]
+        valid, failures = _validate_job_outputs(payload, expected, raw_descriptions)
+        if failures:
+            retry_jobs = [expected[job_id] for job_id in failures]
             try:
                 retry_payload = self._call_batch(
                     context,
@@ -214,14 +222,20 @@ class SemanticExtractionEngine:
                     allow_budget_exception=allow_budget_exception,
                 )
                 _require_top_level(retry_payload)
-                retry_valid, _retry_failed = _validate_job_outputs(
+                retry_valid, retry_failures = _validate_job_outputs(
                     retry_payload,
                     {job_identity(job): job for job in retry_jobs},
                     raw_descriptions,
                 )
                 valid.update(retry_valid)
+                self._record_semantic_failures(context, retry_jobs, retry_failures, attempt=2)
             except _TopLevelInvalid:
-                pass
+                self._record_semantic_failures(
+                    context,
+                    retry_jobs,
+                    {job_identity(job): ("top_level_invalid", ("__root__",)) for job in retry_jobs},
+                    attempt=2,
+                )
 
         for output in valid.values():
             taxonomy.discover_from_output(
@@ -229,6 +243,31 @@ class SemanticExtractionEngine:
                 discovery_source=discovery_source,
             )
         return valid
+
+    @staticmethod
+    def _record_semantic_failures(
+        context: DirectionRunContext,
+        jobs: list[CollectedJob],
+        failures: dict[str, tuple[str, tuple[str, ...]]],
+        *,
+        attempt: int,
+    ) -> None:
+        """将最终失败岗位写为脱敏审计；不传递 JD、evidence 或模型错误原文。"""
+        for job in jobs:
+            failure = failures.get(job_identity(job))
+            if failure is None:
+                continue
+            failure_type, field_paths = failure
+            context.record_semantic_validation_failure(
+                SemanticValidationAudit(
+                    job_id=job_identity(job),
+                    job_url=job.job_url,
+                    failure_type=failure_type,
+                    field_paths=field_paths,
+                    attempt=attempt,
+                    occurred_at=datetime.now(UTC),
+                )
+            )
 
     def _call_batch(
         self,
@@ -347,11 +386,11 @@ def _validate_job_outputs(
     payload: dict[str, Any],
     expected: dict[str, CollectedJob],
     raw_descriptions: dict[str, str],
-) -> tuple[dict[str, JobExtractionOutput], tuple[str, ...]]:
+) -> tuple[dict[str, JobExtractionOutput], dict[str, tuple[str, tuple[str, ...]]]]:
     """逐岗位检查缺失、重复、Schema 和原文依据，返回有效输出与一次重试 ID。"""
     entries = payload.get("jobs")
     if not isinstance(entries, list):
-        return {}, tuple(expected)
+        return {}, {job_id: ("top_level_invalid", ("__root__",)) for job_id in expected}
     raw_ids = [
         entry.get("job_id")
         for entry in entries
@@ -359,7 +398,10 @@ def _validate_job_outputs(
     ]
     duplicate_ids = {job_id for job_id, count in Counter(raw_ids).items() if count > 1}
     valid: dict[str, JobExtractionOutput] = {}
-    failed: set[str] = set(duplicate_ids & expected.keys())
+    failures: dict[str, tuple[str, tuple[str, ...]]] = {
+        job_id: ("duplicate_output", ("job_id",))
+        for job_id in duplicate_ids & expected.keys()
+    }
     for entry in entries:
         if not isinstance(entry, dict):
             continue
@@ -368,16 +410,27 @@ def _validate_job_outputs(
             continue
         try:
             parsed = JobExtractionOutput.model_validate(entry)
-        except ValidationError:
-            failed.add(raw_id)
+        except ValidationError as error:
+            failures[raw_id] = (
+                "schema_validation",
+                tuple(
+                    dict.fromkeys(
+                        ".".join(str(segment) for segment in item["loc"]) or "__root__"
+                        for item in error.errors()
+                    )
+                )[:10]
+                or ("__root__",),
+            )
             continue
         raw_jd = raw_descriptions.get(raw_id)
         if raw_jd is None or not _all_evidence_exists(parsed, raw_jd):
-            failed.add(raw_id)
+            failures[raw_id] = ("evidence_not_found", ("evidence",))
             continue
         valid[raw_id] = parsed
-    failed.update(set(expected) - set(valid))
-    return valid, tuple(job_id for job_id in expected if job_id in failed)
+    for job_id in expected:
+        if job_id not in valid and job_id not in failures:
+            failures[job_id] = ("missing_output", ("__root__",))
+    return valid, {job_id: failures[job_id] for job_id in expected if job_id in failures}
 
 
 def _all_evidence_exists(output: JobExtractionOutput, raw_jd: str) -> bool:

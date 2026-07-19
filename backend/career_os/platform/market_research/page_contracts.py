@@ -52,14 +52,13 @@ class PageChangedError(MarketResearchError):
 class BossPageContract:
     """BossPageContract（BOSS 页面契约）冻结官方页面、登录标识和岗位字段定位器。"""
 
-    contract_version: str = "boss-web-v1"  # 当前 BOSS 页面字段契约版本
+    contract_version: str = "boss-web-v2"  # 当前 BOSS 页面字段契约版本
     allowed_hosts: frozenset[str] = frozenset({"www.zhipin.com"})  # 可导航的官方 HTTPS host
-    search_url_template: str = "https://www.zhipin.com/web/geek/job"  # 岗位搜索页面 URL
+    search_url_template: str = "https://www.zhipin.com/web/geek/jobs"  # 当前岗位搜索页面 URL
     detail_url_template: str = "https://www.zhipin.com/job_detail/{security_id}.html"  # 岗位详情 URL
     login_markers: tuple[str, ...] = (
-        "css:.login-register",
-        "css:.btn-login",
-        "text:登录/注册",
+        "css:.login-dialog",
+        "text:没有更多职位，尝试登录查看全部职位",
     )  # 需要用户登录的页面标识
     verification_markers: tuple[str, ...] = (
         "css:.geetest_panel",
@@ -73,16 +72,25 @@ class BossPageContract:
     )  # 全职岗位筛选器
     job_list: PageField = PageField(
         "job_list",
-        ("css:.job-list-box", "css:.job-card-wrapper"),
+        ("css:.job-list-container", "css:.job-list-box", "css:.job-card-wrapper"),
     )  # 岗位搜索结果列表
     job_card: PageField = PageField(
         "job_card",
-        ("css:.job-card-wrapper", "css:li.job-card-wrapper"),
+        (
+            "css:.job-list-container .card-area",
+            "css:.card-area",
+            "css:.job-card-wrapper",
+            "css:li.job-card-wrapper",
+        ),
     )  # 单个岗位卡片
     job_card_link: PageField = PageField(
         "job_card_link",
-        ("css:a.job-card-left", "css:a[href*='/job_detail/']"),
+        ("css:a.job-name", "css:a.job-card-left", "css:a[href*='/job_detail/']"),
     )  # 岗位卡片内的官方详情链接
+    job_detail_panel: PageField = PageField(
+        "job_detail_panel",
+        ("css:.job-detail-container",),
+    )  # /jobs 主从布局右侧、随左侧岗位卡片切换的详情面板
     detail_closed_marker: PageField = PageField(
         "detail_closed_marker",
         ("text:该职位已关闭", "text:职位已下线", "text:岗位已下线"),
@@ -93,19 +101,27 @@ class BossPageContract:
     )  # 详情页全职用工类型
     detail_title: PageField = PageField(
         "detail_title",
-        ("css:.job-title", "css:h1"),
+        ("css:.job-detail-container .job-detail-info .job-name", "css:.job-detail-container .job-title", "css:.job-title", "css:.job-detail-container h1", "css:h1"),
     )  # 岗位标题
     detail_salary: PageField = PageField(
         "detail_salary",
-        ("css:.salary", "css:.job-banner .salary"),
+        ("css:.job-detail-container .job-detail-info .job-salary", "css:.job-detail-container .salary", "css:.salary", "css:.job-banner .salary"),
     )  # 月薪范围文本
     detail_city: PageField = PageField(
         "detail_city",
-        ("css:.text-city", "css:.job-primary .text-desc"),
+        (
+            "xpath://div[contains(@class,'job-header-info')]"
+            "//ul[contains(@class,'tag-list')]/li[1]",
+            "css:.job-detail-container .text-city",
+            "css:.text-city",
+            "css:.job-primary .text-desc",
+        ),
     )  # 岗位城市
     detail_experience: PageField = PageField(
         "detail_experience",
         (
+            "xpath://div[contains(@class,'job-header-info')]"
+            "//ul[contains(@class,'tag-list')]/li[2]",
             "css:.job-primary .text-desc",
             "xpath://span[contains(text(),'年') or contains(text(),'应届') or contains(text(),'经验不限')]",
         ),
@@ -113,6 +129,8 @@ class BossPageContract:
     detail_education: PageField = PageField(
         "detail_education",
         (
+            "xpath://div[contains(@class,'job-header-info')]"
+            "//ul[contains(@class,'tag-list')]/li[3]",
             "xpath://span[contains(text(),'本科') or contains(text(),'大专') or "
             "contains(text(),'硕士') or contains(text(),'博士') or contains(text(),'高中') or "
             "contains(text(),'中专') or contains(text(),'学历不限')]",
@@ -124,7 +142,7 @@ class BossPageContract:
     )  # 招聘者活跃度
     company_name: PageField = PageField(
         "company_name",
-        ("css:.company-info a", "css:.sider-company .company-info"),
+        ("css:.job-list-container .card-area .job-card-wrap.active .boss-name", "css:.company-info a", "css:.sider-company .company-info"),
     )  # 公司名称
     company_industry: PageField = PageField(
         "company_industry",
@@ -136,7 +154,12 @@ class BossPageContract:
     )  # 公司规模
     job_description: PageField = PageField(
         "job_description",
-        ("css:.job-sec-text", "css:.job-detail-section .text"),
+        (
+            "css:.job-detail-container .job-detail-body .desc",
+            "css:.job-detail-container .job-sec-text",
+            "css:.job-sec-text",
+            "css:.job-detail-section .text",
+        ),
     )  # 临时交给受限提取模型的完整 JD 正文区域
 
     def build_search_url(self, keyword: str, city_code: str) -> str:
@@ -156,8 +179,8 @@ class BossPageContract:
         return self.detail_url_template.format(security_id=safe_id)
 
     def user_action_required(self, page: Any) -> bool:
-        """检测登录或验证码标识；系统只暂停，不输入密码、短信码或验证码。"""
-        return _page_has_any(page, (*self.login_markers, *self.verification_markers))
+        """仅在登录或验证码组件实际可见时暂停，忽略 SPA 常驻的隐藏弹窗。"""
+        return _page_has_any_visible(page, (*self.login_markers, *self.verification_markers))
 
     def read_required(self, page: Any, field: PageField, *, stage: str) -> Any:
         """读取关键字段；所有候选定位器失败时抛出带契约信息的 page_changed。"""
@@ -184,9 +207,9 @@ class BossPageContract:
 
 @dataclass(frozen=True)
 class TrendsPageContract:
-    """TrendsPageContract（搜索关注度页面契约）冻结官方页面与比较卡片定位器。"""
+    """TrendsPageContract（搜索关注度页面契约）冻结趋势组件和无障碍表格定位器。"""
 
-    contract_version: str = "google-trends-web-v1"  # 当前搜索关注度页面字段契约版本
+    contract_version: str = "google_trends_web_v2"  # 当前搜索关注度页面字段契约版本
     allowed_hosts: frozenset[str] = frozenset({"trends.google.com"})  # 可导航的官方 HTTPS host
     explore_url_template: str = "https://trends.google.com/trends/explore"  # 搜索关注度探索页 URL
     verification_markers: tuple[str, ...] = (
@@ -202,7 +225,13 @@ class TrendsPageContract:
         "text:请稍后重试",
         "text:Oops! Something went wrong",
         "text:Please try again later",
-    )  # Google widget 接口限流或暂时失败时显示的可重试技术错误
+    )  # 没有明确 429 证据的 Google 通用可重试技术错误
+    rate_limit_markers: tuple[str, ...] = (
+        "text:429",
+        "text:Too Many Requests",
+        "text:请求过多",
+        "text:请求次数过多",
+    )  # 明确限流证据；不得把通用 Oops 页面归入这里
     geo_filter: PageField = PageField(
         "geo_filter",
         ("css:[aria-label*='地区']", "css:[aria-label*='Region']"),
@@ -215,22 +244,14 @@ class TrendsPageContract:
         "interest_over_time_region",
         ("css:.fe-line-chart", "xpath://*[*[contains(text(),'热度随时间变化')]]"),
     )  # 热度随时间变化区域，不用于读取折线点位
-    comparison_card: PageField = PageField(
-        "comparison_card",
-        ("css:.comparison-card", "css:[data-entity='comparison']"),
-    )  # 页面直接展示的窗口比较卡片
-    comparison_direction: PageField = PageField(
-        "comparison_direction",
-        ("css:.comparison-card .direction", "css:.comparison-card .trend"),
-    )  # 比较卡片显示的上升、下降或持平方向
-    comparison_percentage: PageField = PageField(
-        "comparison_percentage",
-        ("css:.comparison-card .percent", "css:.comparison-card [data-value]"),
-    )  # 比较卡片直接显示的变化百分比
-    comparison_label: PageField = PageField(
-        "comparison_label",
-        ("css:.comparison-card .label", "css:.comparison-card .comparison-label"),
-    )  # 比较卡片的窗口口径标签
+    interest_over_time_table: PageField = PageField(
+        "interest_over_time_table",
+        (
+            "css:[aria-label*='热度随时间变化'] table",
+            "css:[aria-label*='Interest over time'] table",
+            "css:.fe-line-chart table",
+        ),
+    )  # 仅限目标趋势组件内、表达图表数据的无障碍表格
     no_data_marker: PageField = PageField(
         "no_data_marker",
         ("text:没有足够的数据", "text:Not enough data"),
@@ -239,7 +260,7 @@ class TrendsPageContract:
     def build_explore_url(self, query: str, time_range: str) -> str:
         """生成固定中国地区与明确时间窗口的 Google Trends 官方 URL。"""
         date_value = "today 12-m" if time_range == "past_12_months" else "today 3-m"
-        params = urlencode({"q": query, "date": date_value, "geo": "CN"})
+        params = urlencode({"q": query, "date": date_value, "geo": "CN", "hl": "zh-CN"})
         return f"{self.explore_url_template}?{params}"
 
     def user_action_required(self, page: Any) -> bool:
@@ -249,6 +270,10 @@ class TrendsPageContract:
     def technical_retry_required(self, page: Any) -> bool:
         """检测无需用户介入、应由采集器自动退避重试的 Trends 页面错误。"""
         return _page_has_any(page, self.technical_retry_markers)
+
+    def rate_limited(self, page: Any) -> bool:
+        """检测明确 429/请求过多证据；通用技术错误由短重试分支单独处理。"""
+        return _page_has_any(page, self.rate_limit_markers)
 
     def read_required(self, page: Any, field: PageField, *, stage: str) -> Any:
         """读取关键字段；失败时抛出带契约版本、阶段和字段名的 page_changed。"""

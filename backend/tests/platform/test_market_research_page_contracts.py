@@ -4,7 +4,8 @@ from typing import Any
 
 import pytest
 
-from career_os.platform.market_research.page_contracts import TrendsPageContract
+from career_os.platform.market_research.boss import _is_explicitly_non_full_time
+from career_os.platform.market_research.page_contracts import BossPageContract, TrendsPageContract
 
 
 class FakeElementStates:
@@ -39,6 +40,60 @@ class FakePage:
         if locator in self.hidden_locators:
             return FakeElement(is_displayed=False)
         return None
+
+
+@pytest.mark.parametrize(
+    "login_marker",
+    ["text:没有更多职位，尝试登录查看全部职位"],
+)
+def test_boss_login_limited_result_requires_user_action(login_marker: str) -> None:
+    """未登录受限空页必须暂停扫码登录，不能继续误报岗位列表结构变化。"""
+    assert BossPageContract().user_action_required(FakePage({login_marker})) is True
+
+
+@pytest.mark.parametrize("login_text", ["text:立即登录", "text:登录/注册"])
+def test_boss_regular_login_entry_does_not_mask_an_already_logged_in_list(login_text: str) -> None:
+    """页面常驻的登录入口不是未登录证据，不能阻塞职位列表采集。"""
+    assert BossPageContract().user_action_required(FakePage({login_text})) is False
+
+
+def test_hidden_boss_login_dialog_does_not_pause_an_already_logged_in_page() -> None:
+    """BOSS SPA 常驻但隐藏的登录弹窗不能被当作用户必须操作的证据。"""
+    assert BossPageContract().user_action_required(
+        FakePage(set(), hidden_locators={"css:.login-dialog"})
+    ) is False
+
+
+def test_boss_contract_builds_current_plural_jobs_search_url() -> None:
+    """BOSS 当前 /jobs 页面使用已验证的列表与职位卡片容器。"""
+    contract = BossPageContract()
+    url = contract.build_search_url("LLM Agent 应用开发", "101010100")
+
+    assert url.startswith("https://www.zhipin.com/web/geek/jobs?")
+    assert "/web/geek/job?" not in url
+    assert contract.job_list.locators[0] == "css:.job-list-container"
+    assert contract.job_card.locators[0] == "css:.job-list-container .card-area"
+    assert contract.job_card_link.locators[0] == "css:a.job-name"
+    assert contract.detail_title.locators[0] == "css:.job-detail-container .job-detail-info .job-name"
+    assert contract.detail_salary.locators[0] == "css:.job-detail-container .job-detail-info .job-salary"
+    assert contract.detail_city.locators[0] == (
+        "xpath://div[contains(@class,'job-header-info')]"
+        "//ul[contains(@class,'tag-list')]/li[1]"
+    )
+    assert contract.company_name.locators[0] == "css:.job-list-container .card-area .job-card-wrap.active .boss-name"
+    assert contract.job_description.locators[0] == "css:.job-detail-container .job-detail-body .desc"
+
+
+@pytest.mark.parametrize(
+    ("employment_text", "expected"),
+    [(None, False), ("全职", False), ("兼职", True)],
+)
+def test_boss_list_url_enforces_full_time_when_detail_panel_omits_employment_text(
+    employment_text: str | None,
+    expected: bool,
+) -> None:
+    """jobType=1901 已限制全职；右侧详情缺少标签不能触发页面结构变化。"""
+    assert _is_explicitly_non_full_time(employment_text) is expected
 
 
 @pytest.mark.parametrize("login_text", ["text:登录", "text:Sign in"])
@@ -98,3 +153,25 @@ def test_trends_transient_widget_error_requires_technical_retry(
 
     assert contract.technical_retry_required(page) is True
     assert contract.user_action_required(page) is False
+
+
+def test_v2_contract_builds_one_chinese_twelve_month_query() -> None:
+    """v2 查询固定中国、简体中文和过去十二个月，多个关键词共用同一页。"""
+    contract = TrendsPageContract()
+
+    url = contract.build_explore_url("LLM Agent,AI Agent", "past_12_months")
+
+    assert contract.contract_version == "google_trends_web_v2"
+    assert "q=LLM+Agent%2CAI+Agent" in url
+    assert "date=today+12-m" in url
+    assert "geo=CN" in url
+    assert "hl=zh-CN" in url
+    assert contract.interest_over_time_table.field_name == "interest_over_time_table"
+
+
+def test_generic_error_is_not_a_rate_limit() -> None:
+    """通用页面错误只走短重试，不能被误认为明确 429 限流。"""
+    contract = TrendsPageContract()
+
+    assert contract.rate_limited(FakePage({"text:Too Many Requests"})) is True
+    assert contract.rate_limited(FakePage({"text:糟糕！出了点问题"})) is False

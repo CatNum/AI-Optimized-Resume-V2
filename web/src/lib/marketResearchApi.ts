@@ -44,6 +44,13 @@ export type ResearchSnapshot = {
   city: string | null;
   candidate_count: number;
   valid_job_count: number;
+  rejected_job_count: number;
+  rejection_counts: Record<string, number>;
+  recent_rejections: Array<{ job_url: string; keyword: string; city: string; reason: string; title: string | null; company_name: string | null; occurred_at: string }>;
+  synthesis_validation_audits: Array<{ failure_type: string; rule_code: string; field_paths: string[]; attempt: number; occurred_at: string }>;
+  semantic_rejected_job_count: number;
+  semantic_failure_counts: Record<string, number>;
+  recent_semantic_failures: Array<{ job_id: string; job_url: string; failure_type: string; field_paths: string[]; attempt: number; occurred_at: string }>;
   semantic_analyzed_count: number;
   elapsed_seconds: number;
   available_actions: Array<"continue" | "cancel">;
@@ -80,6 +87,13 @@ export type DirectionRetryRun = {
   city: string | null;
   candidate_count: number;
   valid_job_count: number;
+  rejected_job_count: number;
+  rejection_counts: Record<string, number>;
+  recent_rejections: Array<{ job_url: string; keyword: string; city: string; reason: string; title: string | null; company_name: string | null; occurred_at: string }>;
+  synthesis_validation_audits: Array<{ failure_type: string; rule_code: string; field_paths: string[]; attempt: number; occurred_at: string }>;
+  semantic_rejected_job_count: number;
+  semantic_failure_counts: Record<string, number>;
+  recent_semantic_failures: Array<{ job_id: string; job_url: string; failure_type: string; field_paths: string[]; attempt: number; occurred_at: string }>;
   semantic_analyzed_count: number;
   elapsed_seconds: number;
   available_actions: Array<"continue" | "cancel">;

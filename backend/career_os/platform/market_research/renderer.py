@@ -147,27 +147,25 @@ class PlainTextMarketReportRenderer:
 
     @staticmethod
     def _trends(directions: list[DirectionResult]) -> list[str]:
-        """分别渲染一年和三个月页面对比，并固定搜索关注度边界声明。"""
+        """渲染 v2 周度计算结果；所有变化均为归一化热度点而非百分比。"""
         lines = ["", "6. Google 搜索关注度"]
         for direction in directions:
             lines.append(f"{direction.direction_name}：")
-            for observation in direction.trend_observations:
-                time_label = (
-                    "过去一年"
-                    if observation.time_range == "past_12_months"
-                    else "最近三个月"
+            trend = direction.trend_result
+            if trend.source_status != "success":
+                lines.append("来源限制：Google Trends 数据未完整可用，本次不据此作趋势判断。")
+            for analysis in trend.keyword_analyses:
+                if analysis.annual_change is None or analysis.first_half is None or analysis.second_half is None:
+                    lines.append(f"{analysis.keyword}：年度数据不足。")
+                    continue
+                lines.append(
+                    f"{analysis.keyword}：{analysis.first_half.label}（{analysis.first_half.start_date} 至 {analysis.first_half.end_date}）均值 {analysis.first_half.mean:.1f}，"
+                    f"{analysis.second_half.label}（{analysis.second_half.start_date} 至 {analysis.second_half.end_date}）均值 {analysis.second_half.mean:.1f}，"
+                    f"变化 {analysis.annual_change.delta_points:.1f} 个归一化热度点（{analysis.annual_change.direction}）。"
                 )
-                if observation.direction in {"unavailable", "no_data"}:
-                    value = "页面无比较字段" if observation.direction == "unavailable" else "无数据"
-                else:
-                    value = (
-                        f"{observation.direction}，{observation.percentage}%"
-                        f"，{observation.comparison_label or '页面未显示比较标签'}"
-                    )
-                lines.append(f"{observation.query}｜{time_label}：{value}。")
             if direction.trend_explanation:
                 lines.append(direction.trend_explanation)
-        lines.append("以上为搜索关注度，不代表招聘趋势。")
+        lines.append("0 是有效归一化热度值，不代表绝对零次搜索；低搜索量、抽样和噪声可能影响结果。以上为搜索关注度，不代表招聘趋势。")
         return lines
 
     @staticmethod

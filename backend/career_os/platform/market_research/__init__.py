@@ -19,7 +19,11 @@ from career_os.platform.market_research.models import (
     ResultRef,
     ScreenshotManifest,
     ScreenshotManifestItem,
-    TrendObservation,
+    KeywordTrendAnalysis,
+    TrendDiagnostic,
+    TrendResearchResult,
+    TrendSeries,
+    WeeklyTrendPoint,
 )
 from career_os.platform.market_research.settings import MarketResearchSettings
 
@@ -42,6 +46,10 @@ __all__ = [
     "ResultRef",
     "ScreenshotManifest",
     "ScreenshotManifestItem",
-    "TrendObservation",
+    "KeywordTrendAnalysis",
+    "TrendDiagnostic",
+    "TrendResearchResult",
+    "TrendSeries",
+    "WeeklyTrendPoint",
     "build_market_research_error",
 ]

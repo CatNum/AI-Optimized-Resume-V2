@@ -23,13 +23,27 @@ _ANNUAL_SHARED_WAN_PATTERN = re.compile(
     r"^(\d+(?:\.\d+)?)\s*[-~—–至]\s*(\d+(?:\.\d+)?)\s*"
     r"(?:万|w|W)\s*/?年$"
 )
+_BOSS_SALARY_DIGIT_START = 0xE031
+_BOSS_SALARY_DIGIT_END = 0xE03A
+
+
+def decode_boss_salary_text(raw: str) -> str:
+    """将 BOSS kanzhun-mix 字体的 U+E031 至 U+E03A 数字还原为普通 0 至 9。"""
+    decoded_characters: list[str] = []
+    for character in raw:
+        code_point = ord(character)
+        if _BOSS_SALARY_DIGIT_START <= code_point <= _BOSS_SALARY_DIGIT_END:
+            decoded_characters.append(str(code_point - _BOSS_SALARY_DIGIT_START))
+        else:
+            decoded_characters.append(character)
+    return "".join(decoded_characters)
 
 
 def parse_salary(raw: str | None) -> tuple[int, int] | None:
     """解析双边税前人民币薪资并返回元/月上下限；单边或非月薪语义返回空值。"""
     if not isinstance(raw, str):
         return None
-    normalized = unicodedata.normalize("NFKC", raw).strip()
+    normalized = unicodedata.normalize("NFKC", decode_boss_salary_text(raw)).strip()
     normalized = _EXTRA_MONTHS_PATTERN.sub("", normalized)
     normalized = _SPACE_PATTERN.sub("", normalized)
     lowered = normalized.casefold()

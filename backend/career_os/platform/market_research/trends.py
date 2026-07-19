@@ -1,47 +1,42 @@
+"""只通过 Google Trends 可见无障碍表格采集周度搜索关注度。"""
+
 from __future__ import annotations
 
 import random
 import re
 import time
-from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Callable, Literal
+from datetime import UTC, date, datetime
+from typing import TYPE_CHECKING, Any, Callable
 
 from career_os.config import settings
-from career_os.platform.market_research.errors import (
-    MarketResearchError,
-    MarketResearchErrorCode,
-)
 from career_os.platform.market_research.models import (
     DirectionPlan,
     ResearchStage,
-    TrendObservation,
+    TrendDiagnostic,
+    TrendResearchResult,
+    TrendSeries,
+    WeeklyTrendPoint,
 )
 from career_os.platform.market_research.page_contracts import (
     PageChangedError,
     TrendsPageContract,
     validate_external_url,
 )
+from career_os.platform.market_research.trend_analysis import analyze_trend_series
 
 if TYPE_CHECKING:
-    from career_os.platform.market_research.runner import (
-        ActiveBudget,
-        DirectionRunContext,
-        StageHandler,
-    )
+    from career_os.platform.market_research.runner import ActiveBudget, DirectionRunContext, StageHandler
 
 
-_TIME_RANGES: tuple[Literal["past_12_months", "past_3_months"], ...] = (
-    "past_12_months",
-    "past_3_months",
-)
-_PERCENTAGE_PATTERN = re.compile(r"([+-]?\d+(?:[.,]\d+)?)\s*%")
-_DISCLAIMER = "Google 搜索关注度不代表岗位需求或招聘趋势。"
-_DEFAULT_RETRY_DELAYS = (10.0, 30.0, 60.0)
-_RATE_LIMIT_MESSAGE = "trends_rate_limited"
+_DEFAULT_RETRY_DELAYS = (10.0,)
+_TRANSIENT_DELAY = 5.0
+_RENDER_WAIT_SECONDS = 5.0
+_POLL_SECONDS = 0.25
+_HEADER_DECORATIONS = ("搜索字词：", "搜索字词:", "Search term:")
 
 
 class GoogleTrendsCollector:
-    """GoogleTrendsCollector（搜索关注度采集器）只读取页面直接展示的窗口比较卡片。"""
+    """GoogleTrendsCollector（搜索关注度采集器）读取一次多关键词十二个月表格并可降级。"""
 
     def __init__(
         self,
@@ -55,284 +50,203 @@ class GoogleTrendsCollector:
         user_action_handler: Callable[[str], None] | None = None,
         now: Callable[[], datetime] | None = None,
     ) -> None:
-        """注入页面契约、重试次数和浏览器回调，便于真实页面与 Fake 页面共享接口。"""
-        self.contract = contract or TrendsPageContract()  # 当前版本化 Trends 页面字段契约
-        self.retry_times = (
-            settings.market_research.trends_retry_times
-            if retry_times is None
-            else retry_times
-        )  # 页面技术失败后的最大重试次数，不包含首次尝试
-        if self.retry_times < 0:
-            raise ValueError("retry_times must not be negative")
-        self.retry_delays = retry_delays or _DEFAULT_RETRY_DELAYS  # 每次技术重试前的基础等待秒数
-        if len(self.retry_delays) < self.retry_times or any(
-            delay <= 0 for delay in self.retry_delays
-        ):
-            raise ValueError("retry_delays must cover retry_times with positive values")
-        self._sleep = sleep  # 自动退避等待函数；等待时间计入有效预算
+        """注入可替换的页面、等待和时钟依赖，便于测试受控状态机。"""
+        self.contract = contract or TrendsPageContract()
+        self.retry_times = settings.market_research.trends_retry_times if retry_times is None else retry_times
+        self.retry_delays = retry_delays or _DEFAULT_RETRY_DELAYS
+        if not 0 <= self.retry_times <= 1 or len(self.retry_delays) < self.retry_times:
+            raise ValueError("retry_times must be between zero and one")
+        self._sleep = sleep
         self._jitter_factor = jitter_factor or (lambda: random.uniform(0.8, 1.2))
-        self.navigate_handler = navigate_handler  # 经专用浏览器白名单导航的可选回调
-        self.user_action_handler = user_action_handler  # 登录或验证时暂停 Runner 的回调
-        self._now = now or (lambda: datetime.now(UTC))  # 生成 fetched_at（采集时间）的时钟
+        self.navigate_handler = navigate_handler
+        self.user_action_handler = user_action_handler
+        self._now = now or (lambda: datetime.now(UTC))
 
-    def collect(
-        self,
-        direction: DirectionPlan,
-        page: Any,
-        budget: ActiveBudget,
-    ) -> tuple[TrendObservation, ...]:
-        """按搜索词顺序采集过去一年和最近三个月，所有页面操作计入方向预算。"""
-        observations: list[TrendObservation] = []
-        for query in direction.trends_keywords:
-            for time_range in _TIME_RANGES:
-                if budget.remaining_seconds() <= 0:
-                    raise MarketResearchError(
-                        MarketResearchErrorCode.BUDGET_EXHAUSTED,
-                        stage=ResearchStage.COLLECTING_TRENDS.value,
-                    )
-                observations.append(
-                    self._collect_with_retry(query, time_range, page, budget)
-                )
-        return tuple(observations)
-
-    def _collect_with_retry(
-        self,
-        query: str,
-        time_range: Literal["past_12_months", "past_3_months"],
-        page: Any,
-        budget: ActiveBudget,
-    ) -> TrendObservation:
-        """页面技术失败最多重试配置次数；无数据或无比较卡片直接形成正常观察。"""
-        last_error: Exception | None = None
+    def collect(self, direction: DirectionPlan, page: Any, budget: ActiveBudget) -> TrendResearchResult:
+        """以冻结关键词构造一个共同归一化页面，任何 Trends 故障都返回来源降级结果。"""
+        query = ",".join(direction.trends_keywords)
+        url = validate_external_url(
+            self.contract.build_explore_url(query, "past_12_months"), self.contract.allowed_hosts
+        )
         rate_limit_attempt = 0
-        for attempt in range(self.retry_times + 1):
-            if budget.remaining_seconds() <= 0:
-                raise MarketResearchError(
-                    MarketResearchErrorCode.BUDGET_EXHAUSTED,
-                    stage=ResearchStage.COLLECTING_TRENDS.value,
-                )
-            try:
-                return self._collect_once(query, time_range, page)
-            except MarketResearchError as error:
-                last_error = error
-            except Exception as error:
-                last_error = MarketResearchError(
-                    MarketResearchErrorCode.EXECUTION_FAILED,
-                    stage=ResearchStage.COLLECTING_TRENDS.value,
-                    message=type(error).__name__,
-                )
-            if attempt >= self.retry_times:
-                break
-            if _is_rate_limit_error(last_error):
-                self._sleep_before_retry(rate_limit_attempt, budget)
+        transient_attempted = False
+        for attempt in range(1, self.retry_times + 2):
+            self._navigate(page, url)
+            if self.contract.user_action_required(page):
+                if self.user_action_handler is None:
+                    return self._degraded(direction, url, "verification_required", attempt)
+                self.user_action_handler(url)
+            state = self._wait_for_terminal_state(page, budget)
+            if state is None:
+                self._refresh(page, url)
+                state = self._wait_for_terminal_state(page, budget)
+                if state is None:
+                    return self._degraded(direction, url, "render_timeout", 2)
+            if state == "rate_limited":
+                if rate_limit_attempt >= self.retry_times or not self._wait(self.retry_delays[rate_limit_attempt], budget):
+                    return self._degraded(direction, url, "rate_limited", attempt)
                 rate_limit_attempt += 1
-        if isinstance(last_error, MarketResearchError):
-            raise last_error
-        raise MarketResearchError(
-            MarketResearchErrorCode.EXECUTION_FAILED,
-            stage=ResearchStage.COLLECTING_TRENDS.value,
-        ) from last_error
+                continue
+            if state == "transient_error":
+                if transient_attempted or not self._wait(_TRANSIENT_DELAY, budget):
+                    return self._degraded(direction, url, "transient_error", attempt)
+                transient_attempted = True
+                continue
+            if state == "no_data":
+                return self._no_data(direction, url, attempt)
+            if state != "data_ready":
+                return self._degraded(direction, url, "render_timeout", attempt)
+            try:
+                table = self.contract.read_required(page, self.contract.interest_over_time_table, stage=ResearchStage.COLLECTING_TRENDS.value)
+                points = parse_weekly_points(table, direction.trends_keywords, contract=self.contract)
+            except PageChangedError as error:
+                return self._degraded(direction, url, "page_changed", attempt, failed_field=error.field_name)
+            actual_keywords = set().union(*(point.values.keys() for point in points)) if points else set()
+            diagnostic = None
+            if actual_keywords != set(direction.trends_keywords):
+                diagnostic = TrendDiagnostic(
+                    page_state="partial_columns", attempt=min(attempt, 2),
+                    expected_keyword_count=len(direction.trends_keywords), actual_series_count=len(actual_keywords),
+                )
+            series = TrendSeries(page_url=url, fetched_at=self._now(), keywords=direction.trends_keywords, weekly_points=points)
+            return analyze_trend_series(series, as_of_date=self._now().date(), diagnostic=diagnostic)
+        return self._degraded(direction, url, "rate_limited", self.retry_times + 1)
 
-    def _sleep_before_retry(self, attempt: int, budget: ActiveBudget) -> None:
-        """按当前重试序号退避，并在等待前拒绝超出方向有效预算。"""
+    def _navigate(self, page: Any, url: str) -> None:
+        """导航到已白名单校验的 URL，并拒绝最终落到非官方 host。"""
+        if self.navigate_handler is None:
+            page.get(url)
+        else:
+            self.navigate_handler(url)
+        validate_external_url(str(getattr(page, "url", url)), self.contract.allowed_hosts)
+
+    def _state(self, page: Any) -> str:
+        """识别页面终止状态，明确 429 优先于通用技术错误。"""
+        if self.contract.rate_limited(page):
+            return "rate_limited"
+        if self.contract.technical_retry_required(page):
+            return "transient_error"
+        if self.contract.read_optional(page, self.contract.no_data_marker) is not None:
+            return "no_data"
+        if self.contract.read_optional(page, self.contract.interest_over_time_table) is not None:
+            return "data_ready"
+        return "render_timeout"
+
+    def _wait_for_terminal_state(self, page: Any, budget: ActiveBudget) -> str | None:
+        """每 0.25 秒轮询最多五秒；未命中终止状态时交由调用方执行唯一一次刷新。"""
+        remaining_at_start = budget.remaining_seconds()
+        while remaining_at_start - budget.remaining_seconds() < _RENDER_WAIT_SECONDS:
+            state = self._state(page)
+            if state != "render_timeout":
+                return state
+            wait_seconds = min(
+                _POLL_SECONDS,
+                _RENDER_WAIT_SECONDS - (remaining_at_start - budget.remaining_seconds()),
+                budget.remaining_seconds(),
+            )
+            if wait_seconds <= 0:
+                return None
+            self._sleep(wait_seconds)
+        return None
+
+    def _refresh(self, page: Any, url: str) -> None:
+        """最多刷新当前页一次；测试替身没有 refresh 时以同一 URL 重新导航模拟刷新。"""
+        refresh = getattr(page, "refresh", None)
+        if callable(refresh):
+            refresh()
+        else:
+            self._navigate(page, url)
+
+    def _wait(self, seconds: float, budget: ActiveBudget) -> bool:
+        """只在剩余有效预算足够时等待，避免 Trends 吞掉 BOSS 的预算。"""
         factor = float(self._jitter_factor())
         if not 0.8 <= factor <= 1.2:
             raise ValueError("jitter_factor must be between 0.8 and 1.2")
-        delay = self.retry_delays[attempt] * factor
+        delay = seconds * factor
         if budget.remaining_seconds() < delay:
-            raise MarketResearchError(
-                MarketResearchErrorCode.BUDGET_EXHAUSTED,
-                stage=ResearchStage.COLLECTING_TRENDS.value,
-            )
+            return False
         self._sleep(delay)
+        return True
 
-    def _collect_once(
-        self,
-        query: str,
-        time_range: Literal["past_12_months", "past_3_months"],
-        page: Any,
-    ) -> TrendObservation:
-        """读取一次页面比较卡；不下载 CSV、不读取折线点位，也不自行计算趋势。"""
-        url = self.contract.build_explore_url(query, time_range)
-        safe_url = validate_external_url(url, self.contract.allowed_hosts)
-        if self.navigate_handler is None:
-            page.get(safe_url)
-        else:
-            self.navigate_handler(safe_url)
+    def _series(self, direction: DirectionPlan, url: str) -> TrendSeries:
+        """构造空周点序列，用于无数据和技术降级的统一可审计结果。"""
+        return TrendSeries(page_url=url, fetched_at=self._now(), keywords=direction.trends_keywords)
 
-        if self.contract.user_action_required(page):
-            if self.user_action_handler is None:
-                raise MarketResearchError(
-                    MarketResearchErrorCode.EXECUTION_FAILED,
-                    stage=ResearchStage.COLLECTING_TRENDS.value,
-                    message="user action handler is not configured",
-                )
-            self.user_action_handler(safe_url)
-        validate_external_url(str(getattr(page, "url", safe_url)), self.contract.allowed_hosts)
+    def _no_data(self, direction: DirectionPlan, url: str, attempt: int) -> TrendResearchResult:
+        """记录页面明确无数据，不把它伪装成页面故障。"""
+        diagnostic = TrendDiagnostic(page_state="no_data", attempt=min(attempt, 2), expected_keyword_count=len(direction.trends_keywords), actual_series_count=0)
+        return analyze_trend_series(self._series(direction, url), as_of_date=self._now().date(), diagnostic=diagnostic)
 
-        if self.contract.technical_retry_required(page):
-            raise MarketResearchError(
-                MarketResearchErrorCode.EXECUTION_FAILED,
-                stage=ResearchStage.COLLECTING_TRENDS.value,
-                message=_RATE_LIMIT_MESSAGE,
-            )
-
-        if self.contract.read_optional(page, self.contract.no_data_marker) is not None:
-            return self._status_observation(query, time_range, safe_url, "no_data")
-
-        stage = ResearchStage.COLLECTING_TRENDS.value
-        self.contract.read_required(page, self.contract.geo_filter, stage=stage)
-        self.contract.read_required(page, self.contract.time_filter, stage=stage)
-        self.contract.read_required(page, self.contract.interest_over_time_region, stage=stage)
-        if self.contract.read_optional(page, self.contract.comparison_card) is None:
-            return self._status_observation(query, time_range, safe_url, "unavailable")
-
-        direction_element = self.contract.read_required(
-            page,
-            self.contract.comparison_direction,
-            stage=stage,
-        )
-        percentage_element = self.contract.read_required(
-            page,
-            self.contract.comparison_percentage,
-            stage=stage,
-        )
-        label_element = self.contract.read_required(
-            page,
-            self.contract.comparison_label,
-            stage=stage,
-        )
-        percentage_text = _element_text(percentage_element)
-        percentage = _parse_percentage(percentage_text, self.contract, stage)
-        direction_value = _parse_direction(
-            _element_text(direction_element),
-            percentage,
-            self.contract,
-            stage,
-        )
-        comparison_label = _element_text(label_element).strip()
-        if not comparison_label:
-            raise PageChangedError(
-                self.contract.contract_version,
-                stage,
-                self.contract.comparison_label.field_name,
-            )
-        return TrendObservation(
-            query=query,
-            time_range=time_range,
-            direction=direction_value,
-            percentage=percentage,
-            comparison_label=comparison_label,
-            page_url=safe_url,
-            fetched_at=self._now(),
-            contract_version=self.contract.contract_version,
-        )
-
-    def _status_observation(
-        self,
-        query: str,
-        time_range: Literal["past_12_months", "past_3_months"],
-        page_url: str,
-        direction: Literal["unavailable", "no_data"],
-    ) -> TrendObservation:
-        """把页面正常无卡片或无数据保存为可继续的显式状态，不伪造百分比。"""
-        return TrendObservation(
-            query=query,
-            time_range=time_range,
-            direction=direction,
-            percentage=None,
-            comparison_label=None,
-            page_url=page_url,
-            fetched_at=self._now(),
-            contract_version=self.contract.contract_version,
-        )
+    def _degraded(self, direction: DirectionPlan, url: str, page_state: str, attempt: int, *, failed_field: str | None = None) -> TrendResearchResult:
+        """把仅影响 Trends 的故障转换为结构化来源限制，供 Runner 继续 BOSS 阶段。"""
+        diagnostic = TrendDiagnostic(page_state=page_state, failed_field=failed_field, attempt=min(attempt, 2), expected_keyword_count=len(direction.trends_keywords), actual_series_count=0)
+        return analyze_trend_series(self._series(direction, url), as_of_date=self._now().date(), diagnostic=diagnostic)
 
 
-def _is_rate_limit_error(error: Exception | None) -> bool:
-    """判断采集异常是否来自 Trends 429 对应页面错误。"""
-    return (
-        isinstance(error, MarketResearchError)
-        and error.error_code == MarketResearchErrorCode.EXECUTION_FAILED
-        and error.message == _RATE_LIMIT_MESSAGE
-    )
+def parse_weekly_points(table: Any, keywords: tuple[str, ...], *, contract: TrendsPageContract) -> tuple[WeeklyTrendPoint, ...]:
+    """解析趋势组件的无障碍表格，并依据每个表头显式绑定冻结关键词。"""
+    rows = list(table.eles("tag:tr"))
+    if len(rows) < 2:
+        raise PageChangedError(contract.contract_version, ResearchStage.COLLECTING_TRENDS.value, "weekly_rows")
+    header_cells = list(rows[0].eles("tag:th")) or list(rows[0].eles("tag:td"))
+    headers = tuple(_element_text(cell) for cell in header_cells)
+    if len(headers) < 2 or not _is_time_axis_header(headers[0]):
+        raise PageChangedError(contract.contract_version, ResearchStage.COLLECTING_TRENDS.value, "time_axis_header")
+    bound = _bind_keyword_headers(headers[1:], keywords, contract=contract)
+    points: list[WeeklyTrendPoint] = []
+    for row in rows[1:]:
+        cells = list(row.eles("tag:td"))
+        if len(cells) != len(header_cells):
+            raise PageChangedError(contract.contract_version, ResearchStage.COLLECTING_TRENDS.value, "row_alignment")
+        try:
+            week_start = date.fromisoformat(_element_text(cells[0]).strip())
+            values = {keyword: _parse_normalized_value(_element_text(cells[index + 1])) for index, keyword in enumerate(bound)}
+        except ValueError as error:
+            raise PageChangedError(contract.contract_version, ResearchStage.COLLECTING_TRENDS.value, "weekly_value") from error
+        points.append(WeeklyTrendPoint(week_start=week_start, values=values))
+    return tuple(sorted(points, key=lambda item: item.week_start))
 
 
-def build_trends_stage_handler(collector: GoogleTrendsCollector) -> StageHandler:
-    """创建 collecting_trends（搜索关注度采集）阶段处理器并写入方向上下文。"""
-
-    def collect_trends(context: DirectionRunContext) -> None:
-        """复用 Runner 唯一标签页采集观察，并生成不含招聘趋势推断的确定性摘要。"""
-        observations = collector.collect(
-            context.direction,
-            context.require_browser_page(),
-            context.budget,
-        )
-        context.record_trend_results(
-            observations,
-            summarize_trend_directions(observations),
-        )
-
-    return collect_trends
+def _bind_keyword_headers(headers: tuple[str, ...], keywords: tuple[str, ...], *, contract: TrendsPageContract) -> tuple[str, ...]:
+    """以有限规范化唯一绑定表头；未知、重复和歧义列一律拒绝，绝不按位置回退。"""
+    normalized_keywords = {_normalize_header(keyword): keyword for keyword in keywords}
+    if len(normalized_keywords) != len(keywords):
+        raise PageChangedError(contract.contract_version, ResearchStage.COLLECTING_TRENDS.value, "frozen_keyword_headers")
+    bound: list[str] = []
+    for header in headers:
+        keyword = normalized_keywords.get(_normalize_header(header))
+        if keyword is None or keyword in bound:
+            raise PageChangedError(contract.contract_version, ResearchStage.COLLECTING_TRENDS.value, "keyword_header_binding")
+        bound.append(keyword)
+    if not bound:
+        raise PageChangedError(contract.contract_version, ResearchStage.COLLECTING_TRENDS.value, "keyword_header_binding")
+    return tuple(bound)
 
 
-def summarize_trend_directions(
-    observations: tuple[TrendObservation, ...],
-) -> dict[str, Any]:
-    """只判断关键词方向一致性和长短期关系，并固定附带搜索关注度边界声明。"""
-    usable = [item for item in observations if item.direction in {"up", "down", "flat"}]
-    by_window: dict[str, set[str]] = {}
-    by_query: dict[str, dict[str, str]] = {}
-    for item in usable:
-        by_window.setdefault(item.time_range, set()).add(item.direction)
-        by_query.setdefault(item.query, {})[item.time_range] = item.direction
+def _normalize_header(value: str) -> str:
+    """仅移除页面固定装饰文字并合并空白，保持表头与关键词的精确可审计比较。"""
+    normalized = " ".join(value.strip().split())
+    for decoration in _HEADER_DECORATIONS:
+        if normalized.startswith(decoration):
+            normalized = normalized[len(decoration):].strip()
+    return normalized
 
-    window_states = {
-        window: (
-            "consistent"
-            if len(directions) == 1
-            else "divergent"
-        )
-        for window, directions in by_window.items()
-    }
-    keyword_direction_state = "insufficient"
-    if window_states:
-        keyword_direction_state = (
-            "divergent"
-            if "divergent" in window_states.values()
-            else "consistent"
-        )
 
-    opposite_queries: list[str] = []
-    comparable_queries = 0
-    for query, windows in by_query.items():
-        long_direction = windows.get("past_12_months")
-        short_direction = windows.get("past_3_months")
-        if long_direction is None or short_direction is None:
-            continue
-        comparable_queries += 1
-        if {long_direction, short_direction} == {"up", "down"}:
-            opposite_queries.append(query)
+def _is_time_axis_header(value: str) -> bool:
+    """识别 v2 表格的日期/时间轴首列表头，避免将数据列误当时间。"""
+    return _normalize_header(value).lower() in {"日期", "时间", "date", "week"}
 
-    if comparable_queries == 0:
-        long_short_state = "insufficient"
-    elif len(opposite_queries) == comparable_queries:
-        long_short_state = "opposite"
-    elif opposite_queries:
-        long_short_state = "mixed"
-    else:
-        long_short_state = "aligned"
 
-    return {
-        "keyword_direction_state": keyword_direction_state,
-        "window_direction_states": window_states,
-        "long_short_state": long_short_state,
-        "opposite_window_queries": tuple(opposite_queries),
-        "disclaimer": _DISCLAIMER,
-    }
+def _parse_normalized_value(value: str) -> float:
+    """解析 0～100 归一化热度；0 是合法数据，空值和越界值是契约错误。"""
+    parsed = float(value.strip())
+    if not 0 <= parsed <= 100:
+        raise ValueError("normalized_value_out_of_range")
+    return parsed
 
 
 def _element_text(element: Any) -> str:
-    """读取页面元素直接可见文本或无障碍标签，不读取整页 DOM。"""
+    """读取单个单元格的可见文本或无障碍标签，不读取整页 DOM。"""
     text = getattr(element, "text", None)
     if isinstance(text, str) and text.strip():
         return text.strip()
@@ -346,40 +260,9 @@ def _element_text(element: Any) -> str:
     return ""
 
 
-def _parse_percentage(
-    value: str,
-    contract: TrendsPageContract,
-    stage: str,
-) -> float:
-    """把页面直接显示的百分比文本解析为数值，不基于折线或时间序列重算。"""
-    match = _PERCENTAGE_PATTERN.search(value)
-    if match is None:
-        raise PageChangedError(
-            contract.contract_version,
-            stage,
-            contract.comparison_percentage.field_name,
-        )
-    return float(match.group(1).replace(",", "."))
-
-
-def _parse_direction(
-    value: str,
-    percentage: float,
-    contract: TrendsPageContract,
-    stage: str,
-) -> Literal["up", "down", "flat"]:
-    """把页面方向文本映射为上升、下降或持平；未知文案视为契约变化。"""
-    normalized = value.strip().lower()
-    if any(token in normalized for token in ("上升", "增长", "增加", "up", "rising")):
-        return "up"
-    if any(token in normalized for token in ("下降", "减少", "降低", "down", "falling")):
-        return "down"
-    if any(token in normalized for token in ("持平", "不变", "flat", "unchanged", "no change")):
-        return "flat"
-    if percentage == 0:
-        return "flat"
-    raise PageChangedError(
-        contract.contract_version,
-        stage,
-        contract.comparison_direction.field_name,
-    )
+def build_trends_stage_handler(collector: GoogleTrendsCollector) -> StageHandler:
+    """创建 collecting_trends（搜索关注度采集）阶段处理器并写入 v2 结果。"""
+    def collect_trends(context: DirectionRunContext) -> None:
+        """采集单一 v2 结果；降级结果仍进入上下文以保留来源限制。"""
+        context.record_trend_result(collector.collect(context.direction, context.require_browser_page(), context.budget))
+    return collect_trends

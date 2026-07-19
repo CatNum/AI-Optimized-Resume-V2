@@ -11,7 +11,9 @@ class MarketResearchErrorCode(StrEnum):
     BROWSER_FAILED = "browser_failed"  # Chrome 未找到、无法启动或异常退出
     PAGE_CHANGED = "page_changed"  # 版本化页面契约的关键字段失效
     TREND_NO_DATA = "trend_no_data"  # 页面正常但当前搜索词没有搜索关注度数据
-    TREND_COMPARISON_UNAVAILABLE = "trend_comparison_unavailable"  # 页面正常但没有窗口比较字段
+    RENDER_TIMEOUT = "render_timeout"  # 两次页面状态等待后仍未进入任何终止状态
+    TREND_RATE_LIMITED = "trends_rate_limited"  # 明确 429 限流完成退避后仍未恢复
+    TREND_TRANSIENT_ERROR = "trends_transient_error"  # 通用技术错误短重试后仍未恢复
     PROCESS_INTERRUPTED = "process_interrupted"  # FastAPI 进程退出导致本地线程任务中断
     STORAGE_FAILED = "storage_failed"  # 状态或正式结果无法可靠写入磁盘
     BUDGET_EXHAUSTED = "budget_exhausted"  # 当前方向十分钟有效预算已经耗尽
@@ -37,9 +39,17 @@ ERROR_DEFINITIONS: dict[MarketResearchErrorCode, tuple[str, str]] = {
         "source_data",
         "当前搜索词没有可用数据，可继续查看岗位结果或调整搜索词后重试。",
     ),
-    MarketResearchErrorCode.TREND_COMPARISON_UNAVAILABLE: (
+    MarketResearchErrorCode.RENDER_TIMEOUT: (
         "source_data",
-        "页面没有提供窗口比较字段，可继续查看岗位结果或稍后重试。",
+        "页面在一次刷新后仍未完成渲染，可继续查看岗位结果或稍后重新调研。",
+    ),
+    MarketResearchErrorCode.TREND_RATE_LIMITED: (
+        "source_data",
+        "Google Trends 暂时限流，可继续查看岗位结果或稍后重新调研。",
+    ),
+    MarketResearchErrorCode.TREND_TRANSIENT_ERROR: (
+        "source_data",
+        "Google Trends 页面组件暂时不可用，可继续查看岗位结果或稍后重新调研。",
     ),
     MarketResearchErrorCode.PROCESS_INTERRUPTED: (
         "runtime",

@@ -26,6 +26,7 @@ from career_os.platform.market_research.models import (
     MarketSynthesisOutput,
     ResearchPlan,
     ResearchStage,
+    SynthesisValidationAudit,
     SynthesisThemeCandidate,
     ThemeSummary,
 )
@@ -45,6 +46,73 @@ if TYPE_CHECKING:
 SynthesisLLMCall = Callable[[str, str], dict[str, Any] | None]
 """SynthesisLLMCall（综合模型调用）只接收受限 System 和结构化 user JSON。"""
 
+_SYNTHESIS_RULE_CODES = {
+    "synthesis references an unknown statistic": "unknown_statistic_ref",
+    "statistic_refs must be unique": "duplicate_statistic_ref",
+    "career definition ids require a definition": "career_definition_missing",
+    "career definition requires three valid job references": "career_definition_invalid_refs",
+    "skill explanation references an unknown frozen skill": "unknown_skill_explanation_ref",
+    "trend explanation must preserve the source boundary": "trend_boundary_missing",
+    "theme support_count does not match unique job ids": "theme_support_count_mismatch",
+    "theme references an unknown semantic job": "theme_unknown_job_ref",
+    "theme representative must belong to support ids": "theme_representative_outside_support",
+    "synthesis contains a prohibited inference": "prohibited_inference",
+    "synthesis explanation cannot contain numeric copies": "numeric_copy",
+}
+
+
+def build_synthesis_validation_audit(
+    error: ValidationError | ValueError | TypeError,
+    *,
+    attempt: int,
+    now: Callable[[], datetime],
+) -> SynthesisValidationAudit:
+    """把综合 Harness 异常归一为脱敏审计；仅保留异常类别和字段路径。"""
+    if isinstance(error, ValidationError):
+        paths = tuple(
+            dict.fromkeys(
+                ".".join(str(segment) for segment in item["loc"]) or "__root__"
+                for item in error.errors()
+            )
+        )[:10]
+    else:
+        paths = ("__root__",)
+    return SynthesisValidationAudit(
+        failure_type=type(error).__name__,
+        rule_code=_synthesis_rule_code(error),
+        field_paths=paths or ("__root__",),
+        attempt=attempt,
+        occurred_at=now(),
+    )
+
+
+def _synthesis_rule_code(error: ValidationError | ValueError | TypeError) -> str:
+    """将内部异常映射为稳定规则码；异常原文不进入审计、状态或前端。"""
+    if isinstance(error, ValidationError):
+        return "schema_validation"
+    if isinstance(error, TypeError):
+        return "type_error"
+    return _SYNTHESIS_RULE_CODES.get(str(error), "unknown_rule")
+
+
+def build_synthesis_retry_feedback(audit: SynthesisValidationAudit) -> dict[str, Any]:
+    """构造第二次综合调用的脱敏纠错反馈，不传递异常原文或模型原始输出。"""
+    return {
+        "rule_code": audit.rule_code,
+        "field_paths": list(audit.field_paths),
+    }
+
+
+def build_synthesis_retry_context(
+    audit: SynthesisValidationAudit,
+    previous_output: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """构造仅供本次内存重试使用的反馈与首次 JSON 输出，不参与持久化。"""
+    return {
+        "validation_feedback": build_synthesis_retry_feedback(audit),
+        "previous_output": previous_output,
+    }
+
 _ALLOWED_STATISTIC_REFS = frozenset(
     {
         "valid_job_count",
@@ -57,7 +125,7 @@ _ALLOWED_STATISTIC_REFS = frozenset(
         "industry_distribution",
         "company_size_distribution",
         "skill_taxonomy",
-        "trend_observations",
+        "trend_result",
     }
 )
 _PROHIBITED_SYNTHESIS_PHRASES = (
@@ -117,11 +185,14 @@ class MarketSynthesisService:
                 message="direction synthesis requires at least three semantic jobs",
             )
         frozen_input = self._direction_input(context, semantic_jobs, statistics)
-        validation_error: str | None = None
-        for _attempt in range(2):
+        retry_audit: SynthesisValidationAudit | None = None
+        previous_output: dict[str, Any] | None = None
+        for attempt in range(1, 3):
             user_payload = dict(frozen_input)
-            if validation_error is not None:
-                user_payload["validation_error"] = validation_error
+            if retry_audit is not None:
+                user_payload.update(
+                    build_synthesis_retry_context(retry_audit, previous_output)
+                )
             raw = self._call(self.direction_prompt, user_payload)
             try:
                 output = MarketSynthesisOutput.model_validate(raw)
@@ -134,7 +205,14 @@ class MarketSynthesisService:
                 context.record_direction_result(direction_result)
                 return direction_result
             except (ValidationError, ValueError, TypeError) as error:
-                validation_error = type(error).__name__
+                audit = build_synthesis_validation_audit(
+                    error,
+                    attempt=attempt,
+                    now=self._now,
+                )
+                context.record_synthesis_validation_audit(audit)
+                retry_audit = audit
+                previous_output = raw
         raise MarketResearchError(
             MarketResearchErrorCode.EXECUTION_FAILED,
             stage=ResearchStage.SYNTHESIZING.value,
@@ -214,10 +292,12 @@ class MarketSynthesisService:
                 for job in semantic_jobs
             ],
             "statistics": statistics.model_dump(mode="json"),
-            "trend_observations": [
-                observation.model_dump(mode="json")
-                for observation in context.data.get("trend_observations") or ()
-            ],
+            # diagnostic（内部页面诊断）不进入 Worker 输入，避免页面实现细节污染综合结论。
+            "trend_result": (
+                context.data["trend_result"].model_dump(mode="json", exclude={"diagnostic"})
+                if context.data.get("trend_result") is not None
+                else None
+            ),
             "allowed_statistic_refs": sorted(_ALLOWED_STATISTIC_REFS),
         }
 
@@ -319,7 +399,7 @@ class MarketSynthesisService:
             salary_explanation=output.salary_explanation,
             industry_distribution=statistics.industry_distribution,
             company_size_distribution=statistics.company_size_distribution,
-            trend_observations=tuple(context.data.get("trend_observations") or ()),
+            trend_result=context.data["trend_result"],
             trend_explanation=output.trend_explanation,
             sample_limitations=tuple(context.data.get("sample_limitations") or ()),
             representative_jobs=tuple(

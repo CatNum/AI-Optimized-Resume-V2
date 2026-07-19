@@ -322,9 +322,7 @@ def _compact_direction(direction: DirectionResult) -> dict[str, Any]:
         "salary_analysis": direction.salary_analysis,
         "industry_distribution": direction.industry_distribution,
         "company_size_distribution": direction.company_size_distribution,
-        "trend_observations": [
-            observation.model_dump(mode="json") for observation in direction.trend_observations
-        ],
+        "trend_result": direction.trend_result.model_dump(mode="json", exclude={"diagnostic"}),
         "sample_limitations": list(direction.sample_limitations),
         "representative_jobs": [
             {

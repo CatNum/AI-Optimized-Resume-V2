@@ -18,6 +18,7 @@ from career_os.platform.market_research.errors import (
 from career_os.platform.market_research.models import (
     CollectedJob,
     DirectionPlan,
+    JobRejectionAudit,
     ResearchStage,
 )
 from career_os.platform.market_research.page_contracts import (
@@ -63,6 +64,7 @@ _BOSS_CITY_CODES = {
     "西安": "101110100",
     "苏州": "101190400",
 }
+_BOSS_LIST_RENDER_WAIT_SECONDS = 10.0
 _JOB_ID_PATTERN = re.compile(r"/job_detail/([^./?#]+)(?:\.html)?")
 _SAMPLE_LIMITATIONS = (
     "BOSS 默认排序可能影响本次岗位样本。",
@@ -80,6 +82,7 @@ class BossCollectionResult:
     visited_cities: tuple[str, ...]  # 实际开始访问过的城市顺序
     keyword_statuses: dict[str, str]  # 每个 BOSS 关键词的 completed/cutoff/not_run 状态
     screenshot_paths: tuple[str, ...]  # 临时审计截图绝对路径，发布时转换为正式引用
+    rejection_audits: tuple[JobRejectionAudit, ...]  # 未入样岗位的身份与确定性拒绝原因，不包含原始 JD
     sample_limitations: tuple[str, ...]  # 必须进入最终报告的样本边界
 
 
@@ -94,6 +97,7 @@ class BossJobCollector:
         screenshot_sampler: ScreenshotSampler | None = None,
         restart_handler: Callable[[], Any] | None = None,
         user_action_handler: Callable[[str], None] | None = None,
+        page_review_handler: Callable[[PageChangedError], None] | None = None,
         progress_handler: Callable[[DirectionRunContext, str, str], None] | None = None,
         sleep: Callable[[float], None] = time.sleep,
         uniform: Callable[[float, float], float] = random.uniform,
@@ -107,6 +111,7 @@ class BossJobCollector:
         )  # 仅对最终新增岗位执行的独立截图抽样器
         self.restart_handler = restart_handler  # 列表技术失败后唯一一次重启专用 Chrome 的回调
         self.user_action_handler = user_action_handler  # 登录或验证时暂停 Runner 的回调
+        self.page_review_handler = page_review_handler  # 页面契约异常时保留专用 Chrome 供用户检查的回调
         self.progress_handler = progress_handler  # 每个新增有效岗位后的状态快照更新回调
         self._sleep = sleep  # 点击、返回、切换和滚动后的低频等待函数
         self._uniform = uniform  # 从配置区间选择等待秒数的随机函数
@@ -119,6 +124,7 @@ class BossJobCollector:
         raw_job_descriptions: dict[str, str] = {}
         visited_cities: list[str] = []
         screenshot_paths: list[str] = []
+        rejection_audits: list[JobRejectionAudit] = []
         keyword_statuses = {keyword: "not_run" for keyword in direction.boss_keywords}
         screenshots_dir = (
             self.store.direction_temp_dir(context.research_id, context.direction_run_id)
@@ -145,35 +151,72 @@ class BossJobCollector:
                     context,
                 )
                 context.data["page"] = active_page
-                self._wait_condition_change()
                 seen_card_urls: set[str] = set()
                 empty_scrolls = 0
 
                 while empty_scrolls < 3:
                     self._require_budget(context)
-                    card_urls = self._read_card_urls(active_page)
-                    new_urls = [url for url in card_urls if url not in seen_card_urls]
-                    if not new_urls:
+                    card_targets = self._read_card_targets(active_page)
+                    new_targets = [target for target in card_targets if target[0] not in seen_card_urls]
+                    if not new_targets:
                         empty_scrolls += 1
                     else:
                         empty_scrolls = 0
-                    seen_card_urls.update(new_urls)
+                    seen_card_urls.update(job_url for job_url, _card in new_targets)
 
-                    for job_url in new_urls:
+                    for job_url, card in new_targets:
                         self._require_budget(context)
                         if new_for_keyword >= settings.market_research.target_jobs_per_keyword:
                             keyword_statuses[keyword] = "cutoff"
                             break
                         context.candidate_count += 1
-                        draft = self._collect_detail(active_page, job_url, keyword, context)
-                        self._return_to_list(active_page, list_url)
+                        try:
+                            draft = self._collect_list_detail(
+                                active_page,
+                                card,
+                                job_url,
+                                keyword,
+                                context,
+                            )
+                        except _InvalidJob as rejected:
+                            self._record_rejection(
+                                context,
+                                rejection_audits,
+                                job_url=job_url,
+                                keyword=keyword,
+                                city=city,
+                                reason=rejected.reason,
+                                title=rejected.title,
+                                company_name=rejected.company_name,
+                            )
+                            continue
                         if draft is None:
                             continue
                         job, raw_description = draft
                         admission = sample.admit(job, keyword)
                         if admission.status == "duplicate":
+                            self._record_rejection(
+                                context,
+                                rejection_audits,
+                                job_url=job_url,
+                                keyword=keyword,
+                                city=city,
+                                reason="duplicate",
+                                title=job.title,
+                                company_name=job.company_name,
+                            )
                             continue
                         if admission.status == "company_limited" or admission.job is None:
+                            self._record_rejection(
+                                context,
+                                rejection_audits,
+                                job_url=job_url,
+                                keyword=keyword,
+                                city=city,
+                                reason="company_limited",
+                                title=job.title,
+                                company_name=job.company_name,
+                            )
                             continue
 
                         accepted = admission.job
@@ -185,9 +228,7 @@ class BossJobCollector:
                             active_page,
                             screenshots_dir,
                             accepted,
-                            job_url,
                         )
-                        self._return_to_list(active_page, list_url)
                         if screenshot_path is not None:
                             screenshot_paths.append(str(screenshot_path))
                         if self.progress_handler is not None:
@@ -208,6 +249,7 @@ class BossJobCollector:
             visited_cities=tuple(visited_cities),
             keyword_statuses=keyword_statuses,
             screenshot_paths=tuple(screenshot_paths),
+            rejection_audits=tuple(rejection_audits),
             sample_limitations=_SAMPLE_LIMITATIONS,
         )
 
@@ -225,6 +267,7 @@ class BossJobCollector:
                 self._require_budget(context)
                 try:
                     self._navigate(active_page, list_url)
+                    self._wait_for_list_render(active_page)
                     self._handle_user_action(active_page, list_url)
                     list_element = self.contract.read_required(
                         active_page,
@@ -235,7 +278,8 @@ class BossJobCollector:
                         raise RuntimeError("BOSS list is unavailable")
                     self._ensure_full_time(active_page)
                     return active_page
-                except PageChangedError:
+                except PageChangedError as error:
+                    self._pause_for_page_review(error)
                     raise
                 except Exception as error:
                     last_error = error
@@ -250,25 +294,32 @@ class BossJobCollector:
             message=type(last_error).__name__ if last_error is not None else "BOSS list failed",
         ) from last_error
 
-    def _collect_detail(
+    def _collect_list_detail(
         self,
         page: Any,
+        card: Any,
         job_url: str,
         keyword: str,
         context: DirectionRunContext,
     ) -> tuple[CollectedJob, str] | None:
-        """详情页最多重试两次；业务准入失败直接跳过，页面契约变化立即停止方向。"""
+        """点击列表卡片并读取右侧详情面板，绝不导航到 job_detail（会额外触发验证）。"""
         for _attempt in range(settings.market_research.job_detail_retry_times + 1):
             self._require_budget(context)
             try:
-                self._navigate(page, job_url)
+                card.click()
                 self._wait_click_or_return()
                 self._handle_user_action(page, job_url)
+                self.contract.read_required(
+                    page,
+                    self.contract.job_detail_panel,
+                    stage=ResearchStage.COLLECTING_BOSS.value,
+                )
                 return self._parse_detail(page, job_url, keyword)
-            except PageChangedError:
+            except PageChangedError as error:
+                self._pause_for_page_review(error)
                 raise
             except _InvalidJob:
-                return None
+                raise
             except Exception:
                 continue
         return None
@@ -282,24 +333,28 @@ class BossJobCollector:
         """以详情页为准构造仅含确定性元数据的岗位，原始 JD 只随返回值留在内存。"""
         stage = ResearchStage.COLLECTING_BOSS.value
         if self.contract.read_optional(page, self.contract.detail_closed_marker) is not None:
-            raise _InvalidJob()
-        employment = _required_text(page, self.contract, self.contract.detail_employment_type, stage)
-        if "全职" not in employment:
-            raise _InvalidJob()
+            raise _InvalidJob("closed_or_offline")
+        employment = _optional_text(page, self.contract, self.contract.detail_employment_type)
+        if _is_explicitly_non_full_time(employment):
+            raise _InvalidJob("not_full_time")
         title = _required_text(page, self.contract, self.contract.detail_title, stage)
         salary_raw = _required_text(page, self.contract, self.contract.detail_salary, stage)
         salary = parse_salary(salary_raw)
         if salary is None:
-            raise _InvalidJob()
+            raise _InvalidJob("salary_unparseable", title=title)
         city = _required_text(page, self.contract, self.contract.detail_city, stage)
         activity_raw = _required_text(page, self.contract, self.contract.recruiter_activity, stage)
         activity = normalize_recruiter_activity(activity_raw)
         if activity is None:
-            raise _InvalidJob()
+            raise _InvalidJob("recruiter_inactive", title=title)
         company_name = _required_text(page, self.contract, self.contract.company_name, stage)
         raw_description = _required_text(page, self.contract, self.contract.job_description, stage)
         if not has_basic_job_content(raw_description):
-            raise _InvalidJob()
+            raise _InvalidJob(
+                "description_insufficient",
+                title=title,
+                company_name=company_name,
+            )
 
         experience_raw, experience_group = normalize_experience(
             _optional_text(page, self.contract, self.contract.detail_experience)
@@ -341,14 +396,15 @@ class BossJobCollector:
         )
         return job, raw_description
 
-    def _read_card_urls(self, page: Any) -> list[str]:
-        """读取当前列表可见岗位卡的官方详情 URL，JD 中的任何链接都不会经过此函数。"""
+    def _read_card_targets(self, page: Any) -> list[tuple[str, Any]]:
+        """返回列表卡及其链接 ID；链接仅用于身份标识，采集不导航到 job_detail。"""
         cards = self.contract.read_all_required(
             page,
             self.contract.job_card,
             stage=ResearchStage.COLLECTING_BOSS.value,
         )
-        urls: list[str] = []
+        targets: list[tuple[str, Any]] = []
+        seen_urls: set[str] = set()
         for card in cards:
             link = _find_in_element(card, self.contract.job_card_link)
             href = _element_attribute(link, "href") if link is not None else None
@@ -359,17 +415,16 @@ class BossJobCollector:
                 safe_url = validate_external_url(absolute, self.contract.allowed_hosts)
             except ValueError:
                 continue
-            if "/job_detail/" in urlsplit(safe_url).path:
-                urls.append(safe_url)
-        return list(dict.fromkeys(urls))
+            if "/job_detail/" in urlsplit(safe_url).path and safe_url not in seen_urls:
+                targets.append((safe_url, card))
+                seen_urls.add(safe_url)
+        return targets
 
     def _ensure_full_time(self, page: Any) -> None:
-        """确认并设置全职筛选，不设置发布日期过滤或改变 BOSS 默认排序。"""
-        field = self.contract.read_required(
-            page,
-            self.contract.full_time_filter,
-            stage=ResearchStage.COLLECTING_BOSS.value,
-        )
+        """若当前页面提供全职控件则确认选中；搜索 URL 的 jobType=1901 已是全职硬约束。"""
+        field = self.contract.read_optional(page, self.contract.full_time_filter)
+        if field is None:
+            return
         class_name = (_element_attribute(field, "class") or "").casefold()
         if not any(marker in class_name for marker in ("active", "selected", "checked")):
             field.click()
@@ -380,15 +435,12 @@ class BossJobCollector:
         page: Any,
         screenshots_dir: Path,
         job: CollectedJob,
-        job_url: str,
     ) -> Path | None:
-        """重新打开已入样详情页后执行独立抽样；失败截图不会退化为 DOM 或局部原文。"""
+        """对当前右侧已选岗位详情执行独立截图抽样，不再导航到 job_detail。"""
         try:
-            self._navigate(page, job_url)
-            self._wait_click_or_return()
-            self._handle_user_action(page, job_url)
             return self.screenshot_sampler.capture_if_selected(page, screenshots_dir, job)
-        except PageChangedError:
+        except PageChangedError as error:
+            self._pause_for_page_review(error)
             raise
         except Exception as error:
             raise MarketResearchError(
@@ -397,10 +449,53 @@ class BossJobCollector:
                 message=type(error).__name__,
             ) from error
 
+    def _record_rejection(
+        self,
+        context: DirectionRunContext,
+        audits: list[JobRejectionAudit],
+        *,
+        job_url: str,
+        keyword: str,
+        city: str,
+        reason: str,
+        title: str | None = None,
+        company_name: str | None = None,
+    ) -> None:
+        """记录不含完整 JD 的岗位拒绝审计，并立即刷新状态卡的原因汇总。"""
+        audit = JobRejectionAudit(
+            job_url=job_url,
+            keyword=keyword,
+            city=city,
+            reason=reason,
+            title=title,
+            company_name=company_name,
+            occurred_at=self._now(),
+        )
+        audits.append(audit)
+        context.record_rejection(audit)
+        if self.progress_handler is not None:
+            self.progress_handler(context, keyword, city)
+
     def _navigate(self, page: Any, url: str) -> None:
         """每次列表和详情导航前复核 BOSS 官方 HTTPS 白名单。"""
         safe_url = validate_external_url(url, self.contract.allowed_hosts)
         page.get(safe_url)
+
+    def _wait_for_list_render(self, page: Any) -> None:
+        """显式等待 BOSS SPA 的 job_list（职位列表）首选容器，避免读取初始加载壳。"""
+        wait_for_element = getattr(getattr(page, "wait", None), "ele_displayed", None)
+        if callable(wait_for_element):
+            try:
+                wait_for_element(
+                    self.contract.job_list.locators[0],
+                    timeout=_BOSS_LIST_RENDER_WAIT_SECONDS,
+                    raise_err=False,
+                )
+                return
+            except Exception:
+                # 不支持显式等待的测试替身或驱动继续走集中配置的低频等待。
+                pass
+        self._wait_condition_change()
 
     def _handle_user_action(self, page: Any, target_url: str) -> None:
         """检测登录或验证页面并交给 Runner 无限等待；采集器不输入任何凭据。"""
@@ -409,6 +504,11 @@ class BossJobCollector:
         if self.user_action_handler is None:
             raise RuntimeError("BOSS user action handler is not configured")
         self.user_action_handler(target_url)
+
+    def _pause_for_page_review(self, error: PageChangedError) -> None:
+        """在关闭专用 Chrome 前暂停，让用户查看触发 page_changed（页面结构变化）的真实页面。"""
+        if self.page_review_handler is not None:
+            self.page_review_handler(error)
 
     def _return_to_list(self, page: Any, list_url: str) -> None:
         """详情处理后返回原列表；浏览器历史异常时仍只导航到已校验官方列表 URL。"""
@@ -472,6 +572,24 @@ def resolve_boss_city_code(city: str) -> str:
 
 class _InvalidJob(Exception):
     """_InvalidJob（岗位未通过准入）用于跳过业务无效详情，不把方向标记为技术失败。"""
+
+    def __init__(
+        self,
+        reason: str,
+        *,
+        title: str | None = None,
+        company_name: str | None = None,
+    ) -> None:
+        """保存确定性拒绝原因和已读取的最小岗位身份，禁止附带完整 JD。"""
+        self.reason = reason
+        self.title = title
+        self.company_name = company_name
+        super().__init__(reason)
+
+
+def _is_explicitly_non_full_time(employment_text: str | None) -> bool:
+    """仅当页面明确标为非全职时拒绝；列表 URL 的 jobType=1901 已是全职硬约束。"""
+    return employment_text is not None and "全职" not in employment_text
 
 
 def _required_text(

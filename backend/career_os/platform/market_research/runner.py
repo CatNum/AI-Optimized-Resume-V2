@@ -15,12 +15,15 @@ from career_os.platform.market_research.models import (
     DirectionPlan,
     DirectionResult,
     FailedDirection,
+    JobRejectionAudit,
     MarketResearchErrorPayload,
     ResearchPlan,
     ResearchSnapshot,
     ResearchStage,
     ResearchStatus,
-    TrendObservation,
+    SemanticValidationAudit,
+    SynthesisValidationAudit,
+    TrendResearchResult,
 )
 from career_os.platform.market_research.store import MarketResearchStore
 
@@ -111,6 +114,13 @@ class DirectionRunContext:
     budget: ActiveBudget  # 当前方向独立的十分钟有效预算时钟
     candidate_count: int = 0  # 页面已经看到的候选岗位数量
     valid_job_count: int = 0  # 已通过确定性准入的岗位数量
+    rejected_job_count: int = 0  # 已判定不进入有效样本的岗位数量
+    rejection_counts: dict[str, int] = field(default_factory=dict)  # 按机器码汇总的拒绝原因
+    recent_rejections: list[JobRejectionAudit] = field(default_factory=list)  # 最近拒绝审计，最多五十条
+    synthesis_validation_audits: list[SynthesisValidationAudit] = field(default_factory=list)  # 综合 Harness 最近两次校验失败审计
+    semantic_rejected_job_count: int = 0  # 最终未通过语义校验的岗位数量
+    semantic_failure_counts: dict[str, int] = field(default_factory=dict)  # 按机器码汇总的语义失败原因
+    recent_semantic_failures: list[SemanticValidationAudit] = field(default_factory=list)  # 最近语义失败审计，最多五十条
     semantic_analyzed_count: int = 0  # 已通过结构和依据校验的岗位数量
     llm_attempt_count: int = 0  # 已发起的常规岗位提取 LLM 调用次数
     data: dict[str, Any] = field(default_factory=dict)  # 后续采集与综合模块使用的方向内存数据
@@ -126,14 +136,9 @@ class DirectionRunContext:
             )
         return page
 
-    def record_trend_results(
-        self,
-        observations: tuple[TrendObservation, ...],
-        summary: dict[str, Any],
-    ) -> None:
-        """记录趋势观察和确定性摘要，供统计、综合与最终持久化阶段顺序读取。"""
-        self.data["trend_observations"] = observations
-        self.data["trend_summary"] = dict(summary)
+    def record_trend_result(self, result: TrendResearchResult) -> None:
+        """记录唯一 v2 趋势结果，供综合、报告和最终持久化阶段顺序读取。"""
+        self.data["trend_result"] = result
 
     def record_boss_results(self, result: Any) -> None:
         """记录 BOSS 确定性岗位和执行口径；raw_job_descriptions 只保留在线程内存供提取。"""
@@ -143,7 +148,29 @@ class DirectionRunContext:
         self.data["visited_cities"] = tuple(result.visited_cities)
         self.data["keyword_statuses"] = dict(result.keyword_statuses)
         self.data["screenshot_paths"] = tuple(result.screenshot_paths)
+        self.data["rejection_audits"] = tuple(result.rejection_audits)
         self.data["sample_limitations"] = tuple(result.sample_limitations)
+
+    def record_rejection(self, audit: JobRejectionAudit) -> None:
+        """累计岗位拒绝原因并保留最近五十条不含 JD 原文的审计记录。"""
+        self.rejected_job_count += 1
+        self.rejection_counts[audit.reason] = self.rejection_counts.get(audit.reason, 0) + 1
+        self.recent_rejections = [*self.recent_rejections[-49:], audit]
+
+    def record_synthesis_validation_audit(self, audit: SynthesisValidationAudit) -> None:
+        """保存综合 Harness 最近两次脱敏失败审计，供终态状态卡说明失败位置。"""
+        self.synthesis_validation_audits = [
+            *self.synthesis_validation_audits[-1:],
+            audit,
+        ]
+
+    def record_semantic_validation_failure(self, audit: SemanticValidationAudit) -> None:
+        """累计最终语义失败并保留最近五十条不含 JD/evidence 的审计记录。"""
+        self.semantic_rejected_job_count += 1
+        self.semantic_failure_counts[audit.failure_type] = (
+            self.semantic_failure_counts.get(audit.failure_type, 0) + 1
+        )
+        self.recent_semantic_failures = [*self.recent_semantic_failures[-49:], audit]
 
     def record_statistics(self, statistics: Any) -> None:
         """记录确定性统计并同步两类岗位计数和带正确分母的冻结技能词表。"""
@@ -275,6 +302,7 @@ class MarketResearchRunner:
                     raise
                 except Exception as error:
                     market_error = self._normalize_error(error)
+                    self.update_progress(context)
                     failed.append(
                         FailedDirection(
                             direction_name=context.direction.direction_name,
@@ -425,6 +453,13 @@ class MarketResearchRunner:
                 "city": city,
                 "candidate_count": context.candidate_count,
                 "valid_job_count": context.valid_job_count,
+                "rejected_job_count": context.rejected_job_count,
+                "rejection_counts": dict(context.rejection_counts),
+                "recent_rejections": tuple(context.recent_rejections),
+                "synthesis_validation_audits": tuple(context.synthesis_validation_audits),
+                "semantic_rejected_job_count": context.semantic_rejected_job_count,
+                "semantic_failure_counts": dict(context.semantic_failure_counts),
+                "recent_semantic_failures": tuple(context.recent_semantic_failures),
                 "semantic_analyzed_count": context.semantic_analyzed_count,
                 "elapsed_seconds": context.budget.elapsed_seconds(),
                 "updated_at": datetime.now(UTC),
@@ -532,6 +567,13 @@ class MarketResearchRunner:
                 "city": None,
                 "candidate_count": context.candidate_count,
                 "valid_job_count": context.valid_job_count,
+                "rejected_job_count": context.rejected_job_count,
+                "rejection_counts": dict(context.rejection_counts),
+                "recent_rejections": tuple(context.recent_rejections),
+                "synthesis_validation_audits": tuple(context.synthesis_validation_audits),
+                "semantic_rejected_job_count": context.semantic_rejected_job_count,
+                "semantic_failure_counts": dict(context.semantic_failure_counts),
+                "recent_semantic_failures": tuple(context.recent_semantic_failures),
                 "semantic_analyzed_count": context.semantic_analyzed_count,
                 "elapsed_seconds": context.budget.elapsed_seconds(),
                 "available_actions": ("cancel",),

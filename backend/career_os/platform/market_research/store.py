@@ -290,12 +290,7 @@ class MarketResearchStore:
                         trends_keywords=direction.trends_keywords,
                         valid_job_count=direction.valid_job_count,
                         semantic_analyzed_count=direction.semantic_analyzed_count,
-                        trend_time_ranges=tuple(
-                            dict.fromkeys(
-                                observation.time_range
-                                for observation in direction.trend_observations
-                            )
-                        ),
+                        trend_source_status=direction.trend_result.source_status,
                     )
                 )
         return sorted(
@@ -811,7 +806,25 @@ class MarketResearchStore:
             }
             if not skill_job_ids.issubset(job_map):
                 raise ValueError("direction skill references an unknown job")
+        self._validate_trend_result(direction.trend_result, direction.trends_keywords)
         self._validate_audit_refs(direction.audit_refs, screenshot_refs)
+
+    @staticmethod
+    def _validate_trend_result(result: Any, frozen_keywords: tuple[str, ...]) -> None:
+        """校验趋势归属、周点和值域及来源状态；不重新执行派生趋势计算。"""
+        if result.series.contract_version != "google_trends_web_v2":
+            raise ValueError("formal trend result requires google_trends_web_v2")
+        if result.series.keywords != frozen_keywords:
+            raise ValueError("trend keywords must match frozen direction keywords")
+        actual_keywords = set().union(*(point.values for point in result.series.weekly_points)) if result.series.weekly_points else set()
+        if result.source_status == "success" and actual_keywords != set(frozen_keywords):
+            raise ValueError("successful trend result requires every frozen keyword")
+        if result.source_status == "partial" and not (actual_keywords < set(frozen_keywords)):
+            raise ValueError("partial trend result requires a proper keyword subset")
+        if result.source_status == "no_data" and actual_keywords:
+            raise ValueError("no_data trend result cannot contain values")
+        if result.source_status != "success" and result.diagnostic is None:
+            raise ValueError("degraded trend result requires diagnostic")
 
     @staticmethod
     def _validate_job_reference(reference: Any, job: CollectedJob) -> None:

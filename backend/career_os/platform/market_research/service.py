@@ -48,7 +48,6 @@ from career_os.platform.market_research.synthesis import (
 )
 from career_os.platform.market_research.trends import (
     GoogleTrendsCollector,
-    summarize_trend_directions,
 )
 from career_os.platform.store.session import SessionStore
 
@@ -94,6 +93,13 @@ class _RetryStoreAdapter:
             city=retry.city,
             candidate_count=retry.candidate_count,
             valid_job_count=retry.valid_job_count,
+            rejected_job_count=retry.rejected_job_count,
+            rejection_counts=retry.rejection_counts,
+            recent_rejections=retry.recent_rejections,
+            synthesis_validation_audits=retry.synthesis_validation_audits,
+            semantic_rejected_job_count=retry.semantic_rejected_job_count,
+            semantic_failure_counts=retry.semantic_failure_counts,
+            recent_semantic_failures=retry.recent_semantic_failures,
             semantic_analyzed_count=retry.semantic_analyzed_count,
             elapsed_seconds=retry.elapsed_seconds,
             available_actions=retry.available_actions,
@@ -117,6 +123,13 @@ class _RetryStoreAdapter:
                     "city": snapshot.city,
                     "candidate_count": snapshot.candidate_count,
                     "valid_job_count": snapshot.valid_job_count,
+                    "rejected_job_count": snapshot.rejected_job_count,
+                    "rejection_counts": snapshot.rejection_counts,
+                    "recent_rejections": snapshot.recent_rejections,
+                    "synthesis_validation_audits": snapshot.synthesis_validation_audits,
+                    "semantic_rejected_job_count": snapshot.semantic_rejected_job_count,
+                    "semantic_failure_counts": snapshot.semantic_failure_counts,
+                    "recent_semantic_failures": snapshot.recent_semantic_failures,
                     "semantic_analyzed_count": snapshot.semantic_analyzed_count,
                     "elapsed_seconds": snapshot.elapsed_seconds,
                     "available_actions": snapshot.available_actions,
@@ -359,10 +372,7 @@ class MarketResearchService:
                 self._require_retry_owner(retry, session_id)
                 runner = self._retry_runners.get(research_id)
                 if runner is None:
-                    raise MarketResearchError(
-                        MarketResearchErrorCode.PROCESS_INTERRUPTED,
-                        stage=retry.stage.value,
-                    )
+                    return self._mark_retry_process_interrupted(retry)
                 runner.request_continue(research_id)
                 return self.store.read_retry_status(research_id) or retry
             snapshot = self.get_status(research_id, session_id)
@@ -391,10 +401,7 @@ class MarketResearchService:
                     return retry
                 runner = self._retry_runners.get(research_id)
                 if runner is None:
-                    raise MarketResearchError(
-                        MarketResearchErrorCode.PROCESS_INTERRUPTED,
-                        stage=retry.stage.value,
-                    )
+                    return self._mark_retry_process_interrupted(retry)
                 runner.request_cancel(research_id)
                 return self.store.read_retry_status(research_id) or retry
             snapshot = self.get_status(research_id, session_id)
@@ -663,6 +670,36 @@ class MarketResearchService:
             [{"op": "set", "path": "market.active_retry_id", "value": None}],
         )
 
+    def _mark_retry_process_interrupted(
+        self, retry: DirectionRetryRun
+    ) -> DirectionRetryRun:
+        """将没有内存 Runner（执行线程）的遗留重试收敛为可见失败终态。"""
+        interrupted = retry.model_copy(
+            update={
+                "status": ResearchStatus.FAILED,
+                "stage": ResearchStage.FINISHED,
+                "available_actions": (),
+                "error": MarketResearchError(
+                    MarketResearchErrorCode.PROCESS_INTERRUPTED,
+                    stage=retry.stage.value,
+                ).to_payload(),
+                "updated_at": datetime.now(UTC),
+            }
+        )
+        self.store.write_retry_status(interrupted)
+        self.store.append_event(
+            retry.retry_id,
+            {
+                "event": "market.retry.process_interrupted",
+                "status": interrupted.status.value,
+                "stage": interrupted.stage.value,
+                "error_code": MarketResearchErrorCode.PROCESS_INTERRUPTED.value,
+            },
+        )
+        self.store.clear_active_run(retry.retry_id)
+        self._clear_session_retry_reference(retry.origin_session_id, retry.retry_id)
+        return interrupted
+
     @staticmethod
     def _require_owner(snapshot: ResearchSnapshot, session_id: str) -> None:
         """校验 origin_session_id（来源 Session）与控制请求 Session 一致。"""
@@ -693,7 +730,7 @@ class MarketResearchService:
         runner: MarketResearchRunner
 
         def collect_trends(direction_context: DirectionRunContext) -> None:
-            """在当前方向复用唯一标签页采集搜索关注度并记录确定性摘要。"""
+            """在当前方向复用唯一标签页采集唯一 v2 搜索关注度结果。"""
             contract = TrendsPageContract()
             collector = GoogleTrendsCollector(
                 contract=contract,
@@ -708,15 +745,12 @@ class MarketResearchService:
                     target_url=target_url,
                 ),
             )
-            observations = collector.collect(
+            trend_result = collector.collect(
                 direction_context.direction,
                 direction_context.require_browser_page(),
                 direction_context.budget,
             )
-            direction_context.record_trend_results(
-                observations,
-                summarize_trend_directions(observations),
-            )
+            direction_context.record_trend_result(trend_result)
 
         def collect_boss(direction_context: DirectionRunContext) -> None:
             """在当前方向组装 BOSS 回调，支持登录等待、状态更新和一次安全重启。"""
@@ -738,6 +772,10 @@ class MarketResearchService:
                     contract=contract,
                     stage=ResearchStage.COLLECTING_BOSS,
                     target_url=target_url,
+                ),
+                page_review_handler=lambda _error: runner.wait_for_user(
+                    direction_context,
+                    stage=ResearchStage.COLLECTING_BOSS,
                 ),
                 progress_handler=lambda current, keyword, city: runner.update_progress(
                     current,

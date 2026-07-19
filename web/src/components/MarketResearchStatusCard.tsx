@@ -30,6 +30,41 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: "已取消",
 };
 
+const REJECTION_LABELS: Record<string, string> = {
+  not_full_time: "非全职",
+  salary_unparseable: "薪资无法解析",
+  recruiter_inactive: "招聘者活跃度不符合要求",
+  description_insufficient: "职位描述不足",
+  closed_or_offline: "职位已关闭或下线",
+  duplicate: "重复岗位",
+  company_limited: "同公司岗位数超限",
+};
+
+const SYNTHESIS_RULE_LABELS: Record<string, string> = {
+  unknown_statistic_ref: "引用了未知统计字段",
+  duplicate_statistic_ref: "统计字段重复引用",
+  career_definition_missing: "职业定义与岗位引用不一致",
+  career_definition_invalid_refs: "职业定义未引用三个有效岗位",
+  unknown_skill_explanation_ref: "技能说明引用了未知技能",
+  trend_boundary_missing: "缺少 Trends 数据边界说明",
+  theme_support_count_mismatch: "主题支持岗位计数不一致",
+  theme_unknown_job_ref: "主题引用了未知语义岗位",
+  theme_representative_outside_support: "主题代表岗位不在支持集合中",
+  prohibited_inference: "出现禁止的比较或推荐性推断",
+  numeric_copy: "说明文本重复了冻结统计数字",
+  schema_validation: "综合输出结构不符合契约",
+  type_error: "综合输出类型不符合契约",
+  unknown_rule: "未分类的综合校验规则",
+};
+
+const SEMANTIC_FAILURE_LABELS: Record<string, string> = {
+  top_level_invalid: "模型返回结构无效",
+  missing_output: "缺少岗位输出",
+  duplicate_output: "岗位输出重复",
+  schema_validation: "岗位字段校验失败",
+  evidence_not_found: "依据未在职位描述中找到",
+};
+
 type Props = {
   sessionId: string | null;
   refreshTrigger?: number;
@@ -59,6 +94,7 @@ export function MarketResearchStatusCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reuseCandidates, setReuseCandidates] = useState<Record<string, ReuseCandidate[]>>({});
+  const [collapsedTerminalKey, setCollapsedTerminalKey] = useState<string | null>(null);
   // notifiedTerminalKeysRef（已通知终态键集合）记录当前 Session 已处理过的调研或重试终态，
   // 避免普通数据刷新把同一个 failed/completed 再次通知给父组件。
   const notifiedTerminalKeysRef = useRef<Set<string>>(new Set());
@@ -158,13 +194,45 @@ export function MarketResearchStatusCard({
 
   const plan = data?.plan;
   const snapshot = data?.snapshot;
+  const activeRetry = data?.active_retry;
+  const retryInProgress = Boolean(activeRetry && ACTIVE.has(activeRetry.status));
+  const terminalCardKey = activeRetry && TERMINAL.has(activeRetry.status)
+    ? `retry:${activeRetry.retry_id}:${activeRetry.status}`
+    : snapshot && TERMINAL.has(snapshot.status)
+      ? `research:${snapshot.research_id}:${snapshot.status}`
+      : null;
+  useEffect(() => {
+    if (terminalCardKey) {
+      setCollapsedTerminalKey(terminalCardKey);
+    } else {
+      setCollapsedTerminalKey(null);
+    }
+  }, [terminalCardKey]);
   if (!sessionId || (!plan && !snapshot && !data?.active_summary)) return null;
+
+  if (terminalCardKey && collapsedTerminalKey === terminalCardKey) {
+    const terminalLabel = activeRetry && TERMINAL.has(activeRetry.status)
+      ? `方向重试${STATUS_LABELS[activeRetry.status] || activeRetry.status}`
+      : `市场调研${snapshot ? STATUS_LABELS[snapshot.status] || snapshot.status : "已结束"}`;
+    return (
+      <div className="mb-2 flex shrink-0 items-center justify-between gap-3 rounded border border-slate-700/70 bg-slate-900/50 px-3 py-2 text-sm text-slate-400">
+        <span>{terminalLabel}，详情已收起。</span>
+        <button className="text-cyan-300 hover:text-cyan-100" onClick={() => setCollapsedTerminalKey(null)}>查看详情</button>
+      </div>
+    );
+  }
 
   return (
     <section className="market-research-card" aria-live="polite">
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-semibold text-cyan-100">市场调研</h2>
-        {snapshot ? (
+        {terminalCardKey ? (
+          <button className="text-sm text-slate-400 hover:text-slate-200" onClick={() => setCollapsedTerminalKey(terminalCardKey)}>收起</button>
+        ) : retryInProgress && activeRetry ? (
+          <span className="rounded-full border border-violet-600/70 bg-violet-950/40 px-2 py-0.5 text-xs text-violet-200">
+            正在重试 · {activeRetry.stage}
+          </span>
+        ) : snapshot ? (
           <span className="rounded-full border border-cyan-700/60 px-2 py-0.5 text-xs text-cyan-200">
             {STATUS_LABELS[snapshot.status] || snapshot.status}
           </span>
@@ -234,9 +302,23 @@ export function MarketResearchStatusCard({
 
       {snapshot ? (
         <div className="mt-3 space-y-2 text-sm text-slate-300">
-          <p>阶段：{snapshot.stage}；方向：{snapshot.direction_name || "准备中"}；关键词/城市：{snapshot.keyword || "-"} / {snapshot.city || "-"}</p>
-          <p>候选 {snapshot.candidate_count} · 有效岗位 {snapshot.valid_job_count} · 语义分析 {snapshot.semantic_analyzed_count} · 有效耗时 {Math.round(snapshot.elapsed_seconds)} 秒</p>
-          {snapshot.error ? <p className="text-amber-200">{snapshot.error.error_code}：{snapshot.error.user_action}</p> : null}
+          {retryInProgress ? (
+            <div className="rounded border border-slate-700/80 bg-slate-950/30 px-3 py-2 text-slate-400">
+              <p>上次主调研已结束：{snapshot.error?.error_code || STATUS_LABELS[snapshot.status] || snapshot.status}。</p>
+              <p className="mt-1 text-slate-500">当前独立重试正在执行，实时进度以下方紫色状态卡为准。</p>
+            </div>
+          ) : (
+            <>
+              <p>阶段：{snapshot.stage}；方向：{snapshot.direction_name || "准备中"}；关键词/城市：{snapshot.keyword || "-"} / {snapshot.city || "-"}</p>
+              <p>候选 {snapshot.candidate_count} · 有效岗位 {snapshot.valid_job_count} · 已过滤 {snapshot.rejected_job_count} · 语义有效 {snapshot.semantic_analyzed_count} · 语义未通过 {snapshot.semantic_rejected_job_count} · 有效耗时 {Math.round(snapshot.elapsed_seconds)} 秒</p>
+              {Object.keys(snapshot.rejection_counts).length > 0 ? <p className="text-slate-400">过滤原因：{Object.entries(snapshot.rejection_counts).map(([reason, count]) => `${REJECTION_LABELS[reason] || reason} ${count}`).join("；")}</p> : null}
+              {snapshot.recent_rejections.length > 0 ? <p className="text-slate-500">最近过滤：{snapshot.recent_rejections.slice(-3).map((audit) => `${audit.title || audit.job_url}（${REJECTION_LABELS[audit.reason] || audit.reason}）`).join("；")}</p> : null}
+              {snapshot.synthesis_validation_audits.length > 0 ? <p className="text-amber-200">综合校验：{snapshot.synthesis_validation_audits.map((audit) => `第 ${audit.attempt} 次${SYNTHESIS_RULE_LABELS[audit.rule_code] || audit.rule_code}（${audit.field_paths.join("、")}）`).join("；")}</p> : null}
+              {Object.keys(snapshot.semantic_failure_counts).length > 0 ? <p className="text-slate-400">语义未通过原因：{Object.entries(snapshot.semantic_failure_counts).map(([reason, count]) => `${SEMANTIC_FAILURE_LABELS[reason] || reason} ${count}`).join("；")}</p> : null}
+              {snapshot.recent_semantic_failures.length > 0 ? <p className="text-slate-500">最近语义未通过：{snapshot.recent_semantic_failures.slice(-3).map((audit) => `${audit.job_url}（${SEMANTIC_FAILURE_LABELS[audit.failure_type] || audit.failure_type}：${audit.field_paths.join("、")}）`).join("；")}</p> : null}
+              {snapshot.error ? <p className="text-amber-200">{snapshot.error.error_code}：{snapshot.error.user_action}</p> : null}
+            </>
+          )}
           <div className="flex gap-2">
             {snapshot.available_actions.includes("continue") ? <button className="market-button" disabled={busy} onClick={() => void run(() => continueMarketResearch(snapshot.research_id, sessionId))}>已完成验证，继续</button> : null}
             {snapshot.available_actions.includes("cancel") ? <button className="market-button-secondary" disabled={busy} onClick={() => void run(() => cancelMarketResearch(snapshot.research_id, sessionId))}>取消调研</button> : null}
@@ -255,14 +337,19 @@ export function MarketResearchStatusCard({
         </div>
       ) : null}
 
-      {data?.active_retry ? (
+      {activeRetry ? (
         <div className="mt-3 space-y-2 rounded border border-violet-800/60 bg-violet-950/20 p-3 text-sm text-slate-300">
-          <p>方向重试：{data.active_retry.direction_name} · {STATUS_LABELS[data.active_retry.status] || data.active_retry.status} · 阶段 {data.active_retry.stage}</p>
-          <p>关键词/城市 {data.active_retry.keyword || "-"} / {data.active_retry.city || "-"} · 候选 {data.active_retry.candidate_count} · 有效 {data.active_retry.valid_job_count} · 语义 {data.active_retry.semantic_analyzed_count} · 有效耗时 {Math.round(data.active_retry.elapsed_seconds)} 秒</p>
-          {data.active_retry.error ? <p className="text-amber-200">{data.active_retry.error.error_code}：{data.active_retry.error.user_action}</p> : null}
+          <p>方向重试：{activeRetry.direction_name} · {STATUS_LABELS[activeRetry.status] || activeRetry.status} · 阶段 {activeRetry.stage}</p>
+          <p>关键词/城市 {activeRetry.keyword || "-"} / {activeRetry.city || "-"} · 候选 {activeRetry.candidate_count} · 有效 {activeRetry.valid_job_count} · 已过滤 {activeRetry.rejected_job_count} · 语义有效 {activeRetry.semantic_analyzed_count} · 语义未通过 {activeRetry.semantic_rejected_job_count} · 有效耗时 {Math.round(activeRetry.elapsed_seconds)} 秒</p>
+          {Object.keys(activeRetry.rejection_counts).length > 0 ? <p className="text-slate-400">过滤原因：{Object.entries(activeRetry.rejection_counts).map(([reason, count]) => `${REJECTION_LABELS[reason] || reason} ${count}`).join("；")}</p> : null}
+          {activeRetry.recent_rejections.length > 0 ? <p className="text-slate-500">最近过滤：{activeRetry.recent_rejections.slice(-3).map((audit) => `${audit.title || audit.job_url}（${REJECTION_LABELS[audit.reason] || audit.reason}）`).join("；")}</p> : null}
+          {activeRetry.synthesis_validation_audits.length > 0 ? <p className="text-amber-200">综合校验：{activeRetry.synthesis_validation_audits.map((audit) => `第 ${audit.attempt} 次${SYNTHESIS_RULE_LABELS[audit.rule_code] || audit.rule_code}（${audit.field_paths.join("、")}）`).join("；")}</p> : null}
+          {Object.keys(activeRetry.semantic_failure_counts).length > 0 ? <p className="text-slate-400">语义未通过原因：{Object.entries(activeRetry.semantic_failure_counts).map(([reason, count]) => `${SEMANTIC_FAILURE_LABELS[reason] || reason} ${count}`).join("；")}</p> : null}
+          {activeRetry.recent_semantic_failures.length > 0 ? <p className="text-slate-500">最近语义未通过：{activeRetry.recent_semantic_failures.slice(-3).map((audit) => `${audit.job_url}（${SEMANTIC_FAILURE_LABELS[audit.failure_type] || audit.failure_type}：${audit.field_paths.join("、")}）`).join("；")}</p> : null}
+          {activeRetry.error ? <p className="text-amber-200">{activeRetry.error.error_code}：{activeRetry.error.user_action}</p> : null}
           <div className="flex gap-2">
-            {data.active_retry.available_actions.includes("continue") ? <button className="market-button" disabled={busy} onClick={() => void run(() => continueMarketResearch(data.active_retry!.retry_id, sessionId))}>已完成验证，继续重试</button> : null}
-            {data.active_retry.available_actions.includes("cancel") ? <button className="market-button-secondary" disabled={busy} onClick={() => void run(() => cancelMarketResearch(data.active_retry!.retry_id, sessionId))}>取消重试</button> : null}
+            {activeRetry.available_actions.includes("continue") ? <button className="market-button" disabled={busy} onClick={() => void run(() => continueMarketResearch(activeRetry.retry_id, sessionId))}>已完成验证，继续重试</button> : null}
+            {activeRetry.available_actions.includes("cancel") ? <button className="market-button-secondary" disabled={busy} onClick={() => void run(() => cancelMarketResearch(activeRetry.retry_id, sessionId))}>取消重试</button> : null}
           </div>
         </div>
       ) : null}
