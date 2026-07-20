@@ -5,6 +5,7 @@ data/tasks/
 data/sessions/
 data/logs/
 data/resume/
+data/market_research/
 
 # 简历 HTML 产出；保留脱敏样例目录 output/example/
 output/**
@@ -17,6 +18,17 @@ output/**
 # --- 前端构建产物 ---
 web/dist/
 web/tsconfig.tsbuildinfo
+web/node_modules/
+web/.vite/
+web/coverage/
+
+# --- 前端包管理器 / 测试日志 ---
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+playwright-report/
+test-results/
 
 # --- IDE / 编辑器 ---
 .idea/
