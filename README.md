@@ -43,6 +43,110 @@ make dev blank
 
 尚未落地或待深化：记忆索引 side-query、三档 HTML 生成顺序复用、Browser Tool 生产级降级、部分 PRD 业务流程细节（见下方「优化点」）。
 
+## 实机演示
+
+以下截图展示从隔离环境启动、职业信息建档、受控市场调研、JD 分析到简历交付与环境清理的完整主链路。
+
+### 1. 本地环境启动
+
+#### 1.1 一条命令启动
+
+开发者运行 `make dev demo`，脚本初始化隔离的演示环境并启动 FastAPI 后端与 Vite 前端。终端同步显示本地访问地址和服务启动状态，方便现场复现。
+
+![运行 make dev demo 启动项目](docs/assets/screenshots/00-project-startup.png)
+
+### 2. 建档与职业初探
+
+#### 2.1 新建隔离会话
+
+用户创建新会话后，系统从职业初探阶段开始，后续阶段保持未启用状态。会话列表、阶段状态和简历产物区彼此分离，为每次职业规划保留独立上下文。
+
+![新建会话并进入职业初探阶段](docs/assets/screenshots/13-new-session.png)
+
+#### 2.2 通过对话开始职业规划
+
+用户描述转行、岗位提升或探索新方向等目标，系统在职业初探阶段继续追问背景和约束。对话结果逐步形成后续市场分析与岗位决策所需的稳定上下文。
+
+![通过对话开始职业方向规划](docs/assets/screenshots/12-career-planning.png)
+
+#### 2.3 收集基础职业信息
+
+用户可以粘贴完整简历，并按需补充工作年限、目标岗位和薪资预期。系统先通过结构化表单建立职业上下文，再在后续对话中确认缺失信息。
+
+![初探信息表收集简历与职业目标](docs/assets/screenshots/14-profile-intake.png)
+
+#### 2.4 拒绝越级调研
+
+用户在职业上下文不足时请求直接发起市场调研。流程闸门拒绝越级执行，并引导用户先补充调研所需的职业信息。
+
+![职业上下文不足时拒绝直接进入市场调研](docs/assets/screenshots/01-market-research-gate.png)
+
+### 3. 市场调研执行
+
+#### 3.1 可观测的异步进度
+
+市场调研以独立任务运行，状态卡持续展示当前阶段、候选数、有效数、过滤原因和耗时。用户可以在界面中查看重试状态，并在需要时取消任务。
+
+![市场调研任务的实时进度与过滤统计](docs/assets/screenshots/04-market-research-progress.png)
+
+#### 3.2 真实岗位数据采集
+
+专用浏览器按照已确认的关键词和城市条件访问招聘页面并采集岗位。浏览器过程保持可见，便于现场确认 Agent 正在执行真实工具操作。
+
+![专用浏览器采集 BOSS 直聘岗位](docs/assets/screenshots/05-boss-job-collection.png)
+
+#### 3.3 市场调研结果
+
+系统结合市场调研结果与候选人的能力背景给出方向匹配总结，同时明确样本限制和待补足项。用户确认结果后，流程才进入具体 JD 分析阶段。
+
+![市场调研与候选人方向匹配总结](docs/assets/screenshots/06-market-fit-summary.png)
+
+### 4. JD 分析与策略确认
+
+#### 4.1 分析具体 JD
+
+用户提供目标岗位 JD 后，系统对照已有能力与项目经历识别匹配优势和关键差距。分析结果进一步给出是否值得投递以及面试准备方向。
+
+![结合具体 JD 分析匹配优势与差距](docs/assets/screenshots/07-jd-fit-analysis.png)
+
+#### 4.2 生成并确认优化策略
+
+系统根据具体 JD 生成简历优化策略，说明项目叙事和经验补强方向。真正修改简历前再次请求用户确认，避免模型未经授权直接改写交付物。
+
+![根据具体 JD 生成简历优化策略并等待确认](docs/assets/screenshots/08-resume-strategy-confirmation.png)
+
+### 5. 最终交付
+
+#### 5.1 选择简历优化档位
+
+用户确认进入简历优化阶段后，可以在保守档、标准档和进取档之间选择调整幅度。系统先说明不同档位的改写边界，再根据用户选择执行对应的优化策略。
+
+![进入简历优化阶段并选择优化档位](docs/assets/screenshots/09-resume-optimization-entry.png)
+
+#### 5.2 生成并登记简历产物
+
+系统按照用户选择的档位完成内容优化，并生成带有明确名称的 HTML 简历文件。生成结果同步登记到简历产物区，用户可以直接打开后续交付物。
+
+![完成简历优化并登记生成的简历产物](docs/assets/screenshots/10-resume-generation.png)
+
+#### 5.3 查看最终 HTML 简历
+
+用户从简历产物区打开生成文件，即可查看、下载和打印完整的 HTML 简历。最终页面集中呈现专业概述、工作经历和核心项目等求职内容。
+
+![最终生成的 HTML 简历页面](docs/assets/screenshots/11-resume-output.png)
+
+### 6. 演示收尾
+
+#### 6.1 按环境清理运行数据
+
+开发者运行 `make clean <suffix>` 清除指定环境的数据与输出，并获得本次清理路径和后续启动提示。清理命令只作用于目标后缀，便于重复演示时恢复干净状态。
+
+![清理指定后缀的运行数据与输出](docs/assets/screenshots/15-environment-cleanup.png)
+
+> 更多运行过程、诊断信息和中间状态截图，见 [docs/assets/screenshots/](docs/assets/screenshots/)。
+>
+> 以上截图来自两次独立任务：主流程截图运行于 `make dev demo`，环境清理截图运行于 `make clean demo3`。
+
 ## 快速开始
 
 **环境**：Python ≥ 3.11、[uv](https://docs.astral.sh/uv/)、Node.js（前端）。
@@ -128,6 +232,7 @@ cd web && npm install && npm run dev
 ├── .agent/skills/         # 三阶段 Skill 包（Worker Run 内 load_skill）
 ├── docs/prd/              # 产品规格
 ├── docs/architecture/     # 架构与协议
+├── docs/assets/screenshots/ # 产品运行界面截图
 ├── docs/superpowers/plans/ # 迭代实施计划
 ├── scripts/dev.sh         # make dev <suffix>
 ├── scripts/clean.sh       # make clean <suffix>
@@ -208,6 +313,22 @@ uv run pytest tests/eval/ -m llm -v
 - [x] 【Bug】刚创建会话时，任务列表应该无选中“进行中”的任务，而且如果进入随便聊聊状态，不应该进入任何一个任务
   - [ ]【】目前的任务是固定大任务流程，针对大任务之内的执行，应该分析用户消息来动态创建小步骤的任务来执行
 - [ ] Agent 间的通知机制【需要优化】
+- [ ] 【已形成设计，待实施】Worker 缺少强类型调用契约：Coordinator 当前主要传递 `worker_id` 与自然语言 `goal`，同一 Worker
+  承担多个业务动作时，会根据用户原话和零散 Session 状态猜测本次职责，存在选错 Skill mode、调用错误 Tool、遗漏必需输入或错误串行下游
+  Worker 的风险
+    -
+    设计见 [强类型 WorkerInvocation 与 ExecutionPlan](docs/superpowers/specs/2026-07-23-typed-worker-invocation-execution-plan-design.md)
+    ；它是 [全局失败机制](docs/superpowers/specs/2026-07-23-global-failure-mechanism-design.md) 的前置改造
+    -
+    实施计划：[强类型调用](docs/superpowers/plans/2026-07-23-typed-worker-invocation-execution-plan.md) → [全局失败机制](docs/superpowers/plans/2026-07-23-global-failure-mechanism.md)
+    - `WorkerInvocation` 至少明确 `worker`、`run_kind`、`required_inputs`、`allowed_operations`、`required_skills`、
+      `success_contract_id`
+    - 建议区分：`identity.exploration_first / exploration_revisit`、
+      `capability.exploration_first / exploration_revisit / jd_bank_deep_dive`、
+      `market.propose_plan / revise_plan / start_research`、`opportunity.evaluate`、
+      `strategy.jd_application / career_plan`、`resume.collect_optimization_levels / generate_optimized_resume`、
+      `asset.reuse_outputs / register_outputs / delete_output`
+    - 两份 spec 和两份 plan 已分别完成；实施顺序固定为“先强类型调用、后全局失败机制”，最终在干净环境执行原 Bug 的跨模块系统级回归
 - [ ] **需要做简历的脱敏**
 
 ## todo
