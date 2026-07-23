@@ -4,6 +4,7 @@ from typing import Any
 
 import pytest
 
+from career_os.config import settings
 from career_os.platform.market_research.errors import MarketResearchError
 from career_os.platform.market_research.errors import MarketResearchErrorCode
 from career_os.platform.market_research.models import DirectionPlan
@@ -14,6 +15,13 @@ from career_os.platform.market_research.trends import (
     _bind_keyword_headers,
 )
 from career_os.platform.market_research.page_contracts import TrendsPageContract
+
+
+# requires_trends_enabled（要求启用趋势采集）在配置关闭时跳过真实采集状态机测试。
+requires_trends_enabled = pytest.mark.skipif(
+    not settings.market_research.trends_enabled,
+    reason="Google Trends collection is disabled by configuration",
+)
 
 
 class FakeClock:
@@ -84,6 +92,7 @@ def test_collector_defaults_to_one_rate_limit_retry() -> None:
     assert GoogleTrendsCollector().retry_times == 1
 
 
+@requires_trends_enabled
 def test_collect_backs_off_once_before_recovering() -> None:
     """首次 429 固定等待十秒后只重试一次，第二次恢复即继续。"""
     page = FakePage()
@@ -123,6 +132,7 @@ def test_collect_backs_off_once_before_recovering() -> None:
     assert user_action_count == 0
 
 
+@requires_trends_enabled
 def test_collect_does_not_sleep_past_remaining_budget() -> None:
     """剩余预算不足以完成下一次退避时直接终止，不执行超预算等待。"""
     page = FakePage()
@@ -148,6 +158,7 @@ def test_collect_does_not_sleep_past_remaining_budget() -> None:
     assert clock.sleeps == [5.0]
 
 
+@requires_trends_enabled
 def test_collect_allows_retry_delay_equal_to_remaining_budget() -> None:
     """剩余预算恰好等于退避时间时允许等待，下一检查点再判定耗尽。"""
     page = FakePage()
@@ -171,6 +182,7 @@ def test_collect_allows_retry_delay_equal_to_remaining_budget() -> None:
     assert clock.sleeps == [5.0]
 
 
+@requires_trends_enabled
 def test_collect_does_not_back_off_for_page_contract_error() -> None:
     """只有 429 对应错误使用退避，普通页面契约失败保持原有立即重试。"""
     page = FakePage()
@@ -196,6 +208,7 @@ def test_collect_does_not_back_off_for_page_contract_error() -> None:
     assert sum(clock.sleeps) == 10.0
 
 
+@requires_trends_enabled
 def test_first_rate_limit_uses_first_delay_after_non_rate_limit_error() -> None:
     """普通页面错误不消耗 429 退避档位，首次限流仍等待 10 秒。"""
     page = FakePage()
@@ -229,6 +242,7 @@ def test_first_rate_limit_uses_first_delay_after_non_rate_limit_error() -> None:
     assert result.source_status == "no_data"
 
 
+@requires_trends_enabled
 def test_collect_returns_degraded_result_after_one_rate_limit_retry() -> None:
     """持续 429 在一次退避重试后返回结构化来源降级。"""
     page = FakePage()
@@ -254,6 +268,7 @@ def test_collect_returns_degraded_result_after_one_rate_limit_retry() -> None:
     assert clock.sleeps == [10.0]
 
 
+@requires_trends_enabled
 def test_collect_ignores_regular_login_button_without_user_wait() -> None:
     """匿名 Trends 页的普通登录按钮不调用人工等待回调。"""
     page = FakePage()

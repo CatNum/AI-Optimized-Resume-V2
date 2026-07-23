@@ -24,6 +24,7 @@ class MarketResearchSettings(BaseModel):
     job_detail_retry_times: int = Field(default=2, ge=0, le=5)  # 单个岗位详情读取失败后的最大重试次数
     boss_list_retry_times: int = Field(default=2, ge=0, le=5)  # BOSS 列表页失败后的最大重试次数
     trends_retry_times: int = Field(default=1, ge=0, le=1)  # 搜索关注度页面失败后的最大额外重试次数
+    trends_enabled: bool = True  # 是否启用 Google Trends 页面采集；代码默认执行正式采集路径
     storage_retry_times: Literal[1] = 1  # 正式结果写入失败后的固定重试次数
     validity_months: Literal[6] = 6  # 方向结果允许下游复用的自然月数
     chrome_path: str | None = None  # 用户本机 Google Chrome 可执行文件覆盖路径

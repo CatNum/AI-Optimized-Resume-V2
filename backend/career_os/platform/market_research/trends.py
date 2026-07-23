@@ -68,6 +68,9 @@ class GoogleTrendsCollector:
         url = validate_external_url(
             self.contract.build_explore_url(query, "past_12_months"), self.contract.allowed_hosts
         )
+        # trends_enabled（是否启用趋势采集）关闭时，在任何页面操作前返回结构化降级结果。
+        if not settings.market_research.trends_enabled:
+            return self._degraded(direction, url, "config_skipped", 1)
         rate_limit_attempt = 0
         transient_attempted = False
         for attempt in range(1, self.retry_times + 2):
