@@ -474,18 +474,19 @@ SSE 完成路径调用 `end_chat` 清除标记，尚未用 `finally` 覆盖异�
 
 [v2.2（开发中）](docs/roadmap/v2.2.md) 是当前产品版本，按以下顺序推进，不自动吸收长期候选项：
 
-1. **先实施强类型调用与执行计划。** `WorkerInvocation`（Worker 结构化调用契约）用于冻结单次业务动作、输入、权限与成功契约；
-   `ExecutionPlan`
-   （执行计划）用于保存节点、依赖、顺序和已验证结果。依据为[设计规格](docs/superpowers/specs/2026-07-23-typed-worker-invocation-execution-plan-design.md)
-   和[实施计划](docs/superpowers/plans/2026-07-23-typed-worker-invocation-execution-plan.md)。
-2. **再实施全局失败机制。**
+1. **先实施强类型 WorkerInvocation 与结果契约。** `WorkerInvocation`（Worker 结构化调用契约）用于冻结单次业务动作、输入、权限与成功契约；
+   `VerifiedOutcome`（已验证业务结果）用于阻止下游从自然语言摘要或默认值猜测结果。依据为[设计规格](docs/superpowers/specs/2026-07-23-typed-worker-invocation-contract-design.md)
+   和[实施计划](docs/superpowers/plans/2026-07-23-typed-worker-invocation-contract.md)。
+2. **再实施 ExecutionPlan 与受控执行生命周期。** `ExecutionPlan`（执行计划）用于保存节点、依赖、顺序和已验证结果，并统一 Session、Gate、operation 授权与产物索引。依据为[设计规格](docs/superpowers/specs/2026-07-23-execution-plan-controlled-lifecycle-design.md)
+   和[实施计划](docs/superpowers/plans/2026-07-23-execution-plan-controlled-lifecycle.md)。
+3. **再实施全局失败机制。**
    统一失败分类、状态传播、策略执行、证据关联与用户错误呈现，依据为[设计规格](docs/superpowers/specs/2026-07-23-global-failure-mechanism-design.md)
    和[实施计划](docs/superpowers/plans/2026-07-23-global-failure-mechanism.md)。
-3. **之后规划并实施纯规划链的最小 pipeline 改造。** 只有前两项完成实现和验证后，才单独形成纯规划链的 Spec/Plan，并让它复用同一
+4. **之后规划并实施纯规划链的最小 pipeline 改造。** 只有前三项完成实现和验证后，才单独形成纯规划链的 Spec/Plan，并让它复用同一
    `WorkerInvocation`、`ExecutionPlan`、Gate 和全局失败语义；当前不提前扩充 15 个闭合 Run Kind，也不建立旁路编排。
-4. **最后执行跨模块系统级回归。** 在干净临时环境证明上游失败会阻断下游、部分成功会保留真实成果、运行身份与 Trace 可以关联，并验证纯规划请求通过同一 pipeline 执行。
+5. **最后执行跨模块系统级回归。** 在干净临时环境证明上游失败会阻断下游、部分成功会保留真实成果、运行身份与 Trace 可以关联，并验证纯规划请求通过同一 pipeline 执行。
 
-上述两份 Spec 和两份 Plan 共四份依赖文档当前工作区已存在，但不由本次 README/Roadmap
+上述三份 Spec 和三份 Plan 共六份依赖文档当前工作区已存在，但不由本次 README/Roadmap
 维护修改或暂存；它们由用户后续加入版本库。文档形成不代表对应业务代码已经实现。
 
 ### 10.3 长期候选方向

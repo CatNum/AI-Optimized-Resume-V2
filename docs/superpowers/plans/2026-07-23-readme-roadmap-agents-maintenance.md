@@ -27,7 +27,7 @@
 - 允许在仓库根目录临时创建 `README.before-maintenance.md` 作为迁移快照；创建前必须确认同名文件不存在，快照不得暂存，人工对照完成后删除。
 - 实施时不得修改本 Plan、Design SSOT、历史 PRD、历史架构文档或其他既有文档；发现错误只在目标文件中标注边界，另行提出修订建议。
 - 保留用户已有未跟踪文件和无关改动，不暂存、不覆盖、不删除；只允许暂存本计划新建的 `AGENTS.md` 和四份 roadmap 文档。
-- 强类型 Worker 调用和全局失败机制对应的四份 Spec/Plan 当前作为 `v2.2` 的本地依赖来源保留，但不纳入本计划的目标文件或暂存范围；若执行时仍未被 Git 跟踪，记录为“由用户后续加入版本库”的临时交付边界。
+- 强类型 Worker 调用、受控执行生命周期和全局失败机制对应的六份 Spec/Plan 当前作为 `v2.2` 的本地依赖来源保留，但不纳入本计划的目标文件或暂存范围；若执行时仍未被 Git 跟踪，记录为“由用户后续加入版本库”的临时交付边界。
 - 根 README 的一级章节顺序必须与 Design SSOT 完全一致。
 - 实机演示内部顺序保持不变；原 14 张截图引用、截图说明、两次独立任务说明和补充截图目录链接必须保留。
 - README 仓库结构只展示目录，不展示文件；选择性展开且最深五级。
@@ -231,9 +231,11 @@ test -e docs/参考文档.md
 - Create: `docs/roadmap/v2.1.md`
 - Create: `docs/roadmap/v2.2.md`
 - Reference: `README.md`
-- Reference: `docs/superpowers/specs/2026-07-23-typed-worker-invocation-execution-plan-design.md`
+- Reference: `docs/superpowers/specs/2026-07-23-typed-worker-invocation-contract-design.md`
+- Reference: `docs/superpowers/specs/2026-07-23-execution-plan-controlled-lifecycle-design.md`
 - Reference: `docs/superpowers/specs/2026-07-23-global-failure-mechanism-design.md`
-- Reference: `docs/superpowers/plans/2026-07-23-typed-worker-invocation-execution-plan.md`
+- Reference: `docs/superpowers/plans/2026-07-23-typed-worker-invocation-contract.md`
+- Reference: `docs/superpowers/plans/2026-07-23-execution-plan-controlled-lifecycle.md`
 - Reference: `docs/superpowers/plans/2026-07-23-global-failure-mechanism.md`
 
 - [ ] **Step 1: 创建 roadmap 目录**
@@ -838,12 +840,13 @@ Worker 内部模型输出不得画成直接流向前端；当前实现先由 Coo
 
 摘要链接到：
 
-- 强类型 WorkerInvocation 与 ExecutionPlan Spec；
+- 强类型 WorkerInvocation 与结果契约 Spec；
+- ExecutionPlan 与受控执行生命周期 Spec；
 - 全局失败机制 Spec；
 - 对应 Implementation Plan。
 
-保持“先强类型调用、后全局失败机制、最后系统级回归”的依赖顺序。
-上述四份依赖文档不由本计划暂存或提交；若仍未被 Git 跟踪，在 `v2.2.md` 中保留引用并明确记录“当前工作区已存在、由用户后续加入版本库”的临时交付边界。
+保持“先强类型调用与结果契约、再受控执行生命周期、后全局失败机制、最后系统级回归”的依赖顺序。
+上述六份依赖文档不由本计划暂存或提交；若仍未被 Git 跟踪，在 `v2.2.md` 中保留引用并明确记录“当前工作区已存在、由用户后续加入版本库”的临时交付边界。
 
 - [ ] **Step 5: 编写长期候选方向**
 
@@ -1039,7 +1042,7 @@ rg -n 'Multi-Agent|记忆系统|评测 Agent|简历模板|Offer|上下文压缩|
 - `http://`、`https://` 和纯锚点不做本地文件检查；
 - 带锚点的本地路径先移除 `#...` 再检查文件；
 - 缺失路径必须修复或显式标记“待补充”。
-- 对强类型 Worker 调用和全局失败机制的四份依赖 Spec/Plan 运行 `git ls-files --error-unmatch <path>` 检查跟踪状态；未跟踪时保留引用，但必须记录“由用户后续加入版本库”，不得暂存这些文件，也不得把链接描述为已随本次提交闭合。
+- 对强类型 Worker 调用、受控执行生命周期和全局失败机制的六份依赖 Spec/Plan 运行 `git ls-files --error-unmatch <path>` 检查跟踪状态；未跟踪时保留引用，但必须记录“由用户后续加入版本库”，不得暂存这些文件，也不得把链接描述为已随本次提交闭合。
 
 特别确认：
 
@@ -1107,7 +1110,7 @@ git diff --cached --stat
 - `README.before-maintenance.md` 仍是未暂存的临时迁移快照；
 - Design Spec 和本 Plan 的既有内容未在实施阶段被改写；
 - 用户原有未跟踪文件和无关修改保持原样；
-- 强类型 Worker 调用和全局失败机制的四份依赖 Spec/Plan 未被本计划暂存；若仍未跟踪，最终交付明确说明它们由用户后续加入版本库；
+- 强类型 Worker 调用、受控执行生命周期和全局失败机制的六份依赖 Spec/Plan 未被本计划暂存；若仍未跟踪，最终交付明确说明它们由用户后续加入版本库；
 - 没有业务代码、配置、依赖或截图变化。
 
 - [ ] **Step 2: 使用根目录快照人工核对 README 迁移完整性**

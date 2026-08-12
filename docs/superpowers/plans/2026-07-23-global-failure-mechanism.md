@@ -2,15 +2,17 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` to implement this plan task-by-task. Each vertical slice follows red → green and uses checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 建立覆盖同步 Worker Run、Turn Run 和后台 Job Run 的全局失败机制，使所有有业务意义的 operation 使用确定性结果、错误分类和策略，并通过 operation 事实、前置计划的泛型 `ContractEvaluation[VerifiedOutcome]` 与可选 Judge 判断真实完成状态，同时保留前置计划建立的 Invocation、Outcome 和 binder 静态类型关系。
+**Goal:** 建立覆盖同步 Worker Run、Turn Run 和后台 Job Run 的全局失败机制，使所有有业务意义的 operation 使用确定性结果、错误分类和策略，并通过 operation 事实、结果契约前置计划的泛型 `ContractEvaluation[VerifiedOutcome]` 与可选 Judge 判断真实完成状态，同时保留结果契约建立的 Invocation/Outcome 和受控生命周期建立的 binder 静态类型关系。
 
-**Architecture:** `OperationExecutor`（operation 执行器）是执行有业务意义动作的唯一深模块接口：它保存不可变输入快照，通过基础设施 Adapter 归一化结果，从代码策略注册表选择唯一策略，并负责重试、结果核对、补偿、断路器和审计。`RunEngine`（Run 引擎）在上层直接消费前置计划原子认领产生的 `PlanDispatch`，使用其中冻结的同一个 `worker_run_id` 管理 Worker/Turn/Job 生命周期：先读取 operation 与运行完整性事实，再调用前置计划已经实现的 `DeterministicSuccessContractRegistry.evaluate()`，必要时调用受约束 Judge，最后把终态 WorkerRunResult 转成强类型 `PlanNodeResult`、聚合 ExecutionPlan，并交给 `TurnResultRenderer` 生成用户可读结果。Snapshot、Trace、Failure 和 Emergency Sink 提供本地可回放证据，但不恢复应用重启前的旧执行。
+**Architecture:** `OperationExecutor`（operation 执行器）是执行有业务意义动作的唯一深模块接口：它保存不可变输入快照，通过基础设施 Adapter 归一化结果，从代码策略注册表选择唯一策略，并负责重试、结果核对、补偿、断路器和审计。`RunEngine`（Run 引擎）在上层直接消费受控生命周期计划原子认领产生的 `PlanDispatch`，使用其中冻结的同一个 `worker_run_id` 管理 Worker/Turn/Job 生命周期：先读取 operation 与运行完整性事实，再调用结果契约计划已经实现的 `DeterministicSuccessContractRegistry.evaluate()`，必要时调用受约束 Judge，最后把终态 WorkerRunResult 转成强类型 `PlanNodeResult`、聚合 ExecutionPlan，并交给 `TurnResultRenderer` 生成用户可读结果。Snapshot、Trace、Failure 和 Emergency Sink 提供本地可回放证据，但不恢复应用重启前的旧执行。
 
 **Tech Stack:** Python 3.11、Pydantic 2、LangGraph、LiteLLM、FastAPI SSE、pytest、本地 JSON/JSONL Store
 
 **Design SSOT:** `../specs/2026-07-23-global-failure-mechanism-design.md`
 
-**Required predecessor:** `2026-07-23-typed-worker-invocation-execution-plan.md` 已全部实施并通过，且已提供闭合 `WorkerInvocation`/`VerifiedOutcome` 联合、唯一 `DeterministicSuccessContractRegistry`、泛型 `ContractEvaluation[TOutcome]`、强类型 OutcomeBinding、原子 `PlanDispatch`、闭合 `PlanNodeResult`/`PlanAdvanceResult`、唯一 `OperationRegistry`，以及单次 operation 的活动快照、闭合 continuation、confirmation、claim 和 committed receipt 状态机。
+**Required direct predecessor:** `2026-07-23-execution-plan-controlled-lifecycle.md` 已全部实施并通过，且已提供强类型 OutcomeBinding、原子 `PlanDispatch`、闭合 `PlanNodeResult`/`PlanAdvanceResult`、唯一 `OperationRegistry`，以及单次 operation 的活动快照、confirmation、claim 和 committed receipt 状态机。
+
+**Required transitive predecessor:** `2026-07-23-typed-worker-invocation-contract.md` 已全部实施并通过，且已提供闭合 `WorkerInvocation`/`VerifiedOutcome` 联合、唯一 `DeterministicSuccessContractRegistry`、泛型 `ContractEvaluation[TOutcome]`、统一 Runner、暂停现场和闭合 continuation。
 
 **Status:** 待实现
 
@@ -18,11 +20,11 @@
 
 ## Global Constraints
 
-- 本 plan 不重新设计 WorkerInvocation、ExecutionPlan 或确定性 Success Contract；直接消费前置 plan 提供的闭合 Invocation/Outcome 联合、Invocation/Plan 标识、allowed operations、required/optional Skill、OutcomeDefinition、success_contract_id、泛型 `ContractEvaluation` 和 OutcomeBinding。
+- 本 plan 不重新设计 WorkerInvocation、ExecutionPlan 或确定性 Success Contract；直接消费结果契约前置 plan 提供的闭合 Invocation/Outcome 联合、allowed operations、required/optional Skill、OutcomeDefinition、success_contract_id 和泛型 `ContractEvaluation`，以及受控生命周期前置 plan 提供的 Invocation/Plan 标识和 OutcomeBinding。
 - RunEngine 启动 Worker 时必须消费完整 `PlanDispatch`，原样沿用 claim 已绑定的 `worker_run_id`；不得只传 Invocation 后重新生成 Worker Run 编号。
 - 本 plan 不创建第二份 Success Contract Registry，不复制各 Run Kind 的确定性契约 handler，也不从原始 Worker `structured_output` 重新提取命名 Outcome。
 - 本 plan 复用前置 `OperationDefinition/OperationRegistry`，只增加执行结果、失败策略和 Adapter 绑定；不得复制 operation 名称、`requires_authorization`、`durable_result_ledger_id` 或 durable ledger 注册关系。
-- RunEngine、WorkerRunResult 与 Store 不得把具体 Invocation/Outcome 降级为裸 `BaseModel`、`Any` 或 `Mapping[str, Any]`；新增接口必须继续通过前置 plan 的 Pyright strict 门禁。
+- RunEngine、WorkerRunResult 与 Store 不得把具体 Invocation/Outcome 降级为裸 `BaseModel`、`Any` 或 `Mapping[str, Any]`；新增接口必须继续通过结果契约前置 plan 的 Pyright strict 门禁。
 - `OperationResult` 顶层只允许 `Success`、`BusinessOutcome`、`FailureResult`；正常等待授权、等待补充信息、无结果和后台任务已接受不能伪装为 Failure。
 - Failure 第一版固定为 `input_required`、`contract_violation`、`tool_failure`、`model_failure`、`policy_blocked`，并提供 `unclassified_failure / unexpected_exception` 兜底。
 - OperationPolicyRegistry 是失败策略唯一事实来源；策略安全行为不得从 JSON、Prompt 或 LLM 输出加载。
@@ -409,7 +411,7 @@ class RunEngine:
 - `start_worker`（启动 Worker Run）：使用 `PlanDispatch` 中已经冻结的 plan_id、node_id、Invocation 和 worker_run_id 创建 running 生命周期，不再生成新编号。
 - `turn_run_id`（Turn Run 编号）：标识当前用户请求的运行生命周期，用于阻止 dispatch 跨 Turn 使用。
 - `finish_worker`（结束 Worker Run）：按运行完整性、确定性契约和可选 Judge 顺序形成终态，并保留同一 node_id 与 worker_run_id。
-- `to_plan_node_result`（转换计划节点结果）：把终态 WorkerRunResult 投影为前置 plan 的闭合 PlanNodeResult，供 ExecutionPlanExecutor 校验身份并推进节点。
+- `to_plan_node_result`（转换计划节点结果）：把终态 WorkerRunResult 投影为受控生命周期前置 plan 的闭合 PlanNodeResult，供 ExecutionPlanExecutor 校验身份并推进节点。
 
 - [ ] **Step 1: 写 resume 三段式集成判定红灯测试**
 
@@ -456,7 +458,7 @@ interrupted
 
 RunEngine 必须：
 
-1. 依赖注入前置 plan 的 `DeterministicSuccessContractRegistry`；
+1. 依赖注入结果契约前置 plan 的 `DeterministicSuccessContractRegistry`；
 2. 为同一 Registry 注入由 OperationResult/WorkerExecutionEvidence 支持的 Artifact/Index verifier Adapter，所有外部事实读取仍遵守 OperationExecutor 规则；
 3. 使用 `evaluate()` 返回的 `ContractEvaluation[VerifiedOutcome]`，不得读取私有契约 handler；
 4. 只有 `satisfied=True` 时接受闭合联合中的具体 `verified_outcomes`，并保持其类型直到 WorkerRunResult 与 Plan binder；
@@ -966,9 +968,9 @@ git status --short
 15. SSE 执行与交付状态分离，断连不重放业务 operation。
 16. 当前 Bug 的干净环境系统级回归和部分成功对照场景通过。
 17. 全部非 LLM 测试与 `uv run pyright` 通过；LLM Eval 与确定性验收分层记录。
-18. RunEngine、WorkerRunResult 和 Store 保持前置 plan 的闭合 Invocation/Outcome 与泛型 ContractEvaluation，不引入裸 `BaseModel`、`Any` 或字符串 Outcome 字典。
+18. RunEngine、WorkerRunResult 和 Store 保持结果契约前置 plan 的闭合 Invocation/Outcome 与泛型 ContractEvaluation，不引入裸 `BaseModel`、`Any` 或字符串 Outcome 字典。
 19. `claim_next()` 产生的 PlanDispatch 被 RunEngine 完整消费；WorkerRun、WorkerRunResult 与 PlanNodeResult 始终保持同一个 plan_id、node_id 和 worker_run_id，重复或错配启动被拒绝。
-20. `OperationDefinition/OperationRegistry` 来自前置 plan 且保持唯一；OperationExecutor 只接收 OperationRequest 并调用 `OperationRegistry.resolve()` 返回的唯一 Definition/handler 绑定，Policy、Adapter catalog 和 Session Grant Registry 只引用它，不复制 operation 授权要求、durable ledger 绑定，也不允许调用方传入 handler。
+20. `OperationDefinition/OperationRegistry` 来自受控生命周期前置 plan 且保持唯一；OperationExecutor 只接收 OperationRequest 并调用 `OperationRegistry.resolve()` 返回的唯一 Definition/handler 绑定，Policy、Adapter catalog 和 Session Grant Registry 只引用它，不复制 operation 授权要求、durable ledger 绑定，也不允许调用方传入 handler。
 
 ## Suggested Commit
 

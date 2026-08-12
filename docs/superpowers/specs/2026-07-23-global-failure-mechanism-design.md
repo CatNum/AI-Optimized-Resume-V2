@@ -5,7 +5,8 @@
 | 状态 | **已确认，实施计划已编写** |
 | 版本 | **1.3.0** |
 | 日期 | 2026-07-23 |
-| 前置规格 | [强类型 WorkerInvocation 与 ExecutionPlan](./2026-07-23-typed-worker-invocation-execution-plan-design.md) |
+| 直接前置规格 | [ExecutionPlan 与受控执行生命周期](./2026-07-23-execution-plan-controlled-lifecycle-design.md) |
+| 传递前置规格 | [强类型 WorkerInvocation 与结果契约](./2026-07-23-typed-worker-invocation-contract-design.md) |
 | 适用范围 | Operation、Worker Run、Turn Run、Job Run、Gate、Trace、SSE、用户错误呈现与本地审计 |
 | 实施计划 | [全局失败机制 Implementation Plan](../plans/2026-07-23-global-failure-mechanism.md) |
 | 领域语言 | [CONTEXT.md](../../../CONTEXT.md) |
@@ -57,9 +58,9 @@
 8. **本地完整可回放**：不做脱敏，但避免把大段原文重复嵌入每条 Trace 和 Failure。
 9. **不恢复旧执行**：应用重启后未完成 Run 只标记 interrupted，不自动续跑。
 10. **运行正确性与离线质量分离**：运行时 Judge 判断目标是否完成；Eval 判断结果质量。
-11. **确定性契约单一事实来源**：复用前置强类型规格提供的闭合 `WorkerInvocation`/`VerifiedOutcome` 联合、`DeterministicSuccessContractRegistry` 与泛型 `ContractEvaluation[TOutcome]`；本规格只编排 operation 事实、运行完整性、确定性验收结果和可选 Judge，不复制业务契约或擦除其静态类型。
+11. **确定性契约单一事实来源**：复用《强类型 WorkerInvocation 与结果契约》提供的闭合 `WorkerInvocation`/`VerifiedOutcome` 联合、`DeterministicSuccessContractRegistry` 与泛型 `ContractEvaluation[TOutcome]`；本规格只编排 operation 事实、运行完整性、确定性验收结果和可选 Judge，不复制业务契约或擦除其静态类型。
 12. **认领身份端到端不变**：RunEngine 完整消费前置 Plan claim 产生的 `PlanDispatch`，从 WorkerRun 到 PlanNodeResult 始终使用同一个 plan_id、node_id 和 worker_run_id。
-13. **授权所有权分层但不重复**：复用前置规格的 `OperationRegistry`、`OperationAuthorizationWait`、闭合 continuation、claim 和 committed receipt 作为单次 operation 恢复的唯一状态机；本规格的 Session Grant 只表达可跨 Worker Run 复用的授权约束，不能替代或复制单次操作状态。
+13. **授权所有权分层但不重复**：复用《强类型 WorkerInvocation 与结果契约》的闭合 continuation，以及《ExecutionPlan 与受控执行生命周期》的 `OperationRegistry`、`OperationAuthorizationWait`、claim 和 committed receipt，组成单次 operation 恢复的唯一状态机；本规格的 Session Grant 只表达可跨 Worker Run 复用的授权约束，不能替代或复制单次操作状态。
 
 ## 3. 目标
 
@@ -95,8 +96,8 @@
 - 对本地 Run Snapshot 做脱敏；
 - 将每个普通内部函数都包装为 operation；
 - 让 LLM 自由选择失败策略、依赖或补偿函数；
-- 重新定义或复制前置强类型规格已经实现的闭合 Invocation/Outcome 类型、确定性 Success Contract Registry、契约 handler 或 Outcome 提取规则；
-- 重新定义前置规格已经实现的 Operation Definition、operation 授权元数据、活动计划快照、confirmation/claim/receipt 状态机或 continuation；
+- 重新定义或复制《强类型 WorkerInvocation 与结果契约》已经实现的闭合 Invocation/Outcome 类型、确定性 Success Contract Registry、契约 handler 或 Outcome 提取规则；
+- 重新定义《ExecutionPlan 与受控执行生命周期》已经实现的 Operation Definition、operation 授权元数据、活动计划快照、confirmation/claim/receipt 状态机，或改写其消费的前置 continuation；
 - 使用运行时 Judge 评价文案是否足够优秀；
 - 删除或重做市场调研已有的显式取消能力。
 
@@ -572,7 +573,7 @@ optional operation 失败是否降级，由匹配策略决定。operation 没有
 
 #### 确定性成功契约
 
-调用前置强类型规格提供的 `DeterministicSuccessContractRegistry.evaluate()`，消费其 `ContractEvaluation[VerifiedOutcome]`。其中 `VerifiedOutcome`（已验证结果）是前置规格定义的闭合联合，`satisfied`（是否满足）是用于静态缩窄成功/不满足分支的 Literal discriminator。该 Registry 是以下规则的唯一实现位置：
+调用《强类型 WorkerInvocation 与结果契约》提供的 `DeterministicSuccessContractRegistry.evaluate()`，消费其 `ContractEvaluation[VerifiedOutcome]`。其中 `VerifiedOutcome`（已验证结果）是该规格定义的闭合联合，`satisfied`（是否满足）是用于静态缩窄成功/不满足分支的 Literal discriminator。该 Registry 是以下规则的唯一实现位置：
 
 - 必需输出字段；
 - 命名 Outcome；
@@ -582,7 +583,7 @@ optional operation 失败是否降级，由匹配策略决定。operation 没有
 - Gate 类型；
 - 上游输入一致性。
 
-本规格的 `RunEngine` 不再注册第二份契约 handler，也不从 Worker 原始 `structured_output` 自行提取 Outcome。它只接收前置规格的闭合 `WorkerInvocation` 联合，并为同一个 Registry 注入由 OperationResult/WorkerExecutionEvidence 支持的 Artifact/Index verifier Adapter，使外部事实读取仍经过 OperationExecutor。只有 `ContractEvaluation.satisfied=True` 时，具体 `verified_outcomes` 才能参与 Worker Run success 和 ExecutionPlan 的强类型 binder；契约不满足时，由本规格结合 operation 事实与运行完整性形成最终状态和 Failure。RunEngine、WorkerRunResult 和 Store 不得把这些对象降级为 `Mapping[str, Any]` 或字符串 Outcome 字典。
+本规格的 `RunEngine` 不再注册第二份契约 handler，也不从 Worker 原始 `structured_output` 自行提取 Outcome。它只接收《强类型 WorkerInvocation 与结果契约》的闭合 `WorkerInvocation` 联合，并为同一个 Registry 注入由 OperationResult/WorkerExecutionEvidence 支持的 Artifact/Index verifier Adapter，使外部事实读取仍经过 OperationExecutor。只有 `ContractEvaluation.satisfied=True` 时，具体 `verified_outcomes` 才能参与 Worker Run success 和 ExecutionPlan 的强类型 binder；契约不满足时，由本规格结合 operation 事实与运行完整性形成最终状态和 Failure。RunEngine、WorkerRunResult 和 Store 不得把这些对象降级为 `Mapping[str, Any]` 或字符串 Outcome 字典。
 
 例如 `resume.generate_optimized_resume`：
 
@@ -624,7 +625,7 @@ Judge 规则：
 
 ### 13.4 Plan claim 与 Worker Run 身份连续性
 
-RunEngine 必须直接消费前置强类型规格的 `PlanDispatch`，不能只接收其中的 Invocation：
+RunEngine 必须直接消费《ExecutionPlan 与受控执行生命周期》的 `PlanDispatch`，不能只接收其中的 Invocation：
 
 ```python
 class RunEngine:
@@ -652,7 +653,7 @@ class RunEngine:
 - `start_worker`（启动 Worker Run）：使用 `PlanDispatch` 中已经由 `claim_next()` 原子认领的计划编号、节点编号、Invocation 和 Worker Run 编号创建 running 生命周期。
 - `turn_run_id`（Turn Run 编号）：标识本轮用户请求的运行生命周期，用于验证 dispatch 所属 Plan 没有跨 Turn 使用。
 - `finish_worker`（结束 Worker Run）：保持同一计划、节点和 Worker Run 身份，结合运行证据生成最终 `WorkerRunResult`。
-- `to_plan_node_result`（转换计划节点结果）：把终态 WorkerRunResult 投影为前置规格定义的最小 `PlanNodeResult`，供 `ExecutionPlanExecutor.advance()` 验证身份并推进 Plan。
+- `to_plan_node_result`（转换计划节点结果）：把终态 WorkerRunResult 投影为《ExecutionPlan 与受控执行生命周期》定义的最小 `PlanNodeResult`，供 `ExecutionPlanExecutor.advance()` 验证身份并推进 Plan。
 
 身份规则：
 
@@ -817,7 +818,7 @@ Job Run 独立拥有：
 
 - 保持同一个 Worker Run 与 ExecutionPlan；
 - 不设置固定 authorization_request_ttl；
-- 完整复用前置规格的 `AuthorizationSuspendedExecution + SuspendedWorkerRun + OperationContinuation + OperationAuthorizationWait`；`AuthorizationSuspendedExecution` 是 `SessionExecutionState.current_execution` 中等待 operation authorization 的唯一分支，ReAct 与确定性执行都按其 discriminator 恢复原执行点；真正异步、跨请求且不等待授权的 Plan 使用独立 `AsynchronousExecution`，后台 Job 仍由自身生命周期管理；
+- 完整复用《强类型 WorkerInvocation 与结果契约》的 `SuspendedWorkerRun + OperationContinuation`，以及《ExecutionPlan 与受控执行生命周期》的 `AuthorizationSuspendedExecution + OperationAuthorizationWait`；`AuthorizationSuspendedExecution` 是 `SessionExecutionState.current_execution` 中等待 operation authorization 的唯一分支，ReAct 与确定性执行都按其 discriminator 恢复原执行点；真正异步、跨请求且不等待授权的 Plan 使用独立 `AsynchronousExecution`，后台 Job 仍由自身生命周期管理；
 - confirmation、恢复权 claim、底层 durable ledger 和 `CommittedOperationReceipt` 继续由前置 `SessionStore` 状态机唯一管理，本规格不创建第二份 authorization request Store；
 - 拒绝、参数变化、运行实例变化、临时资源失效或业务主动结束会终止等待；
 - 参数变化时旧 Run superseded，新建 Run。
@@ -1273,10 +1274,9 @@ resume Worker Run = success
 
 ## 27. 实施顺序与依赖
 
-1. 先完成强类型 WorkerInvocation/ExecutionPlan spec 对应 plan。
-2. 前置 plan 必须已经提供闭合 `WorkerInvocation`/`VerifiedOutcome` 联合、`DeterministicSuccessContractRegistry`、泛型 `ContractEvaluation[TOutcome]`、强类型 OutcomeBinding、原子 `PlanDispatch`、闭合 `PlanNodeResult`/`PlanAdvanceResult`、唯一 `OperationRegistry`，以及单次 operation 的快照/continuation/claim/receipt 状态机；本规格不得用动态字典、临时目录、第二份 Registry、第二份授权请求 Store 或重新生成的 Worker Run 编号替代。
-3. 再编写本规格对应的独立 plan。
-4. 实施时先完成强类型 plan，再实施全局失败 plan。
-5. 两个 plan 内各自测试先行。
-6. 当前 2026-07-22 demo Bug 的跨模块系统级回归测试最后在干净环境增加。
-7. 不在本规格实施中迁移或修复旧 demo 运行记录。
+1. 先完成《强类型 WorkerInvocation 与结果契约》对应 plan；它提供闭合 `WorkerInvocation`/`VerifiedOutcome` 联合、唯一 `DeterministicSuccessContractRegistry`、泛型 `ContractEvaluation[TOutcome]`、统一 Runner、暂停现场和闭合 continuation。
+2. 再完成《ExecutionPlan 与受控执行生命周期》对应 plan；它提供强类型 OutcomeBinding、原子 `PlanDispatch`、闭合 `PlanNodeResult`/`PlanAdvanceResult`、唯一 `OperationRegistry`，以及单次 operation 的活动快照、confirmation、claim 和 committed receipt 状态机。
+3. 两个前置 plan 都通过各自验收后，才实施本规格对应的独立 plan；本规格不得用动态字典、临时目录、第二份 Registry、第二份授权请求 Store 或重新生成的 Worker Run 编号替代前置能力。
+4. 三个 plan 内各自测试先行。
+5. 当前 2026-07-22 demo Bug 的跨模块系统级回归测试最后在干净环境增加。
+6. 不在本规格实施中迁移或修复旧 demo 运行记录。

@@ -110,15 +110,19 @@ flowchart TD
 
 ### 修复方向
 
-修复分为两个独立机制，并按固定顺序实施：
+修复分为三个顺序阶段：前两阶段共同建立受控执行基础，第三阶段统一失败语义。
 
-1. **强类型 WorkerInvocation 与 ExecutionPlan**
+1. **强类型 WorkerInvocation 与结果契约**
    - Coordinator 只提出 `InvocationProposal`（调用提议），内容为 Worker 和 Run Kind。
    - Harness 生成不可变 `WorkerInvocation`，冻结输入、允许 operation、Skill 和成功契约。
+   - 确定性 Success Contract 只有在业务条件满足时才产生 `VerifiedOutcome`（已验证业务结果）。
+
+2. **ExecutionPlan 与受控执行生命周期**
    - 使用 `ExecutionPlan` 表达 `resume.generate_optimized_resume → asset.register_outputs` 的依赖。
    - `asset.register_outputs` 只有取得上游已验证的 `verified_html_deliveries` 后才能物化 Invocation 并进入 ready。
+   - Session、Gate、operation 授权和产物索引进入同一受控生命周期。
 
-2. **全局失败机制**
+3. **全局失败机制**
    - 所有有业务意义的 operation 统一返回 Success、BusinessOutcome 或 Failure。
    - 由 OperationPolicyRegistry 按 operation 类型、错误码和幂等能力决定重试、核对、降级或失败。
    - Worker Run 同时检查已知 operation 事实和整体 Success Contract。
@@ -127,8 +131,10 @@ flowchart TD
 
 相关设计与实施计划：
 
-- [强类型 WorkerInvocation 与 ExecutionPlan Spec](docs/superpowers/specs/2026-07-23-typed-worker-invocation-execution-plan-design.md)
-- [强类型 WorkerInvocation 与 ExecutionPlan Plan](docs/superpowers/plans/2026-07-23-typed-worker-invocation-execution-plan.md)
+- [强类型 WorkerInvocation 与结果契约 Spec](docs/superpowers/specs/2026-07-23-typed-worker-invocation-contract-design.md)
+- [强类型 WorkerInvocation 与结果契约 Plan](docs/superpowers/plans/2026-07-23-typed-worker-invocation-contract.md)
+- [ExecutionPlan 与受控执行生命周期 Spec](docs/superpowers/specs/2026-07-23-execution-plan-controlled-lifecycle-design.md)
+- [ExecutionPlan 与受控执行生命周期 Plan](docs/superpowers/plans/2026-07-23-execution-plan-controlled-lifecycle.md)
 - [全局失败机制 Spec](docs/superpowers/specs/2026-07-23-global-failure-mechanism-design.md)
 - [全局失败机制 Plan](docs/superpowers/plans/2026-07-23-global-failure-mechanism.md)
 
