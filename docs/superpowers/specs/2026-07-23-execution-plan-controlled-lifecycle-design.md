@@ -71,9 +71,10 @@
 | 模块接口 | 含义 | 作用 |
 |----------|------|------|
 | `ExecutionPlanBuilder.build()` | 计划构建接口 | 将合法 Proposal 和 Session 投影转换为完整 Plan 或结构化拒绝 |
+| `InvocationRequestBinder.bind()` | 调用创建请求绑定接口 | 将节点身份、目标、完整输入和原始控制快照组合成前置契约定义的唯一创建请求 |
 | `ExecutionPlanExecutor.advance()` | 计划推进接口 | 验证新节点结果、持久化到 Plan 并物化满足依赖的下游 Invocation |
 | `ExecutionPlanExecutor.claim_next()` | 节点认领接口 | 原子绑定唯一 Worker Run 身份并生成不可变 dispatch |
-| `OperationRegistry.resolve()` | operation 解析接口 | 返回唯一冻结 Definition/handler 绑定 |
+| `OperationRegistry.resolve()` | operation 解析接口 | 校验 `operation_name + purpose` 并返回唯一冻结 Definition/handler 绑定 |
 | `ExecutionPlanRequestService.handle()` | 请求事务接口 | 加载 Session 聚合、运行 Turn/Resume Handler、CAS 提交并返回已提交结果 |
 | `OutputIndexStore` | 产物索引接口 | 管理稳定 output_id、全局版本和幂等登记/删除 |
 
@@ -104,14 +105,16 @@ API、页面和测试都只通过这些接口，不预读内部 Store 或拼装�
 | 字段 | 含义 | 作用 |
 |------|------|------|
 | `node_id` | 节点编号 | 关联依赖、结果、Worker Run 和 Trace |
-| `definition_id` | 动作定义编号 | 证明节点使用哪个前置 Definition |
-| `worker_id` / `run_kind` | 具体动作 discriminator | 缩窄 PreparedInput 和后续 Invocation 类型 |
 | `goal` | 本节点业务目标 | 向 Worker 说明动作，不代替控制字段 |
 | `prepared_inputs` | 深冻结准备输入 | 保存 Plan 创建时已有事实 |
 | `required_outcomes` | 依赖结果集合 | 指定来源节点、绑定函数和最小数量 |
-| 能力与契约快照 | operation、Skill、执行策略、Contract、Judge 模式 | 防止运行中 Registry 变化改写已批准节点 |
+| `control_snapshot: WorkerRunControlSnapshot` | 前置 Registry 生成的完整动作控制快照 | 原样保存 Definition 身份、operation capability/purpose、Skill、执行策略、Adapter、Contract 与 Judge 模式，防止运行中事实漂移 |
+
+`control_snapshot` 必须直接来自前置 `WorkerInvocationRegistry.prepare()` 的成功结果。Node Spec 不拆分、重建或逐项覆盖该快照；`definition_id`、`worker_id`、`run_kind` 等控制身份只从快照读取，不在 Node Spec 中建立第二份存储事实。
 
 存在 RequiredOutcome 的节点在 Plan 创建时只能保存 Node Spec，`invocation=None`；不得构造输入不完整的 Invocation。
+
+`InvocationRequestBinder.bind(spec, inputs)`（调用创建请求绑定函数）只使用 `spec.node_id + spec.goal + inputs + spec.control_snapshot` 构造 `InvocationCreationRequest[WorkerInput]`。`node_id` 是节点编号，用于绑定 Plan 节点；`goal` 是业务目标，用于指导 Worker；`inputs` 是 Outcome binding 后的完整输入，用于通过具体 `input_model` 校验；`control_snapshot` 是原始控制快照，用于选择并复核同一 Definition。Binder 不生成 `invocation_id`，不重算、拆分或改写快照，也不接受调用方另传 operation、Skill、执行策略、Contract 或 Judge 字段；只有前置 `WorkerInvocationRegistry.resolve(request)` 能校验请求并生成 Invocation。
 
 ## 6. ExecutionPlan 模型
 
@@ -153,7 +156,7 @@ Plan 深冻结；调用方必须采用 Builder/Executor 返回的新 Plan，不�
 2. 用前置 Registry 创建具体 Node Spec；
 3. 由 Harness 补充依赖和 RequiredOutcome；
 4. 校验 DAG、来源节点、binding 类型、scope 和能力快照；
-5. 为无依赖节点解析 Invocation 并置为 ready；有依赖节点保持 blocked；
+5. 为无依赖节点生成完整 Input，再由 `InvocationRequestBinder` 构造 `InvocationCreationRequest` 并交给前置 Registry 解析 Invocation、置为 ready；有依赖节点保持 blocked；
 6. 返回 `PlanBuilt(plan, state_transition)` 或 `PlanBuildRejected(errors)`。
 
 拒绝结果不得携带部分 Plan，也不得提前推进阶段或写 Store。
@@ -165,7 +168,7 @@ Plan 深冻结；调用方必须采用 Builder/Executor 返回的新 Plan，不�
 - 先验证 plan/node/worker_run 身份、running 状态、重复结果和结果类型；任一错误返回原 Plan；
 - 验证通过后把结果持久化到 finished 节点；
 - 从 Plan 中读取全部历史 finished 结果完成 fan-in；
-- 只有来源节点 success 且 Outcome 名称、类型、数量满足 RequiredOutcome，才调用 binding 创建完整 Input 并通过 Registry 物化下游 Invocation；
+- 只有来源节点 success 且 Outcome 名称、类型、数量满足 RequiredOutcome，才调用 Outcome binding 创建完整 Input，再由 `InvocationRequestBinder` 使用 Node Spec 的 `node_id + goal + control_snapshot` 和该 Input 构造 `InvocationCreationRequest`，最后通过前置 Registry 物化下游 Invocation；
 - 上游失败、取消、中断或契约不满足时，下游置为 `blocked_by_upstream`；
 - `advance()` 只产生 ready 节点，不 dispatch。
 
@@ -249,12 +252,13 @@ Harness 根据当前 `SessionExecutionState` 纯计算 selectable phases 和模�
 | 字段 | 含义 | 作用 |
 |------|------|------|
 | `operation_name` | 稳定操作名称 | 关联 Tool、授权、receipt、Trace 和后续策略 |
+| `supported_purposes` | 该 operation 支持的闭合用途集合 | 让运行时解析和启动校验验证 `operation_name + purpose` 组合，而不是只验证名称 |
 | `requires_authorization` | 是否需要用户授权 | 决定执行前是否创建授权暂停状态 |
 | `durable_result_ledger_id` | 持久化账本编号 | 为有副作用 operation 提供提交结果查询与幂等重放 |
 
-`OperationRegistry.resolve(name)`（解析 operation）返回唯一冻结 `ResolvedOperation(definition, handler)`。Registry 不接受调用方临时注册 handler；`ToolRegistry` 只保存模型可见名称、角色与参数 Schema，不拥有或执行 handler。
+`OperationRegistry.resolve(operation_name, purpose)`（解析 operation 与用途）先验证 `purpose` 属于该 Operation Definition 的 `supported_purposes`，再返回唯一冻结 `ResolvedOperation(definition, handler)`。`operation_name` 是操作名称，用于选择受控能力；`purpose` 是本次业务用途，用于限制同一能力在当前动作中的合法使用场景。Registry 不接受调用方临时注册 handler；`ToolRegistry` 只保存模型可见名称、角色与参数 Schema，不拥有或执行 handler。
 
-`validate_startup()`（启动校验）验证名称唯一、每项恰有一个同名 handler、授权字段组合合法、声明的 ledger 存在且持久化，以及全部 Worker Definition 的 allowed operations 都可解析。
+`validate_startup(worker_definitions)`（启动校验）验证名称唯一、每项恰有一个同名 handler、`supported_purposes` 非空且只含闭合 `OperationPurpose`、授权字段组合合法、声明的 ledger 存在且持久化；随后遍历全部 Worker Definition 的 `operation_capabilities`，对每个 `OperationCapability.operation_name` 与其每个 `allowed_purposes` 成员验证 `OperationRegistry.resolve(operation_name, purpose)` 可解析。`allowed_operations` 只能是名称投影的只读派生属性，不能成为启动校验输入或第二份事实源。
 
 ### 10.2 DurableResultLedgerRegistry
 
@@ -345,7 +349,7 @@ API 只负责 HTTP 参数校验和 Request 构造，不预读 Session、OutputIn
 1. Builder 创建 resume Invocation 与 blocked asset Node Spec；
 2. `claim_next()` 原子认领 resume，Runner 执行；
 3. Contract 只有在 HTML delivery 确定性验证通过时产生 `VerifiedHtmlDeliveriesOutcome`；
-4. `advance()` 保存 resume 结果并通过具体 binder 创建 asset 完整 Input/Invocation；
+4. `advance()` 保存 resume 结果，通过具体 Outcome binder 创建 asset 完整 Input，再由 `InvocationRequestBinder` 使用 asset Node Spec 的 `node_id + goal + control_snapshot` 构造 `InvocationCreationRequest` 并解析 Invocation；
 5. asset 才能变为 ready 并被下一次 claim；
 6. resume failed、空 delivery、取消或中断时 asset 为 blocked_by_upstream，不创建 Worker Run、不执行 operation、不登记产物。
 
@@ -381,7 +385,7 @@ API 只负责 HTTP 参数校验和 Request 构造，不预读 Session、OutputIn
 ## 16. 验收标准
 
 1. Plan Builder 只返回完整 Plan 或结构化拒绝，不发布 partial/invalid Plan。
-2. 所有依赖使用具体 OutcomeBinding；没有动态字段写入或从摘要/default 补结果。
+2. 所有依赖使用具体 OutcomeBinding；`ExecutionPlanNodeSpec` 原样保存完整 `WorkerRunControlSnapshot`，`InvocationRequestBinder` 只用 `node_id + goal + inputs + control_snapshot` 构造前置契约定义的 `InvocationCreationRequest`；没有动态字段写入、快照重建或从摘要/default 补结果。
 3. `advance()` 先验证后持久化，fan-in 从 Plan 历史读取；错误输入返回原 Plan。
 4. `claim_next()` 是 ready→running、worker_run_id 绑定和 dispatch 的唯一接口，一次只有一个节点 running。
 5. Runner/后续 RunEngine 完整消费 PlanDispatch，Plan/节点/Worker Run 身份端到端不变。
@@ -395,7 +399,7 @@ API 只负责 HTTP 参数校验和 Request 构造，不预读 Session、OutputIn
 13. `market.start_research` 只有经 Contract 验证的 JobAcceptedOutcome 才让当前节点 success；后台 Job 独立运行。
 14. 临时 PlanResultPresenter 不消费旧 summary，且不把非 success 终态呈现为成功。
 15. `strategy.career_plan`、`list_type="plan"` 旁路和 legacy Adapter 不存在。
-16. 启动校验阻止 Definition、Prompt、Skill、operation、handler、ledger 或 Adapter 目录不完整的应用启动。
+16. 启动校验逐项消费全部 Definition 的 `operation_capabilities`，验证每个 `operation_name + purpose` 都可由唯一 OperationRegistry 解析，并阻止 Definition、Prompt、Skill、operation、handler、ledger 或 Adapter 目录不完整的应用启动。
 17. 定向测试、全部非 LLM 后端测试、完整 Pyright 和前端构建通过；失败、跳过和未执行项如实记录。
 18. 新系统从干净 DATA_DIR 验收，不读取或迁移旧 Session/Task/Artifact/Output 数据。
 19. 没有提前实现 Failure 分类、重试、Judge、最终 Run 聚合、授权 TTL 或 Trace exactly-once。

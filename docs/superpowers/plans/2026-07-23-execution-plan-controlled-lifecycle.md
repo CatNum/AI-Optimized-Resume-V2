@@ -35,9 +35,10 @@
 | seam | 验证目标 |
 |------|----------|
 | `ExecutionPlanBuilder.build()` | 合法 Proposal 如何形成完整 Plan，非法输入如何整体拒绝 |
+| `InvocationRequestBinder.bind()` | Node Spec 与完整 Input 如何形成前置契约唯一的 Invocation 创建请求 |
 | `ExecutionPlanExecutor.advance()` | 新结果如何验证、持久化、fan-in 和物化下游 |
 | `ExecutionPlanExecutor.claim_next()` | 唯一节点如何原子认领并生成 dispatch |
-| `OperationRegistry.resolve()/validate_startup()` | operation、授权、ledger 与 handler 是否唯一绑定 |
+| `OperationRegistry.resolve()/validate_startup()` | `operation_name + purpose`、授权、ledger 与 handler 是否唯一绑定 |
 | `run_execution_plan_turn()` / Resume Handler | 无持久化 Turn/Resume 如何形成闭合 transition |
 | `ExecutionPlanRequestService.handle()` | Session 聚合如何加载、提交并返回已提交结果 |
 | SessionStore 命名 CAS | 授权、claim、receipt、恢复、reject 和重启收敛是否幂等 |
@@ -132,17 +133,19 @@ config/workers.registry.json
 
 - Builder 创建 resume ready Invocation 与 asset blocked Node Spec；
 - asset 在 delivery Outcome 绑定前 `invocation=None`；
+- 每个 Node Spec 原样保存前置 `prepare()` 返回的完整 `WorkerRunControlSnapshot`，不拆分、重算或逐项覆盖控制字段；
 - `RequiredOutcome` 只保存 source node、binding ID 和 minimum，不使用目标字段字符串；
+- `InvocationRequestBinder` 只使用 `node_id + goal + inputs + control_snapshot` 构造 `InvocationCreationRequest`，不接受 `invocation_id` 或调用方另传的 operation、Skill、执行策略、Contract/Judge 字段；
 - 空 delivery、错误来源节点、错误 Outcome 类型或跨 Plan 结果不能物化 asset；
 - `PlanBuildRejected` 不携带 partial Plan，也不推进阶段。
 
 ### Step 2: 实现泛型 OutcomeBinding 和 Node Spec
 
-实现 `OutcomeBinding[TOutcome, TPrepared, TInput]`、`RequiredOutcome` 与 15 个具体 Node Spec。binding 是纯函数，创建新 Input，不修改 PreparedInput/Outcome。
+实现 `OutcomeBinding[TOutcome, TPrepared, TInput]`、`RequiredOutcome`、`InvocationRequestBinder` 与 15 个具体 Node Spec。Outcome binding 是纯函数，创建新 Input，不修改 PreparedInput/Outcome；Node Spec 原样保存完整 `WorkerRunControlSnapshot`；`InvocationRequestBinder.bind(spec, inputs)` 使用 `spec.node_id`（节点编号，用于绑定 Plan 节点）、`spec.goal`（业务目标，用于指导 Worker）、`inputs`（完整输入，用于具体模型校验）和 `spec.control_snapshot`（原始动作控制快照，用于选择并复核 Definition）构造前置模块定义的 `InvocationCreationRequest`，不生成 `invocation_id`，也不拆分或重建快照。
 
 ### Step 3: 实现 PlanBuilder
 
-Builder 消费 Proposal、SessionRoutingFacts 和前置 Registry；Harness 代码补依赖、scope 和 binding。无依赖节点物化 Invocation 并 ready，有依赖节点保持 blocked。
+Builder 消费 Proposal、SessionRoutingFacts 和前置 Registry；Harness 代码补依赖、scope 和 binding。无依赖节点先形成完整 Input，再用 `InvocationRequestBinder` 构造 `InvocationCreationRequest` 并交给前置 Registry 物化 Invocation、置为 ready；有依赖节点保持 blocked。
 
 ### Step 4: 写 advance/claim 红灯测试
 
@@ -151,6 +154,7 @@ Builder 消费 Proposal、SessionRoutingFacts 和前置 Registry；Harness 代�
 - `advance()` 只接受本批新结果，fan-in 从 Plan 已完成节点读取；
 - plan/node/worker_run/mapping key/running 状态/重复结果任一错配返回原 Plan；
 - 上游 success 且 Outcome 兼容时下游物化并 ready；其他终态下游 blocked_by_upstream；
+- 下游物化严格按 Outcome binding 生成 Input → `InvocationRequestBinder` 以 `node_id + goal + inputs + control_snapshot` 生成 `InvocationCreationRequest` → 前置 Registry 解析 Invocation 的顺序执行；
 - `advance()` 不返回 dispatch；
 - `claim_next()` 原子执行唯一 ready→running、绑定未使用 worker_run_id 并返回同一结果中的新 Plan/PlanDispatch；
 - 已有 running 节点时不能认领第二个节点。
@@ -185,15 +189,15 @@ cd backend && uv run pyright typecheck/worker_invocation_contracts.py
 
 验证：
 
-- `resolve(name)` 返回唯一冻结 Definition/handler；未知名称拒绝；
+- `resolve(operation_name, purpose)` 返回唯一冻结 Definition/handler；未知名称、未知 purpose 或不支持的名称/用途组合拒绝；
 - 名称重复、缺 handler、多 handler、授权字段非法、ledger 缺失或非持久化时启动校验失败；
-- 全部 Worker Definition 的 allowed operations 都能解析；
+- 遍历全部 Worker Definition 的 `operation_capabilities`，每个 `operation_name` 与每个 `allowed_purposes` 成员都能作为 `operation_name + purpose` 组合解析；不以派生的 `allowed_operations` 代替用途校验；
 - ToolRegistry 只保存模型 Schema，不保存或执行 handler；
 - durable ledger 只查询/保存已提交规范化结果，不拥有首次副作用执行权。
 
 ### Step 2: 实现 OperationRegistry 与 ledger Adapter
 
-将现有业务 handler 注册到代码 Registry。调用方只能传 operation request，不能临时传 handler。为有副作用 operation 配置 durable ledger；读操作按定义明确无 ledger。
+将现有业务 handler 注册到代码 Registry，并为每项 Operation Definition 声明闭合 `supported_purposes`。调用方只能传包含 `operation_name + purpose` 的 operation request，不能临时传 handler。Registry 在返回 handler 前验证用途受支持；为有副作用 operation 配置 durable ledger，读操作按定义明确无 ledger。
 
 ### Step 3: 写并实现 delegate_invocation
 
@@ -448,7 +452,7 @@ cd web && npm run build
 应用启动前验证：
 
 - 15 个 Definition/Prompt/Skill/Contract/Adapter 完整；
-- 全部 allowed operation 可由唯一 OperationRegistry 解析；
+- 全部 Definition 的 `operation_capabilities` 均被遍历，每个 `operation_name + purpose` 组合可由唯一 OperationRegistry 解析；`allowed_operations` 只允许作为只读名称投影，不参与启动校验；
 - 每项 operation 恰有一个 handler，授权与 ledger 组合合法；
 - OutputIndex、Session 聚合和 DATA_DIR writer lease 配置可用；
 - 任一失败阻止启动，不降级到旧路径。
@@ -468,7 +472,7 @@ cd web && npm run build
 ```bash
 rg -n 'pending_workers|current_worker_id|runner\(worker_id|build_stub_worker_runner\(|workers\.registry\.json|get_litellm_tools_for_worker' backend config
 rg -n 'WORKER_SCHEMAS|validate_structured_output|enhance_worker_summary_with_llm|user_visible_summary|session_state: dict\[str, Any\]' backend/career_os
-rg -n 'target_input_field|inputs: BaseModel|verified_outcomes: Mapping\[str, Any\]|OutcomeBinding\[Any' backend/career_os/platform/worker backend/typecheck
+rg -n 'target_input_field|inputs: BaseModel|verified_outcomes: Mapping\[str, Any\]|OutcomeBinding\[Any|allowed_operations\s*[:=]' backend/career_os/platform/worker backend/typecheck
 rg -n 'handler[=:]|ToolDefinition\([^)]*handler|ToolRegistry.*execute' backend/career_os/platform/tool
 rg -n 'TaskStore|platform\.store\.task|list_type="plan"|LegacyCareerPlanAdapter' backend/career_os web/src backend/tests
 rg -n 'view\?path|encoded_path|attachment\.path|delivery_id|delete_output\([^)]*path' web/src backend/career_os backend/tests
@@ -502,9 +506,9 @@ cd web && npm run build
 ## Completion Criteria
 
 1. 前置 15 类契约通过唯一 ExecutionPlan 主链投入运行。
-2. Plan Builder、advance、claim、dispatch 和 Outcome binding 满足设计规格。
+2. Plan Builder、advance、claim、dispatch 和 Outcome binding 满足设计规格；Node Spec 原样保存 `WorkerRunControlSnapshot`，Binder 通过 `node_id + goal + inputs + control_snapshot` 构造唯一 `InvocationCreationRequest`。
 3. Coordinator、Session、Gate、授权、API、SSE 与前端只使用新类型化接口。
-4. OperationRegistry、ledger、handler 和 Tool Schema 各自职责唯一，无第二执行 seam。
+4. OperationRegistry、ledger、handler 和 Tool Schema 各自职责唯一；启动校验消费 `operation_capabilities` 并逐项验证 `operation_name + purpose`，无第二执行 seam。
 5. OutputIndex 使用稳定 output_id、全局版本和幂等删除 receipt。
 6. 旧字符串队列、旧 Runner、旧 Task/Session 事实、路径产物身份和 legacy 纯规划旁路删除。
 7. 全部非 LLM 测试、Pyright 和前端构建通过，或如实记录阻塞；未通过不得称为完成。
