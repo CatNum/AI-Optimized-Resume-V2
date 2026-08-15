@@ -1,17 +1,19 @@
-# 全局失败机制设计规格
+# 全局失败机制设计规格（暂不实现）
 
 | 属性 | 内容 |
 |------|------|
-| 状态 | **已确认，实施计划已编写** |
+| 状态 | **暂不实现** |
 | 版本 | **1.3.0** |
 | 日期 | 2026-07-23 |
-| 直接前置规格 | [ExecutionPlan 与受控执行生命周期](./2026-07-23-execution-plan-controlled-lifecycle-design.md) |
-| 传递前置规格 | [强类型 WorkerInvocation 与结果契约](./2026-07-23-typed-worker-invocation-contract-design.md) |
+| 直接前置规格 | [ExecutionPlan 与受控执行生命周期（暂不实现）](./2026-07-23-execution-plan-controlled-lifecycle-design-暂不实现.md) |
+| 传递前置规格 | [强类型 WorkerInvocation 与结果契约（暂不实现）](./2026-07-23-typed-worker-invocation-contract-design-暂不实现.md) |
 | 适用范围 | Operation、Worker Run、Turn Run、Job Run、Gate、Trace、SSE、用户错误呈现与本地审计 |
-| 实施计划 | [全局失败机制 Implementation Plan](../plans/2026-07-23-global-failure-mechanism.md) |
+| 实施计划 | [全局失败机制 Implementation Plan（暂不实现）](../plans/2026-07-23-global-failure-mechanism-暂不实现.md) |
 | 领域语言 | [CONTEXT.md](../../../CONTEXT.md) |
 
 ---
+
+> **暂不实现：** 本文仅保留历史设计讨论，不作为当前版本的实施依据。未经重新评审和用户明确确认，不得据此启动代码改造。
 
 ## 1. 背景与现场证据
 

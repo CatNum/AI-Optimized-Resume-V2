@@ -1,14 +1,14 @@
-# 强类型 WorkerInvocation 与结果契约 Implementation Plan
+# 强类型 WorkerInvocation 与结果契约 Implementation Plan（暂不实现）
 
-> **状态：已确认，待实施。** 本 Plan 是一次性系统重写的第一阶段，只交付可独立验收的契约模块，不要求聊天主链在本阶段结束时可运行。
+> **状态：暂不实现。** 本 Plan 仅保留历史实施讨论，不作为当前版本的执行清单。未经重新评审和用户明确确认，不得按本文任务修改代码。
 
 **Goal:** 为全部 15 个 Run Kind 建立不可变 `WorkerInvocation`、闭合业务输出和确定性 Success Contract，并统一 required Skill 预加载与 Worker Runner seam。
 
 **Architecture:** `WorkerInvocationRegistry` 是 Definition 解析与 Invocation 创建的深模块；`DeterministicSuccessContractRegistry` 是业务结果验收的深模块；`RequiredSkillPreloader` 在 Runner 前强制加载必需 Skill；统一 Runner 只消费 `WorkerInvocation + WorkerRuntimeContext`。真实 operation 执行通过注入的 `HarnessOperationInvoker` 端口，OperationRegistry、授权和持久化由第二阶段实现。
 
-**Design SSOT:** `../specs/2026-07-23-typed-worker-invocation-contract-design.md`
+**Design SSOT:** `../specs/2026-07-23-typed-worker-invocation-contract-design-暂不实现.md`
 
-**Direct successor:** `2026-07-23-execution-plan-controlled-lifecycle.md`
+**Direct successor:** `2026-07-23-execution-plan-controlled-lifecycle-暂不实现.md`
 
 ---
 

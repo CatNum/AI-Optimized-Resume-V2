@@ -1,6 +1,8 @@
-# 全局失败机制 Implementation Plan
+# 全局失败机制 Implementation Plan（暂不实现）
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` to implement this plan task-by-task. Each vertical slice follows red → green and uses checkbox (`- [ ]`) syntax for tracking.
+> **状态：暂不实现。** 本 Plan 仅保留历史实施讨论，下方 agentic worker 执行指令当前不生效。未经重新评审和用户明确确认，不得按本文任务修改代码。
+
+> **历史执行指令（当前禁用）：** 原计划要求使用 `superpowers:executing-plans` 逐项执行，并按 red → green 和复选框跟踪；在本文恢复实施前，该指令不得触发任何代码修改。
 
 **Goal:** 建立覆盖同步 Worker Run、Turn Run 和后台 Job Run 的全局失败机制，使所有有业务意义的 operation 使用确定性结果、错误分类和策略，并通过 operation 事实、结果契约前置计划的泛型 `ContractEvaluation[VerifiedOutcome]` 与可选 Judge 判断真实完成状态，同时保留结果契约建立的 Invocation/Outcome 和受控生命周期建立的 binder 静态类型关系。
 
@@ -8,13 +10,13 @@
 
 **Tech Stack:** Python 3.11、Pydantic 2、LangGraph、LiteLLM、FastAPI SSE、pytest、本地 JSON/JSONL Store
 
-**Design SSOT:** `../specs/2026-07-23-global-failure-mechanism-design.md`
+**Design SSOT:** `../specs/2026-07-23-global-failure-mechanism-design-暂不实现.md`
 
-**Required direct predecessor:** `2026-07-23-execution-plan-controlled-lifecycle.md` 已全部实施并通过，且已提供强类型 OutcomeBinding、原子 `PlanDispatch`、闭合 `PlanNodeResult`/`PlanAdvanceResult`、唯一 `OperationRegistry`，以及单次 operation 的活动快照、confirmation、claim 和 committed receipt 状态机。
+**Required direct predecessor:** `2026-07-23-execution-plan-controlled-lifecycle-暂不实现.md`；当前未满足实施前置。
 
-**Required transitive predecessor:** `2026-07-23-typed-worker-invocation-contract.md` 已全部实施并通过，且已提供闭合 `WorkerInvocation`/`VerifiedOutcome` 联合、唯一 `DeterministicSuccessContractRegistry`、泛型 `ContractEvaluation[TOutcome]`、统一 Runner、暂停现场和闭合 continuation。
+**Required transitive predecessor:** `2026-07-23-typed-worker-invocation-contract-暂不实现.md`；当前未满足实施前置。
 
-**Status:** 待实现
+**Status:** 暂不实现
 
 ---
 

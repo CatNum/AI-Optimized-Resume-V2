@@ -1,16 +1,18 @@
-# 强类型 WorkerInvocation 与结果契约设计规格
+# 强类型 WorkerInvocation 与结果契约设计规格（暂不实现）
 
 | 属性 | 内容 |
 |------|------|
-| 状态 | **已确认，待实施** |
+| 状态 | **暂不实现** |
 | 版本 | **1.0.0** |
 | 日期 | 2026-07-23 |
-| 直接后续规格 | [ExecutionPlan 与受控执行生命周期](./2026-07-23-execution-plan-controlled-lifecycle-design.md) |
-| 后续系统规格 | [全局失败机制](./2026-07-23-global-failure-mechanism-design.md) |
-| 实施计划 | [强类型 WorkerInvocation 与结果契约 Implementation Plan](../plans/2026-07-23-typed-worker-invocation-contract.md) |
+| 直接后续规格 | [ExecutionPlan 与受控执行生命周期（暂不实现）](./2026-07-23-execution-plan-controlled-lifecycle-design-暂不实现.md) |
+| 后续系统规格 | [全局失败机制（暂不实现）](./2026-07-23-global-failure-mechanism-design-暂不实现.md) |
+| 实施计划 | [强类型 WorkerInvocation 与结果契约 Implementation Plan（暂不实现）](../plans/2026-07-23-typed-worker-invocation-contract-暂不实现.md) |
 | 领域语言 | [CONTEXT.md](../../../CONTEXT.md) |
 
 ---
+
+> **暂不实现：** 本文仅保留历史设计讨论，不作为当前版本的实施依据。未经重新评审和用户明确确认，不得据此启动代码改造。
 
 ## 1. 背景与问题
 

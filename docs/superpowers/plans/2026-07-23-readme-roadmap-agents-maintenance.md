@@ -231,12 +231,12 @@ test -e docs/参考文档.md
 - Create: `docs/roadmap/v2.1.md`
 - Create: `docs/roadmap/v2.2.md`
 - Reference: `README.md`
-- Reference: `docs/superpowers/specs/2026-07-23-typed-worker-invocation-contract-design.md`
-- Reference: `docs/superpowers/specs/2026-07-23-execution-plan-controlled-lifecycle-design.md`
-- Reference: `docs/superpowers/specs/2026-07-23-global-failure-mechanism-design.md`
-- Reference: `docs/superpowers/plans/2026-07-23-typed-worker-invocation-contract.md`
-- Reference: `docs/superpowers/plans/2026-07-23-execution-plan-controlled-lifecycle.md`
-- Reference: `docs/superpowers/plans/2026-07-23-global-failure-mechanism.md`
+- Reference: `docs/superpowers/specs/2026-07-23-typed-worker-invocation-contract-design-暂不实现.md`
+- Reference: `docs/superpowers/specs/2026-07-23-execution-plan-controlled-lifecycle-design-暂不实现.md`
+- Reference: `docs/superpowers/specs/2026-07-23-global-failure-mechanism-design-暂不实现.md`
+- Reference: `docs/superpowers/plans/2026-07-23-typed-worker-invocation-contract-暂不实现.md`
+- Reference: `docs/superpowers/plans/2026-07-23-execution-plan-controlled-lifecycle-暂不实现.md`
+- Reference: `docs/superpowers/plans/2026-07-23-global-failure-mechanism-暂不实现.md`
 
 - [ ] **Step 1: 创建 roadmap 目录**
 

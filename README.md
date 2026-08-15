@@ -456,8 +456,8 @@ SSE 完成路径调用 `end_chat` 清除标记，尚未用 `finally` 覆盖异�
 
 - **本地优先，不是生产级 SaaS。** 会话、档案、任务、Trace 和 HTML 产物保存在本地隔离环境；当前不承诺多租户、云端高可用、灾备、计费或生产
   SLO。
-- **强类型调用待实施。** Coordinator 当前主要以 Worker 标识和自然语言目标组织调用，尚未由强类型契约封闭业务动作、必需输入、允许操作和成功条件。
-- **全局失败机制待实施。** 当前没有统一覆盖 Worker、Turn 和后台 Job 的失败分类、传播、重试、降级、部分成功与用户错误呈现，不能因最后一段自然语言回复正常就推断整条链路成功。
+- **强类型调用暂不实现。** Coordinator 当前主要以 Worker 标识和自然语言目标组织调用；相关强类型改造方案仅保留历史设计，不属于当前开发执行队列。
+- **全局失败机制暂不实现。** 当前没有统一覆盖 Worker、Turn 和后台 Job 的失败分类、传播、重试、降级、部分成功与用户错误呈现；相关重写方案仅保留历史设计，不能作为当前实现能力或执行依据。
 - **同一 Session 的异常清理尚未闭环。** `ChatOrchestrator`（聊天运行协调器）使用进程内 `_active_runs`（活动会话运行表）阻止同一
   Session 并发；但 `_chat_stream`（处理单轮聊天流的函数）只在正常完成路径调用 `end_chat`（清除活动运行标记的函数），尚未使用
   `finally`（无论成功或异常都会执行的收尾块）覆盖 SSE 中断或 LLM 异常。发生异常后，当前可能需要重启进程才能解除运行标记。
@@ -470,24 +470,23 @@ SSE 完成路径调用 `end_chat` 清除标记，尚未用 `finally` 覆盖异�
 - **浏览器与真实 LLM 依赖外部环境。** 市场调研依赖本机可见 Chrome、站点登录状态、页面结构、验证码和网络；真实 LLM 推理依赖有效
   Key、Provider 可用性和外部服务质量，失败时只能如实记录，不能以 mock 结果替代。
 
-### 10.2 v2.2 当前开发方向
+### 10.2 v2.2 暂缓方向
 
-[v2.2（开发中）](docs/roadmap/v2.2.md) 是当前产品版本，按以下顺序推进，不自动吸收长期候选项：
+[v2.2](docs/roadmap/v2.2.md) 原计划按以下顺序推进，但三个阶段现均标记为“暂不实现”。相关文档仅保留历史设计参考，不属于当前开发执行队列：
 
-1. **先实施强类型 WorkerInvocation 与结果契约。** `WorkerInvocation`（Worker 结构化调用契约）用于冻结单次业务动作、输入、权限与成功契约；
-   `VerifiedOutcome`（已验证业务结果）用于阻止下游从自然语言摘要或默认值猜测结果。依据为[设计规格](docs/superpowers/specs/2026-07-23-typed-worker-invocation-contract-design.md)
-   和[实施计划](docs/superpowers/plans/2026-07-23-typed-worker-invocation-contract.md)。
-2. **再实施 ExecutionPlan 与受控执行生命周期。** `ExecutionPlan`（执行计划）用于保存节点、依赖、顺序和已验证结果，并统一 Session、Gate、operation 授权与产物索引。依据为[设计规格](docs/superpowers/specs/2026-07-23-execution-plan-controlled-lifecycle-design.md)
-   和[实施计划](docs/superpowers/plans/2026-07-23-execution-plan-controlled-lifecycle.md)。
-3. **再实施全局失败机制。**
-   统一失败分类、状态传播、策略执行、证据关联与用户错误呈现，依据为[设计规格](docs/superpowers/specs/2026-07-23-global-failure-mechanism-design.md)
-   和[实施计划](docs/superpowers/plans/2026-07-23-global-failure-mechanism.md)。
-4. **之后规划并实施纯规划链的最小 pipeline 改造。** 只有前三项完成实现和验证后，才单独形成纯规划链的 Spec/Plan，并让它复用同一
+1. **强类型 WorkerInvocation 与结果契约（暂不实现）。** `WorkerInvocation`（Worker 结构化调用契约）原计划用于冻结单次业务动作、输入、权限与成功契约；
+   `VerifiedOutcome`（已验证业务结果）原计划用于阻止下游从自然语言摘要或默认值猜测结果。保留的[设计规格](docs/superpowers/specs/2026-07-23-typed-worker-invocation-contract-design-暂不实现.md)
+   和[实施计划](docs/superpowers/plans/2026-07-23-typed-worker-invocation-contract-暂不实现.md)当前均不得作为实施依据。
+2. **ExecutionPlan 与受控执行生命周期（暂不实现）。** `ExecutionPlan`（执行计划）原计划用于保存节点、依赖、顺序和已验证结果，并统一 Session、Gate、operation 授权与产物索引。保留的[设计规格](docs/superpowers/specs/2026-07-23-execution-plan-controlled-lifecycle-design-暂不实现.md)
+   和[实施计划](docs/superpowers/plans/2026-07-23-execution-plan-controlled-lifecycle-暂不实现.md)当前均不得作为实施依据。
+3. **全局失败机制（暂不实现）。**
+   原计划统一失败分类、状态传播、策略执行、证据关联与用户错误呈现；保留的[设计规格](docs/superpowers/specs/2026-07-23-global-failure-mechanism-design-暂不实现.md)
+   和[实施计划](docs/superpowers/plans/2026-07-23-global-failure-mechanism-暂不实现.md)当前均不得作为实施依据。
+4. **纯规划链的最小 pipeline 改造同步暂缓。** 如果未来重新批准前三项并完成实现和验证，才单独形成纯规划链的 Spec/Plan，并让它复用同一
    `WorkerInvocation`、`ExecutionPlan`、Gate 和全局失败语义；当前不提前扩充 15 个闭合 Run Kind，也不建立旁路编排。
-5. **最后执行跨模块系统级回归。** 在干净临时环境证明上游失败会阻断下游、部分成功会保留真实成果、运行身份与 Trace 可以关联，并验证纯规划请求通过同一 pipeline 执行。
+5. **相关跨模块系统级回归同步暂缓。** 只有恢复并完成上述实现后，才在干净临时环境执行对应回归。
 
-上述三份 Spec 和三份 Plan 共六份依赖文档当前工作区已存在，但不由本次 README/Roadmap
-维护修改或暂存；它们由用户后续加入版本库。文档形成不代表对应业务代码已经实现。
+上述三份 Spec 和三份 Plan 共六份文档已在文件名和文档状态中标记“暂不实现”。文档仅作为历史设计材料保留，不代表当前开发方向或对应业务代码已经实现。
 
 ### 10.3 长期候选方向
 

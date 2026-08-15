@@ -108,9 +108,9 @@ flowchart TD
     G --> H["真实失败原因被覆盖"]
 ```
 
-### 修复方向
+### 暂不采用的修复方向
 
-修复分为三个顺序阶段：前两阶段共同建立受控执行基础，第三阶段统一失败语义。
+以下三个顺序阶段现均标记为“暂不实现”，仅保留历史方案参考；未经重新评审和明确确认，不得据此修改当前系统。
 
 1. **强类型 WorkerInvocation 与结果契约**
    - Coordinator 只提出 `InvocationProposal`（调用提议），内容为 Worker 和 Run Kind。
@@ -131,16 +131,16 @@ flowchart TD
 
 相关设计与实施计划：
 
-- [强类型 WorkerInvocation 与结果契约 Spec](docs/superpowers/specs/2026-07-23-typed-worker-invocation-contract-design.md)
-- [强类型 WorkerInvocation 与结果契约 Plan](docs/superpowers/plans/2026-07-23-typed-worker-invocation-contract.md)
-- [ExecutionPlan 与受控执行生命周期 Spec](docs/superpowers/specs/2026-07-23-execution-plan-controlled-lifecycle-design.md)
-- [ExecutionPlan 与受控执行生命周期 Plan](docs/superpowers/plans/2026-07-23-execution-plan-controlled-lifecycle.md)
-- [全局失败机制 Spec](docs/superpowers/specs/2026-07-23-global-failure-mechanism-design.md)
-- [全局失败机制 Plan](docs/superpowers/plans/2026-07-23-global-failure-mechanism.md)
+- [强类型 WorkerInvocation 与结果契约 Spec（暂不实现）](docs/superpowers/specs/2026-07-23-typed-worker-invocation-contract-design-暂不实现.md)
+- [强类型 WorkerInvocation 与结果契约 Plan（暂不实现）](docs/superpowers/plans/2026-07-23-typed-worker-invocation-contract-暂不实现.md)
+- [ExecutionPlan 与受控执行生命周期 Spec（暂不实现）](docs/superpowers/specs/2026-07-23-execution-plan-controlled-lifecycle-design-暂不实现.md)
+- [ExecutionPlan 与受控执行生命周期 Plan（暂不实现）](docs/superpowers/plans/2026-07-23-execution-plan-controlled-lifecycle-暂不实现.md)
+- [全局失败机制 Spec（暂不实现）](docs/superpowers/specs/2026-07-23-global-failure-mechanism-design-暂不实现.md)
+- [全局失败机制 Plan（暂不实现）](docs/superpowers/plans/2026-07-23-global-failure-mechanism-暂不实现.md)
 
 ### 验证建议
 
-两个机制全部实施后，在全局失败机制 Plan 的最终系统验收阶段使用干净临时环境增加跨模块回归测试：
+如果未来重新批准并完成三个阶段，在全局失败机制 Plan 的最终系统验收阶段使用干净临时环境增加跨模块回归测试：
 
 - [ ] 创建全新 Session 并进入 `resume_optimize`。
 - [ ] 创建 `resume.generate_optimized_resume → asset.register_outputs` ExecutionPlan。

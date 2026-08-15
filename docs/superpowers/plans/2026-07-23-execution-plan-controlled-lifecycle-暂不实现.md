@@ -1,16 +1,16 @@
-# ExecutionPlan 与受控执行生命周期 Implementation Plan
+# ExecutionPlan 与受控执行生命周期 Implementation Plan（暂不实现）
 
-> **状态：已确认，待实施。** 本 Plan 是一次性系统重写的第二阶段；完成时必须恢复完整产品主链可运行性，并成为全局失败机制的直接实施前置。
+> **状态：暂不实现。** 本 Plan 仅保留历史实施讨论，不作为当前版本的执行清单。未经重新评审和用户明确确认，不得按本文任务修改代码。
 
 **Goal:** 将前置强类型 Invocation、Outcome、Contract 和 Runner 接入唯一 ExecutionPlan 主链，统一 Session、Gate、operation 授权、产物索引、API、SSE 与前端生命周期，并删除旧事实来源。
 
 **Architecture:** `ExecutionPlanBuilder/Executor` 管理依赖、结果、推进与认领；`OperationRegistry` 管理 operation 定义与唯一 handler；`ExecutionPlanRequestService` 管理 Session 聚合事务。Coordinator 和 Handler 只返回不可变 transition，API 只构造请求，Store 只通过命名 CAS 发布状态。
 
-**Design SSOT:** `../specs/2026-07-23-execution-plan-controlled-lifecycle-design.md`
+**Design SSOT:** `../specs/2026-07-23-execution-plan-controlled-lifecycle-design-暂不实现.md`
 
-**Required predecessor:** `2026-07-23-typed-worker-invocation-contract.md` 已全部实施并通过定向测试与 Pyright，且提供完整 15 类型目录、Registry、Contract、Runner、暂停现场、continuation 和 operation 调用端口。
+**Required predecessor:** `2026-07-23-typed-worker-invocation-contract-暂不实现.md`；当前未满足实施前置。
 
-**Direct successor:** `2026-07-23-global-failure-mechanism.md`
+**Direct successor:** `2026-07-23-global-failure-mechanism-暂不实现.md`
 
 ---
 
